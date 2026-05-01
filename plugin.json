@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.9.2",
+  "version": "2.10.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -132,6 +132,17 @@
         "Envelope generator",
         "Slew limiter",
         "Function generator",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "Shift",
+      "name": "Shift",
+      "description": "4-output CV shift register with per-output step count and parallel/cascade mode. Cascade chains outputs into exponentially-slowing dividers; parallel runs each output as an independent divider on the input clock.",
+      "tags": [
+        "Sample and hold",
+        "Sequencer",
+        "Random",
         "Utility"
       ]
     }
