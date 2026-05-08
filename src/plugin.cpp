@@ -18,6 +18,7 @@ void init(Plugin* p) {
 	p->addModel(modelBeat);
 	p->addModel(modelNote);
 	p->addModel(modelSwell);
+	p->addModel(modelShift);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

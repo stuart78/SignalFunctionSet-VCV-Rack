@@ -41,6 +41,7 @@ If a WAV file contains embedded cue points, those are used as transient markers 
 
 - **Play** — green LED latch button, toggles play/stop
 - **Sync** — momentary button, resets both loops to start
+- **Rec A / Rec B** — red LED latch buttons. Click to arm; click again to stop. The LED is dim while armed but waiting for input, bright while actually recording.
 
 ## Inputs
 
@@ -61,6 +62,10 @@ If a WAV file contains embedded cue points, those are used as transient markers 
 |-------|----------|
 | **PLAY GATE** | High (>=1V) = play, overrides button |
 | **SYNC** | Trigger: reset both loops |
+| **REC A IN** | Audio input for live recording into Sample A (±5V) |
+| **REC A GATE** | Gate input. While high, Sample A is recording. Overrides the panel button when patched. |
+| **REC B IN** | Audio input for Sample B. Normalled from REC A IN — patch into A only and both buffers see the same source. |
+| **REC B GATE** | Gate input for Sample B. Normalled from REC A GATE (unless REC B's panel button is independently armed). |
 
 ## Outputs
 
@@ -87,6 +92,35 @@ Right-click menu:
 - **Clear Sample A / B** — Remove loaded sample
 - Maximum sample length: 10 minutes
 
+## Live Recording
+
+Each buffer can be recorded into directly from a patched audio source. Recording is **straight-in (replace)** — it overwrites the buffer rather than overdubbing.
+
+### How it works
+
+1. Patch an audio source into **REC A IN** (and optionally **REC B IN** for an independent source).
+2. Start recording one of two ways:
+   - **Click the REC button** on the panel. Click again to stop.
+   - **Send a gate to REC GATE.** Recording happens while the gate is high. The gate overrides the button when patched.
+3. While recording, the loop's playback is suppressed and you hear a **dry monitor passthrough** of the incoming audio at the buffer's current Pan position. No loop content plays through, so there's no risk of feedback.
+4. On stop, the loop region is reset to `0..length`, the new waveform is rendered, transient detection runs on the captured audio, and playback resumes from sample 0.
+
+### Recording length
+
+Maximum recording length is **60 seconds**. Recording auto-stops if the buffer fills.
+
+### Cascading
+
+REC B IN is normalled from REC A IN, and REC B GATE is normalled from REC A GATE. Patch a single audio source and gate into the A jacks and both buffers will record the same input simultaneously — the equivalent of the file-load cascade ("loading Sample A also loads Sample B"). Patch into B explicitly to record different sources.
+
+### Anti-click
+
+A 1ms fade-in/fade-out envelope is applied to the captured audio at the start and end of each recording, eliminating click artifacts at the boundaries.
+
+### Persistence
+
+Recorded samples are **not** saved with the patch (they can be megabytes of audio data). If you want to keep a recording, capture it to disk in your DAW or by recording the Phase output.
+
 ## Transient Detection
 
 Right-click menu controls:
@@ -107,3 +141,9 @@ Default: on. Toggle in right-click menu. Applies a 1ms fade envelope around all 
 **Transient Slicer**: Load rhythmic material. High sensitivity detection. Clock both loops from different clock dividers.
 
 **Granular Scanning**: LFO on START CV to sweep through the sample. Short LEN for small loop windows. Different LFO rates on A and B.
+
+**Live Recorded Phase**: Patch a synth voice into REC A IN. Hit Rec A, play a short phrase, click Rec A again to stop. Both buffers now hold the phrase (cascade). Set Drift A to 5-10ms, Drift B to 0ms — instant Steve Reich phasing on a live take.
+
+**Gated Loop Capture**: Patch a clock or trigger sequence into REC A GATE so each gate cycle captures a fresh loop into the buffer. With Pan opposed and small Drift, every captured loop becomes its own short phasing study.
+
+**Two-Source Tape Phase**: Patch one source into REC A IN and a different source into REC B IN. Send a shared gate to REC A GATE (B picks it up via normalling). Both buffers capture in lockstep but hold completely different material — phase drift now creates evolving counterpoint between two distinct sources.
