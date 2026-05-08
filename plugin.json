@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -138,7 +138,7 @@
     {
       "slug": "Shift",
       "name": "Shift",
-      "description": "4-output CV shift register with per-output step count and parallel/cascade mode. Cascade chains outputs into exponentially-slowing dividers; parallel runs each output as an independent divider on the input clock.",
+      "description": "4-output CV shift register. Per-lane step count, clock divider, step CV, and parallel/cascade mode (parallel = N-step delay line; cascade = tape-loop FIFO fed by the previous lane). Per-lane CV + gate outs, plus a jumble pair (random pick across lanes + accompanying clock).",
       "tags": [
         "Sample and hold",
         "Sequencer",
