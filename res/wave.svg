@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="81.28mm" height="128.69mm" viewBox="0 0 230.4 364.8">
+  <g id="Background">
+    <rect x="0" y="0" width="230.4" height="364.8" fill="#f0f0f0"/>
+  </g>
+  <g id="UI" font-family="sans-serif" fill="#444">
+    <!-- Title -->
+    <text x="115.2" y="9" text-anchor="middle" font-size="6" font-weight="bold" fill="#0097DE" letter-spacing="2">WAVE</text>
+
+    <!-- Shape param labels (row 1: knobs at y~147; place text just above CV jacks) -->
+    <text x="39.7"  y="190" text-anchor="middle" font-size="5">PEAKS</text>
+    <text x="115.2" y="190" text-anchor="middle" font-size="5">BIAS</text>
+    <text x="190.7" y="190" text-anchor="middle" font-size="5">TRANS</text>
+
+    <!-- Shape param labels (row 2: knobs at y~221) -->
+    <text x="39.7"  y="263" text-anchor="middle" font-size="5">SKEW</text>
+    <text x="115.2" y="263" text-anchor="middle" font-size="5">WIDTH</text>
+    <text x="190.7" y="263" text-anchor="middle" font-size="5">FOLD</text>
+
+    <!-- Macro row labels (knobs/buttons at y=104mm = ~295) -->
+    <text x="28.4"  y="282" text-anchor="middle" font-size="4.5">WANDER</text>
+    <text x="93.7"  y="282" text-anchor="middle" font-size="4.5">WT VEL</text>
+    <text x="153.2" y="282" text-anchor="middle" font-size="4.5">ACCEL</text>
+    <text x="194.4" y="282" text-anchor="middle" font-size="4.5">SNAP</text>
+
+    <!-- I/O row labels (jacks at y=120mm = ~340) -->
+    <text x="22.7"  y="328" text-anchor="middle" font-size="4.5">RESET</text>
+    <text x="99.2"  y="328" text-anchor="middle" font-size="4.5">V/OCT</text>
+    <text x="127.6" y="328" text-anchor="middle" font-size="4.5">FM</text>
+    <text x="156.0" y="328" text-anchor="middle" font-size="4.5">SYNC</text>
+    <text x="207.0" y="328" text-anchor="middle" font-size="4.5" fill="#EC652E">OUT</text>
+  </g>
+</svg>

@@ -21,3 +21,7 @@ extern Model* modelBeat;
 extern Model* modelNote;
 extern Model* modelSwell;
 extern Model* modelShift;
+extern Model* modelWave;
+extern Model* modelVac;
+extern Model* modelMuse;
+extern Model* modelSwing;

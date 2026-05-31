@@ -10,3 +10,11 @@
 /build
 /dep
 /dist
+dist-win/
+*.ai
+Panels.ai
+SFS.ai
+Design Files/
+Reference/
+SVG/
+~ai-*.tmp

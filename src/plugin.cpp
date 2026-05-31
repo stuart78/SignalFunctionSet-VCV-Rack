@@ -19,6 +19,10 @@ void init(Plugin* p) {
 	p->addModel(modelNote);
 	p->addModel(modelSwell);
 	p->addModel(modelShift);
+	p->addModel(modelWave);
+	p->addModel(modelVac);
+	p->addModel(modelMuse);
+	p->addModel(modelSwing);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

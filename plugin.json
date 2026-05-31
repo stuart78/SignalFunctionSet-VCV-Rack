@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.10.1",
+  "version": "2.11.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -88,7 +88,7 @@
     {
       "slug": "FugueX",
       "name": "Fugue X",
-      "description": "Expander for Fugue — per-voice steps, range, sleep, probability, S&H mode, sorted CV outputs, and per-step trigger outputs",
+      "description": "Expander for Fugue \u2014 per-voice steps, range, sleep, probability, S&H mode, sorted CV outputs, and per-step trigger outputs",
       "tags": [
         "Sequencer",
         "Expander",
@@ -145,6 +145,49 @@
         "Random",
         "Utility"
       ]
+    },
+    {
+      "slug": "Wave",
+      "name": "Wave",
+      "description": "Parametric wavetable voice. Six macro shape controls (Peaks, Bias, Transition, Skew, Width, Fold) sculpt each waveform; eight bookmark slots form a wavetable that WT INDEX scans through with adjustable morph time.",
+      "tags": [
+        "Oscillator",
+        "Waveshaper",
+        "Synth voice"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "Vac",
+      "name": "Vac",
+      "description": "Semi-stable A/R envelope with vactrol-like drift. Rise and fall each have a bipolar STAB control: each trigger samples a fresh random factor scaled exponentially by STAB, so cycle-to-cycle timing wanders without ever collapsing. Linear\u2194exponential CURVE, latching LOOP (with CV override), END trigger out.",
+      "tags": [
+        "Envelope generator",
+        "Function generator",
+        "Random",
+        "Utility"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "Muse",
+      "name": "Muse",
+      "description": "Faithful Triadex Muse sequencer port. 4 Theme + 4 Interval sliders each select one of 40 taps (counters + 31-bit XNOR-feedback shift register); Theme bits drive the SR feedback, Interval bits address a diatonic scale. External clock, V/oct + gate out, randomize button/CV, selectable scale.",
+      "tags": [
+        "Sequencer",
+        "Random"
+      ]
+    },
+    {
+      "slug": "Swing",
+      "name": "Swing",
+      "description": "Double-pendulum chaos LFO. A normalized double pendulum read three ways: bipolar X/Y tip position, six morph-crossfaded sector distance CVs, and six retriggerable boundary-ray gates. Speed and chaos controls, plus ragdoll-drag either bob on the display to relaunch the motion.",
+      "tags": [
+        "Low-frequency oscillator",
+        "Random",
+        "Utility"
+      ],
+      "hidden": true
     }
   ]
 }

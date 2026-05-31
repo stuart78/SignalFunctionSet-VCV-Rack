@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="30.48mm" height="128.5mm" viewBox="0 0 86.4 364.25">
+  <g id="Background">
+    <rect x="0" y="0" width="86.4" height="364.25" fill="#f0f0f0"/>
+  </g>
+  <g id="UI" font-family="sans-serif" fill="#444">
+    <!-- Title -->
+    <text x="43.2" y="11" text-anchor="middle" font-size="6" font-weight="bold" fill="#0097DE" letter-spacing="2">VAC</text>
+
+    <!-- Column labels above first row -->
+    <!-- Row layout: trimpot in left col (xL=7.62mm = 21.6px), CV jack in right col (xR=22.86mm = 64.8px) -->
+    <!-- Row y positions in mm: 27, 40, 53, 66, 79, 92, 105 -->
+    <!-- Convert mm to viewBox px (× 2.83): 76.5, 113.3, 150.1, 187.0, 223.8, 260.6, 297.5 -->
+
+    <text x="21.6"  y="70"  text-anchor="middle" font-size="4.5">RISE</text>
+    <text x="64.8"  y="70"  text-anchor="middle" font-size="3.5" fill="#777">CV</text>
+
+    <text x="21.6"  y="107" text-anchor="middle" font-size="4.5">RISE STAB</text>
+    <text x="64.8"  y="107" text-anchor="middle" font-size="3.5" fill="#777">CV</text>
+
+    <text x="21.6"  y="144" text-anchor="middle" font-size="4.5">FALL</text>
+    <text x="64.8"  y="144" text-anchor="middle" font-size="3.5" fill="#777">CV</text>
+
+    <text x="21.6"  y="181" text-anchor="middle" font-size="4.5">FALL STAB</text>
+    <text x="64.8"  y="181" text-anchor="middle" font-size="3.5" fill="#777">CV</text>
+
+    <text x="21.6"  y="218" text-anchor="middle" font-size="4.5">CURVE</text>
+    <text x="64.8"  y="218" text-anchor="middle" font-size="3.5" fill="#777">LOOP CV</text>
+
+    <text x="21.6"  y="254" text-anchor="middle" font-size="4.5">LOOP</text>
+    <text x="64.8"  y="254" text-anchor="middle" font-size="4.5">TRIG</text>
+
+    <!-- END / OUT row — slightly darker plate behind audio out for the "outputs are special" pattern -->
+    <rect x="50" y="285" width="29" height="29" rx="2" fill="#d8d8d8"/>
+    <text x="21.6"  y="291" text-anchor="middle" font-size="4.5">END</text>
+    <text x="64.8"  y="291" text-anchor="middle" font-size="4.5" fill="#EC652E">OUT</text>
+  </g>
+</svg>
