@@ -397,8 +397,68 @@ struct Intone : Module {
 
 // Spectrum display drawing implementation
 void IntoneDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		Widget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		// Browser-preview: hardcode the 5 vowel "ah" formant centers + bandwidths
+		// + amplitudes so the screenshot shows the characteristic spectrum.
+		float w = box.size.x;
+		float h = box.size.y;
+		const float minFreq = 50.f, maxFreq = 5000.f;
+		const float logMin = std::log10(minFreq), logMax = std::log10(maxFreq);
+		const float logRange = logMax - logMin;
+		// "Ah" vowel formants (approx): F1=730, F2=1090, F3=2440, F4=3000, F5=4000
+		const float fcs[5] = {730.f, 1090.f, 2440.f, 3000.f, 4000.f};
+		const float bws[5] = {80.f, 100.f, 130.f, 200.f, 300.f};
+		const float amps[5] = {1.0f, 0.7f, 0.4f, 0.25f, 0.15f};
+		NVGcolor formantColors[5] = {
+			nvgRGBA(100, 180, 255, 80),
+			nvgRGBA(100, 255, 180, 80),
+			nvgRGBA(255, 220, 100, 80),
+			nvgRGBA(255, 140, 100, 80),
+			nvgRGBA(255, 100, 180, 80),
+		};
+		for (int i = 0; i < 5; i++) {
+			nvgBeginPath(args.vg);
+			bool first = true;
+			for (int b = 0; b < DISPLAY_BINS; b++) {
+				float t = (float)b / (float)(DISPLAY_BINS - 1);
+				float lf = logMin + t * logRange;
+				float f = std::pow(10.f, lf);
+				float dist = (f - fcs[i]) / (bws[i] * 0.5f);
+				float val = amps[i] / (1.f + dist * dist);
+				float px = t * w;
+				float py = h - 2.f - val * (h - 4.f);
+				if (first) { nvgMoveTo(args.vg, px, py); first = false; }
+				else nvgLineTo(args.vg, px, py);
+			}
+			nvgLineTo(args.vg, w, h - 2.f);
+			nvgLineTo(args.vg, 0.f, h - 2.f);
+			nvgClosePath(args.vg);
+			nvgFillColor(args.vg, formantColors[i]); nvgFill(args.vg);
+		}
+		// Composite envelope
+		nvgBeginPath(args.vg);
+		for (int b = 0; b < DISPLAY_BINS; b++) {
+			float t = (float)b / (float)(DISPLAY_BINS - 1);
+			float lf = logMin + t * logRange;
+			float f = std::pow(10.f, lf);
+			float total = 0.f;
+			for (int i = 0; i < 5; i++) {
+				float dist = (f - fcs[i]) / (bws[i] * 0.5f);
+				total += amps[i] / (1.f + dist * dist);
+			}
+			if (total > 1.f) total = 1.f;
+			float px = t * w;
+			float py = h - 2.f - total * (h - 4.f);
+			if (b == 0) nvgMoveTo(args.vg, px, py);
+			else nvgLineTo(args.vg, px, py);
+		}
+		nvgStrokeColor(args.vg, nvgRGBA(220, 220, 255, 220));
+		nvgStrokeWidth(args.vg, 1.2f);
+		nvgStroke(args.vg);
 		return;
 	}
 

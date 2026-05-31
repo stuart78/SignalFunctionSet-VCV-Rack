@@ -34,6 +34,7 @@ struct MeterDisplay : Widget {
 	std::shared_ptr<Font> font;
 
 	void drawLayer(const DrawArgs& args, int layer) override;
+	void drawPreview(const DrawArgs& args);   // module==NULL fallback
 
 	void draw(const DrawArgs& args) override {
 		Widget::draw(args);
@@ -649,8 +650,12 @@ struct Meter : Module {
 // --- Display drawLayer ---
 
 void MeterDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		Widget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		drawPreview(args);
 		return;
 	}
 
@@ -869,6 +874,88 @@ void MeterDisplay::drawLayer(const DrawArgs& args, int layer) {
 	}
 
 	Widget::drawLayer(args, layer);
+}
+
+
+// --- Browser-preview render (module == NULL) ---
+// Shows "120.0 BPM", "4/4", "BAR 1", and a simple position tracker.
+void MeterDisplay::drawPreview(const DrawArgs& args) {
+	if (!font || font->handle < 0) {
+		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
+	}
+	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
+	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
+	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
+	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
+	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
+	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
+
+	float w = box.size.x;
+	float h = box.size.y;
+
+	if (font && font->handle >= 0) {
+		nvgFontFaceId(args.vg, font->handle);
+		float topY = h * 0.22f;
+
+		nvgFontSize(args.vg, 8.f);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		nvgFillColor(args.vg, COL_TEXT_DIM);
+		nvgText(args.vg, 5.f, topY, "120.0 BPM", NULL);
+
+		nvgFontSize(args.vg, 14.f);
+		nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+		nvgFillColor(args.vg, COL_TEXT_BRIGHT);
+		nvgText(args.vg, w * 0.5f, topY, "4/4", NULL);
+
+		nvgFontSize(args.vg, 8.f);
+		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+		nvgFillColor(args.vg, COL_TEXT_DIM);
+		nvgText(args.vg, w - 5.f, topY, "BAR 1", NULL);
+	}
+
+	// Simple per-output indicator rows (one tick per subdivision)
+	const int cells = 16;
+	float trackerY = h * 0.78f;
+	float trackerH = h * 0.18f;
+	float trackerW = w - 6.f;
+	float cellSpacing = trackerW / (float)cells;
+	float cellW = cellSpacing * 0.85f;
+
+	float indTop = h * 0.42f;
+	float indBottom = trackerY - 1.f;
+	float rowH = (indBottom - indTop) / 6.f;
+	int hitsPerRow[6] = {1, 4, 8, 16, 12, 24};   // BAR, Q, 8th, 16th, QT, 8T
+
+	for (int row = 0; row < 6; row++) {
+		float yRow = indTop + (row + 0.5f) * rowH;
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, 3.f, yRow);
+		nvgLineTo(args.vg, 3.f + trackerW, yRow);
+		nvgStrokeColor(args.vg, nvgRGBA(0x35, 0x35, 0x4D, 0x80));
+		nvgStrokeWidth(args.vg, 0.5f);
+		nvgStroke(args.vg);
+		int hits = hitsPerRow[row];
+		float tickH = std::max(rowH * 0.75f, 1.5f);
+		float tickW = 1.4f;
+		for (int i = 0; i < hits; i++) {
+			float xPos = 3.f + (i + 0.5f) * trackerW / (float)hits;
+			NVGcolor c = (i == 0 && row == 0) ? COL_ORANGE : COL_BLUE;
+			nvgBeginPath(args.vg);
+			nvgRect(args.vg, xPos - tickW * 0.5f, yRow - tickH * 0.5f, tickW, tickH);
+			nvgFillColor(args.vg, c); nvgFill(args.vg);
+		}
+	}
+
+	// Position tracker: cell 0 highlighted, beat boundaries mid-purple
+	for (int i = 0; i < cells; i++) {
+		float cx = 3.f + i * cellSpacing + (cellSpacing - cellW) * 0.5f;
+		NVGcolor c = (i == 0) ? COL_ORANGE
+			: (i % 4 == 0) ? COL_PURPLE_MID
+			: COL_PURPLE;
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, cx, trackerY, cellW, trackerH);
+		nvgFillColor(args.vg, c); nvgFill(args.vg);
+	}
 }
 
 

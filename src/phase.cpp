@@ -1547,8 +1547,49 @@ static std::vector<float> buildLiveRecMini(const std::vector<float>& buf, size_t
 }
 
 void PhaseWaveformDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		Widget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		// Browser-preview render: synthesize two stylized mini waveforms (top =
+		// blue, bottom = orange) with loop handles drawn at sensible positions
+		// so the VCV Library screenshot shows what Phase looks like loaded.
+		float w = box.size.x;
+		float h = box.size.y;
+		float halfH = h * 0.5f;
+		NVGcolor colorA = nvgRGBA(100, 180, 255, 200);
+		NVGcolor colorB = nvgRGBA(255, 140, 80, 200);
+		NVGcolor handleColorA = nvgRGBA(200, 220, 255, 255);
+		NVGcolor handleColorB = nvgRGBA(255, 200, 160, 255);
+
+		// Synthesize amplitude envelopes: A = decaying drum-like, B = sustained pad-like
+		const int N = 128;
+		std::vector<float> miniA(N), miniB(N);
+		for (int i = 0; i < N; i++) {
+			float t = (float)i / (float)(N - 1);
+			// A: percussive shape (fast attack, exp decay), with sub-detail
+			miniA[i] = std::exp(-t * 4.f) * (0.4f + 0.5f * std::sin(t * 40.f));
+			// B: sustained shape, slow envelope
+			miniB[i] = (0.6f + 0.3f * std::sin(t * 18.f)) * std::sin(t * (float)M_PI);
+		}
+		drawWaveform(args, miniA, 0, 0,     w, halfH, 0.1f, 0.85f, colorA, 0.f);
+		drawWaveform(args, miniB, 0, halfH, w, halfH, 0.05f, 0.9f, colorB, 0.f);
+		// Loop handles
+		drawHandle(args, 0.1f,  0, 0,     w, halfH, handleColorA, true);
+		drawHandle(args, 0.85f, 0, 0,     w, halfH, handleColorA, false);
+		drawHandle(args, 0.05f, 0, halfH, w, halfH, handleColorB, true);
+		drawHandle(args, 0.9f,  0, halfH, w, halfH, handleColorB, false);
+		// Playheads (mid-loop on each)
+		NVGcolor playColor = nvgRGBA(255, 255, 255, 220);
+		float pxA = 0.45f * w;
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, pxA, 0); nvgLineTo(args.vg, pxA, halfH);
+		nvgStrokeColor(args.vg, playColor); nvgStrokeWidth(args.vg, 1.5f); nvgStroke(args.vg);
+		float pxB = 0.6f * w;
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, pxB, halfH); nvgLineTo(args.vg, pxB, h);
+		nvgStrokeColor(args.vg, playColor); nvgStrokeWidth(args.vg, 1.5f); nvgStroke(args.vg);
 		return;
 	}
 

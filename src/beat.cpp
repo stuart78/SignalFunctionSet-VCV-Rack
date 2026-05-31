@@ -53,6 +53,7 @@ struct BeatDisplay : OpaqueWidget {
 	void onHoverScroll(const HoverScrollEvent& e) override;
 
 	void drawLayer(const DrawArgs& args, int layer) override;
+	void drawPreview(const DrawArgs& args);   // module==NULL fallback for browser screenshot
 	void draw(const DrawArgs& args) override {
 		// Background is drawn via SVG; only emissive layer matters here.
 		OpaqueWidget::draw(args);
@@ -729,8 +730,12 @@ void BeatDisplay::onHoverScroll(const HoverScrollEvent& e) {
 
 
 void BeatDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		OpaqueWidget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		drawPreview(args);
 		return;
 	}
 
@@ -1008,6 +1013,173 @@ void BeatDisplay::drawLayer(const DrawArgs& args, int layer) {
 	}
 
 	OpaqueWidget::drawLayer(args, layer);
+}
+
+
+// --- Browser-preview render (module == NULL) ---
+// Draws a representative populated state so the VCV Library auto-screenshot
+// shows what Beat does instead of an empty dark slab. Static, no module data.
+void BeatDisplay::drawPreview(const DrawArgs& args) {
+	computeLayout();
+	if (!font || font->handle < 0) {
+		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
+	}
+
+	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
+	const NVGcolor COL_BLUE_DARK   = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);
+	const NVGcolor COL_BLUE_LINE   = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);
+	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
+	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
+	const NVGcolor COL_PURPLE_DK   = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);
+	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
+	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
+
+	float w = box.size.x;
+	float s = w / 174.f;
+
+	// Hardcoded scene: kicks on 0/4/8/12 + ghosts on 2/10/14 + accents on 0,8.
+	const bool steps[16]   = {true,false,true,false, true,false,false,false, true,false,true,false, true,false,true,false};
+	const float vels[16]   = {1.f,0.f,0.4f,0.f, 0.85f,0.f,0.f,0.f, 1.f,0.f,0.4f,0.f, 0.85f,0.f,0.3f,0.f};
+	const bool accents[16] = {true,false,false,false, false,false,false,false, true,false,false,false, false,false,false,false};
+	const int  editMode    = 0;   // STEPS tab selected
+	const int  editPattern = 0;
+	const bool activePat[NUM_PATTERNS] = { true, true, true, true, false, false, false, false };
+	const int  editReps    = 4;
+
+	// Mode tabs
+	const char* tabLabels[4] = { "STEPS", "VEL", "ACC", "PROB" };
+	for (int i = 0; i < 4; i++) {
+		bool active = (i == editMode);
+		NVGcolor bg = active ? COL_BLUE_DARK : COL_PURPLE;
+		NVGcolor fg = active ? COL_TEXT_BRIGHT : COL_TEXT_DIM;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, tabRect[i].pos.x, tabRect[i].pos.y, tabRect[i].size.x, tabRect[i].size.y, 2.f * s);
+		nvgFillColor(args.vg, bg); nvgFill(args.vg);
+		if (font && font->handle >= 0) {
+			nvgFontFaceId(args.vg, font->handle);
+			nvgFontSize(args.vg, 9.f * s);
+			nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			nvgFillColor(args.vg, fg);
+			nvgText(args.vg, tabRect[i].pos.x + tabRect[i].size.x * 0.5f,
+				tabRect[i].pos.y + tabRect[i].size.y * 0.5f, tabLabels[i], NULL);
+		}
+	}
+
+	// Top rail (mode tabs → step grid)
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, 7.f * s, 32.f * s);
+	nvgLineTo(args.vg, 165.f * s, 32.f * s);
+	nvgStrokeColor(args.vg, COL_BLUE_LINE);
+	nvgStrokeWidth(args.vg, 1.f);
+	nvgStroke(args.vg);
+	// Stem from active tab center
+	float tabCx = tabRect[editMode].pos.x + tabRect[editMode].size.x * 0.5f;
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, tabCx, tabRect[editMode].pos.y + tabRect[editMode].size.y);
+	nvgLineTo(args.vg, tabCx, 32.f * s);
+	nvgStrokeColor(args.vg, COL_BLUE_LINE);
+	nvgStrokeWidth(args.vg, 1.f);
+	nvgStroke(args.vg);
+
+	// Step grid
+	for (int idx = 0; idx < 16; idx++) {
+		rack::math::Rect cr = cellRectForStep(idx);
+		bool stepOn = steps[idx];
+		bool beatStart = (idx % 4 == 0);
+		NVGcolor cellBg = stepOn ? COL_BLUE : (beatStart ? COL_PURPLE_MID : COL_PURPLE);
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, cr.pos.x, cr.pos.y, cr.size.x, cr.size.y, 2.f * s);
+		nvgFillColor(args.vg, cellBg); nvgFill(args.vg);
+		if (stepOn) {
+			// Velocity hint (faint white, since STEPS mode)
+			float overlayH = cr.size.y * vels[idx];
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, cr.pos.x, cr.pos.y + cr.size.y - overlayH,
+				cr.size.x, overlayH, 2.f * s);
+			nvgFillColor(args.vg, nvgRGBA(255,255,255,26));
+			nvgFill(args.vg);
+			if (accents[idx]) {
+				float r = std::min(cr.size.x, cr.size.y) * 0.39f;
+				nvgBeginPath(args.vg);
+				nvgCircle(args.vg, cr.pos.x + cr.size.x * 0.5f, cr.pos.y + cr.size.y * 0.5f, r);
+				nvgStrokeColor(args.vg, nvgRGBA(255,255,255,26));
+				nvgStrokeWidth(args.vg, 1.f * s);
+				nvgStroke(args.vg);
+			}
+		}
+	}
+
+	// Length dots — all lit (length=16)
+	for (int i = 0; i < 16; i++) {
+		const rack::math::Rect& dr = lengthDotRect[i];
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, dr.pos.x, dr.pos.y, dr.size.x, dr.size.y, 2.f * s);
+		nvgFillColor(args.vg, COL_BLUE); nvgFill(args.vg);
+	}
+
+	// PATTERN label
+	if (font && font->handle >= 0) {
+		nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, 9.f * s);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+		nvgFillColor(args.vg, COL_TEXT_BRIGHT);
+		nvgText(args.vg, 8.f * s, 103.f * s, "PATTERN", NULL);
+	}
+
+	// Pattern selector
+	for (int p = 0; p < NUM_PATTERNS; p++) {
+		const rack::math::Rect& pr = patternRect[p];
+		bool active = activePat[p];
+		bool isEdit = (p == editPattern);
+		NVGcolor bg = !active ? COL_PURPLE_DK
+			: isEdit ? COL_BLUE
+			: COL_PURPLE_MID;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, pr.pos.x, pr.pos.y, pr.size.x, pr.size.y, 2.f * s);
+		nvgFillColor(args.vg, bg); nvgFill(args.vg);
+		if (font && font->handle >= 0) {
+			nvgFontFaceId(args.vg, font->handle);
+			nvgFontSize(args.vg, 9.f * s);
+			nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			NVGcolor tc = active ? COL_TEXT_BRIGHT : COL_TEXT_DIM;
+			nvgFillColor(args.vg, tc);
+			std::string lbl = string::f("%d", p + 1);
+			nvgText(args.vg, pr.pos.x + pr.size.x * 0.5f,
+				pr.pos.y + pr.size.y * 0.42f, lbl.c_str(), NULL);
+		}
+		// Repeat-count dots
+		if (active) {
+			int reps = editReps;
+			float dotR = 0.7f * s;
+			float dotSpacing = 1.9f * s;
+			float totalW = (reps - 1) * dotSpacing;
+			float startX = pr.pos.x + pr.size.x * 0.5f - totalW * 0.5f;
+			float dotY = pr.pos.y + pr.size.y - 3.f * s;
+			for (int d = 0; d < reps; d++) {
+				nvgBeginPath(args.vg);
+				nvgCircle(args.vg, startX + d * dotSpacing, dotY, dotR);
+				nvgFillColor(args.vg, nvgRGBA(255,255,255,90));
+				nvgFill(args.vg);
+			}
+		}
+	}
+
+	// Bottom rail
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, 7.f * s, 134.5f * s);
+	nvgLineTo(args.vg, 165.f * s, 134.5f * s);
+	nvgStrokeColor(args.vg, COL_BLUE_LINE);
+	nvgStrokeWidth(args.vg, 1.f);
+	nvgStroke(args.vg);
+
+	// Repeats bar
+	for (int i = 0; i < 8; i++) {
+		const rack::math::Rect& rr = repeatsRect[i];
+		NVGcolor c = (i < editReps) ? COL_BLUE : COL_PURPLE;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, rr.pos.x, rr.pos.y, rr.size.x, rr.size.y, 2.f * s);
+		nvgFillColor(args.vg, c); nvgFill(args.vg);
+	}
 }
 
 

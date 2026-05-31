@@ -21,6 +21,7 @@ struct SwellDisplay : Widget {
 	std::shared_ptr<Font> font;
 
 	void drawLayer(const DrawArgs& args, int layer) override;
+	void drawPreview(const DrawArgs& args);   // module==NULL fallback
 	void draw(const DrawArgs& args) override { Widget::draw(args); }
 };
 
@@ -226,8 +227,12 @@ struct Swell : Module {
 // --- SwellDisplay: scope view — past trace + future projection ---
 
 void SwellDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		Widget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		drawPreview(args);
 		return;
 	}
 
@@ -367,6 +372,59 @@ void SwellDisplay::drawLayer(const DrawArgs& args, int layer) {
 	}
 
 	Widget::drawLayer(args, layer);
+}
+
+
+// --- Browser-preview render (module == NULL) ---
+// Static scope trace: a few staggered rises stacked additively, then decaying.
+void SwellDisplay::drawPreview(const DrawArgs& args) {
+	const NVGcolor COL_BLUE       = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
+	const NVGcolor COL_PURPLE_DIM = nvgRGBA(0x35, 0x35, 0x4D, 0x80);
+
+	float w = box.size.x;
+	float h = box.size.y;
+	float pad = 2.f;
+	float plotL = pad, plotR = w - pad;
+	float plotT = pad, plotB = h - pad;
+	float plotW = plotR - plotL;
+	float plotH = plotB - plotT;
+	auto yAt = [&](float v) { return plotB - clamp(v / 10.f, 0.f, 1.f) * plotH; };
+
+	// Gridlines
+	for (int t = 0; t <= 10; t += 5) {
+		nvgBeginPath(args.vg);
+		nvgMoveTo(args.vg, plotL, yAt((float)t));
+		nvgLineTo(args.vg, plotR, yAt((float)t));
+		nvgStrokeColor(args.vg, COL_PURPLE_DIM);
+		nvgStrokeWidth(args.vg, 0.5f);
+		nvgStroke(args.vg);
+	}
+
+	// Synthesize a representative envelope: 3 stacked rises decaying over time.
+	const int N = 120;
+	nvgBeginPath(args.vg);
+	for (int i = 0; i < N; i++) {
+		float t = (float)i / (float)(N - 1);   // 0..1 across scope
+		// Rises at t=0.05, 0.30, 0.55, each adds ~3V over a brief rise then decays
+		float v = 0.f;
+		auto add = [&](float t0, float amp, float riseLen, float tau) {
+			if (t < t0) return;
+			float dt = t - t0;
+			if (dt < riseLen) v += amp * (dt / riseLen);
+			else              v += amp * std::exp(-(dt - riseLen) / tau);
+		};
+		add(0.05f, 3.f, 0.03f, 0.45f);
+		add(0.30f, 3.f, 0.03f, 0.45f);
+		add(0.55f, 3.f, 0.03f, 0.45f);
+		if (v > 10.f) v = 10.f;
+		float x = plotL + plotW * t;
+		float y = yAt(v);
+		if (i == 0) nvgMoveTo(args.vg, x, y);
+		else nvgLineTo(args.vg, x, y);
+	}
+	nvgStrokeColor(args.vg, COL_BLUE);
+	nvgStrokeWidth(args.vg, 1.2f);
+	nvgStroke(args.vg);
 }
 
 
