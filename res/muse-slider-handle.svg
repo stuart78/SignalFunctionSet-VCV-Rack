@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="6" viewBox="0 0 17 6">
+  <!-- Slider handle: small dark cap on the track with a right-pointing wedge
+       so the user can see which row this slider is selecting. -->
+  <rect x="3" y="1" width="11" height="4" rx="0.8" ry="0.8" fill="#454545" stroke="#222" stroke-width="0.4"/>
+  <!-- Light + dark grip stripes (matches existing horizontal slider) -->
+  <rect x="4" y="1.4" width="0.8" height="3.2" fill="#787878"/>
+  <rect x="5.4" y="1.4" width="6" height="3.2" fill="#d4d4d4"/>
+  <rect x="11.7" y="1.4" width="0.8" height="3.2" fill="#262626"/>
+</svg>

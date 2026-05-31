@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="152.4mm" height="128.5mm" viewBox="0 0 432.00 364.25">
+  <!-- Background (SFS light panel) -->
+  <g id="Background">
+    <rect x="0" y="0" width="432.00" height="364.25" fill="#f0f0f0"/>
+  </g>
+  <g id="UI">
+    <!-- Faint concentric guide rings tying the radial jacks together -->
+    <circle cx="215.43" cy="181.42" r="138.90" fill="none" stroke="#dcdce4" stroke-width=".85"/>
+    <circle cx="215.43" cy="181.42" r="107.72" fill="none" stroke="#dcdce4" stroke-width=".85"/>
+    <!-- Dark circular display inset (widget draws the field on top) -->
+    <circle cx="215.43" cy="181.42" r="85.04" fill="#1a1a2e" stroke="#404060" stroke-width=".85"/>
+  </g>
+  <!-- Reticules: design-time control guides (invisible at runtime) -->
+  <g id="Reticules" stroke="red" fill="none" stroke-miterlimit="11.34">
+    <!-- SPEED pot + cv -->
+    <g><line x1="25.51" y1="45.35" x2="36.85" y2="45.35" stroke-width=".57"/><line x1="31.18" y1="39.68" x2="31.18" y2="51.02" stroke-width=".57"/><circle cx="31.18" cy="45.35" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="25.51" y1="76.54" x2="36.85" y2="76.54" stroke-width=".57"/><line x1="31.18" y1="70.87" x2="31.18" y2="82.21" stroke-width=".57"/><circle cx="31.18" cy="76.54" r="4.25" stroke-width=".43"/></g>
+    <!-- CHAOS pot + cv -->
+    <g><line x1="25.51" y1="119.06" x2="36.85" y2="119.06" stroke-width=".57"/><line x1="31.18" y1="113.39" x2="31.18" y2="124.73" stroke-width=".57"/><circle cx="31.18" cy="119.06" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="25.51" y1="150.24" x2="36.85" y2="150.24" stroke-width=".57"/><line x1="31.18" y1="144.57" x2="31.18" y2="155.91" stroke-width=".57"/><circle cx="31.18" cy="150.24" r="4.25" stroke-width=".43"/></g>
+    <!-- GRAV pot + cv -->
+    <g><line x1="25.51" y1="192.76" x2="36.85" y2="192.76" stroke-width=".57"/><line x1="31.18" y1="187.09" x2="31.18" y2="198.43" stroke-width=".57"/><circle cx="31.18" cy="192.76" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="25.51" y1="223.94" x2="36.85" y2="223.94" stroke-width=".57"/><line x1="31.18" y1="218.27" x2="31.18" y2="229.61" stroke-width=".57"/><circle cx="31.18" cy="223.94" r="4.25" stroke-width=".43"/></g>
+    <!-- MODE pot + cv -->
+    <g><line x1="25.51" y1="266.46" x2="36.85" y2="266.46" stroke-width=".57"/><line x1="31.18" y1="260.79" x2="31.18" y2="272.13" stroke-width=".57"/><circle cx="31.18" cy="266.46" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="25.51" y1="297.64" x2="36.85" y2="297.64" stroke-width=".57"/><line x1="31.18" y1="291.97" x2="31.18" y2="303.31" stroke-width=".57"/><circle cx="31.18" cy="297.64" r="4.25" stroke-width=".43"/></g>
+    <!-- X out -->
+    <g><line x1="394.02" y1="56.69" x2="405.36" y2="56.69" stroke-width=".57"/><line x1="399.69" y1="51.02" x2="399.69" y2="62.36" stroke-width=".57"/><circle cx="399.69" cy="56.69" r="4.25" stroke-width=".43"/></g>
+    <!-- Y out -->
+    <g><line x1="394.02" y1="130.39" x2="405.36" y2="130.39" stroke-width=".57"/><line x1="399.69" y1="124.72" x2="399.69" y2="136.06" stroke-width=".57"/><circle cx="399.69" cy="130.39" r="4.25" stroke-width=".43"/></g>
+    <!-- RADIUS out -->
+    <g><line x1="394.02" y1="204.09" x2="405.36" y2="204.09" stroke-width=".57"/><line x1="399.69" y1="198.42" x2="399.69" y2="209.76" stroke-width=".57"/><circle cx="399.69" cy="204.09" r="4.25" stroke-width=".43"/></g>
+    <!-- ANGLE out -->
+    <g><line x1="394.02" y1="277.80" x2="405.36" y2="277.80" stroke-width=".57"/><line x1="399.69" y1="272.13" x2="399.69" y2="283.47" stroke-width=".57"/><circle cx="399.69" cy="277.80" r="4.25" stroke-width=".43"/></g>
+    <!-- mandala gate ring (inner) -->
+    <g><line x1="209.76" y1="289.13" x2="221.10" y2="289.13" stroke-width=".57"/><line x1="215.43" y1="283.46" x2="215.43" y2="294.80" stroke-width=".57"/><circle cx="215.43" cy="289.13" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="303.05" y1="235.28" x2="314.39" y2="235.28" stroke-width=".57"/><line x1="308.72" y1="229.61" x2="308.72" y2="240.95" stroke-width=".57"/><circle cx="308.72" cy="235.28" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="303.05" y1="127.56" x2="314.39" y2="127.56" stroke-width=".57"/><line x1="308.72" y1="121.89" x2="308.72" y2="133.23" stroke-width=".57"/><circle cx="308.72" cy="127.56" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="209.76" y1="73.70" x2="221.10" y2="73.70" stroke-width=".57"/><line x1="215.43" y1="68.03" x2="215.43" y2="79.37" stroke-width=".57"/><circle cx="215.43" cy="73.70" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="116.48" y1="127.56" x2="127.82" y2="127.56" stroke-width=".57"/><line x1="122.15" y1="121.89" x2="122.15" y2="133.23" stroke-width=".57"/><circle cx="122.15" cy="127.56" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="116.48" y1="235.28" x2="127.82" y2="235.28" stroke-width=".57"/><line x1="122.15" y1="229.61" x2="122.15" y2="240.95" stroke-width=".57"/><circle cx="122.15" cy="235.28" r="4.25" stroke-width=".43"/></g>
+    <!-- mandala sector ring (outer) -->
+    <g><line x1="279.21" y1="301.71" x2="290.55" y2="301.71" stroke-width=".57"/><line x1="284.88" y1="296.04" x2="284.88" y2="307.38" stroke-width=".57"/><circle cx="284.88" cy="301.71" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="348.66" y1="181.42" x2="360.00" y2="181.42" stroke-width=".57"/><line x1="354.33" y1="175.75" x2="354.33" y2="187.09" stroke-width=".57"/><circle cx="354.33" cy="181.42" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="279.21" y1="61.13" x2="290.55" y2="61.13" stroke-width=".57"/><line x1="284.88" y1="55.46" x2="284.88" y2="66.80" stroke-width=".57"/><circle cx="284.88" cy="61.13" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="140.31" y1="61.13" x2="151.65" y2="61.13" stroke-width=".57"/><line x1="145.98" y1="55.46" x2="145.98" y2="66.80" stroke-width=".57"/><circle cx="145.98" cy="61.13" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="70.87" y1="181.42" x2="82.21" y2="181.42" stroke-width=".57"/><line x1="76.54" y1="175.75" x2="76.54" y2="187.09" stroke-width=".57"/><circle cx="76.54" cy="181.42" r="4.25" stroke-width=".43"/></g>
+    <g><line x1="140.31" y1="301.71" x2="151.65" y2="301.71" stroke-width=".57"/><line x1="145.98" y1="296.04" x2="145.98" y2="307.38" stroke-width=".57"/><circle cx="145.98" cy="301.71" r="4.25" stroke-width=".43"/></g>
+  </g>
+</svg>
