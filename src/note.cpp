@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "scales.hpp"
 #include <cmath>
 
 
@@ -10,53 +11,13 @@ static const int N_REPEATS  = 8;
 
 
 // --- Scale definitions ---
-// Each scale lists semitones above the root for each row index. Harmonic
-// series uses just-intonation log2(n)*12 for harmonic n=1..12.
-struct ScaleDef {
-	const char* name;
-	int size;
-	float semitones[16];
-};
-
-static const ScaleDef SCALES[] = {
-	{"Chromatic", 12, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}},
-	{"Major",     7,  {0, 2, 4, 5, 7, 9, 11}},
-	{"Minor",     7,  {0, 2, 3, 5, 7, 8, 10}},
-	{"Penta+",    5,  {0, 2, 4, 7, 9}},
-	{"Penta-",    5,  {0, 3, 5, 7, 10}},
-	{"Blues",     6,  {0, 3, 5, 6, 7, 10}},
-	{"Whole",     6,  {0, 2, 4, 6, 8, 10}},
-	{"Harmonic", 12, {
-		0.f,
-		12.f,
-		19.0196f,
-		24.f,
-		27.8631f,
-		31.0196f,
-		33.6883f,
-		36.f,
-		38.0392f,
-		39.8632f,
-		41.5126f,
-		43.0196f
-	}},
-	// --- Modes ---
-	{"Dorian",    7, {0, 2, 3, 5, 7, 9, 10}},
-	{"Phrygian",  7, {0, 1, 3, 5, 7, 8, 10}},
-	{"Lydian",    7, {0, 2, 4, 6, 7, 9, 11}},
-	{"Mixolyd",   7, {0, 2, 4, 5, 7, 9, 10}},
-	// --- Western exotic ---
-	{"HarmMin",   7, {0, 2, 3, 5, 7, 8, 11}},
-	// --- World ---
-	{"Hijaz",     7, {0, 1, 4, 5, 7, 8, 10}},
-	{"Hirajoshi", 5, {0, 2, 3, 7, 8}},
-	// Pelog: non-12-TET approximation of a Surakarta-style tuning so it's
-	// distinct from Phrygian. Cents: 0, 120, 270, 540, 700, 800, 1040.
-	{"Pelog",     7, {0.f, 1.2f, 2.7f, 5.4f, 7.0f, 8.0f, 10.4f}},
-	// Slendro: 5 equal divisions of the octave (non-12-TET, ~2.4 semis each).
-	{"Slendro",   5, {0.f, 2.4f, 4.8f, 7.2f, 9.6f}},
-};
-static const int NUM_SCALES = sizeof(SCALES) / sizeof(SCALES[0]);
+// Scales come from the shared canonical list (src/scales.hpp) so SCALE CV
+// values are interchangeable across Note, Fugue, and Muse. Note reads the
+// variable-length `intervals[]` per scale (octave wrapping handled in DSP)
+// and shows `shortName` in its compact on-screen status cell.
+using ScaleDef = sfs::Scale;
+static const sfs::Scale* const SCALES = sfs::SCALES;
+static const int NUM_SCALES = sfs::NUM_SCALES;
 
 static const char* NOTE_NAMES[12] = {
 	"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
@@ -114,6 +75,7 @@ struct NoteDisplay : OpaqueWidget {
 	void onHoverScroll(const HoverScrollEvent& e) override;
 
 	void drawLayer(const DrawArgs& args, int layer) override;
+	void drawPreview(const DrawArgs& args);    // module==NULL fallback for browser screenshot
 	void draw(const DrawArgs& args) override { OpaqueWidget::draw(args); }
 };
 
@@ -202,16 +164,13 @@ struct Note : Module {
 		configSwitch(ROOT_PARAM, 0.f, 11.f, 0.f, "Root note", {
 			"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
 		});
-		configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES - 1), 0.f, "Scale", {
-			"Chromatic", "Major", "Minor",
-			"Pentatonic Major", "Pentatonic Minor",
-			"Blues", "Whole tone", "Harmonic series",
-			"Dorian", "Phrygian", "Lydian", "Mixolydian",
-			"Harmonic Minor", "Hijaz (Arabic)",
-			"Hirajoshi (Japanese)",
-			"Pelog (Gamelan, 7-tone)",
-			"Slendro (Gamelan, 5-equal)"
-		});
+		{
+			std::vector<std::string> scaleNames;
+			for (int i = 0; i < NUM_SCALES; i++)
+				scaleNames.push_back(sfs::SCALES[i].longName);
+			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES - 1), 0.f,
+				"Scale", scaleNames);
+		}
 		configParam<OctaveQuantity>(OCT_PARAM, -4.f, 4.f, 0.f, "Octave shift");
 		paramQuantities[OCT_PARAM]->snapEnabled = true;
 		configInput(CLOCK_INPUT, "Clock (step advance)");
@@ -273,7 +232,7 @@ struct Note : Module {
 	float voctForRow(int row) const {
 		int sz = currentScaleSize();
 		if (row < 0 || row > sz) return 0.f;
-		float semis = (row == sz) ? 12.f : SCALES[scaleIndex].semitones[row];
+		float semis = (row == sz) ? 12.f : SCALES[scaleIndex].intervals[row];
 		semis += (float)rootNote;
 		semis += (float)octaveShift * 12.f;
 		return semis / 12.f;
@@ -836,8 +795,12 @@ void NoteDisplay::onHoverScroll(const HoverScrollEvent& e) {
 
 
 void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
-	if (layer != 1 || !module) {
+	if (layer != 1) {
 		OpaqueWidget::drawLayer(args, layer);
+		return;
+	}
+	if (!module) {
+		drawPreview(args);
 		return;
 	}
 	computeLayout();
@@ -1044,7 +1007,7 @@ void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
 		const rack::math::Rect* statRects[3] = { &rootRect, &scaleRect, &octRect };
 		std::string statValues[3] = {
 			std::string(NOTE_NAMES[module->rootNote]),
-			std::string(SCALES[module->scaleIndex].name),
+			std::string(SCALES[module->scaleIndex].shortName),
 			string::f("%+d", module->octaveShift)
 		};
 		for (int i = 0; i < 3; i++) {
@@ -1147,6 +1110,165 @@ void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
 	}
 
 	OpaqueWidget::drawLayer(args, layer);
+}
+
+
+// --- Browser-preview render (module == NULL) ---
+// Static melody in the pitch matrix so the VCV Library auto-screenshot shows
+// what Note does. STEPS mode, Major scale, ascending-ish melody.
+void NoteDisplay::drawPreview(const DrawArgs& args) {
+	computeLayout();
+	if (!font || font->handle < 0) {
+		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
+	}
+
+	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
+	const NVGcolor COL_BLUE_DARK   = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);
+	const NVGcolor COL_BLUE_LINE   = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);
+	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
+	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
+	const NVGcolor COL_PURPLE_DK   = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);
+	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
+	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
+
+	float w = box.size.x;
+	float s = w / 174.f;
+
+	// Hardcoded scene: Major scale, ascending pentatonic-ish melody
+	const int  scaleSize   = 7;                // Major
+	const int  pitches[N_STEPS] = {0, 2, 4, 2, 7, 5, 4, 0};  // C, E, G, E, ...
+	const bool actCols[N_STEPS] = {true,false,false,false, true,false,false,false};
+	const int  editMode    = 0;
+	const int  editPattern = 0;
+	const bool activePat[N_PATTERNS] = {true,true,true,true,false,false,false,false};
+	const int  editReps    = 4;
+	const int  editLen     = N_STEPS;
+
+	// Mode tabs (STEPS)
+	const char* tabLabels[4] = {"STEPS", "VEL", "ACC", "PROB"};
+	for (int i = 0; i < 4; i++) {
+		bool active = (i == editMode);
+		NVGcolor bg = active ? COL_BLUE_DARK : COL_PURPLE;
+		NVGcolor fg = active ? COL_TEXT_BRIGHT : COL_TEXT_DIM;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, tabRect[i].pos.x, tabRect[i].pos.y, tabRect[i].size.x, tabRect[i].size.y, 2.f * s);
+		nvgFillColor(args.vg, bg); nvgFill(args.vg);
+		if (font && font->handle >= 0) {
+			nvgFontFaceId(args.vg, font->handle);
+			nvgFontSize(args.vg, 9.f * s);
+			nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			nvgFillColor(args.vg, fg);
+			nvgText(args.vg, tabRect[i].pos.x + tabRect[i].size.x * 0.5f,
+				tabRect[i].pos.y + tabRect[i].size.y * 0.5f, tabLabels[i], NULL);
+		}
+	}
+
+	// Rails
+	nvgStrokeColor(args.vg, COL_BLUE_LINE); nvgStrokeWidth(args.vg, 1.f);
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, 7.f * s, 32.f * s);
+	nvgLineTo(args.vg, 165.f * s, 32.f * s);
+	nvgStroke(args.vg);
+	float topStemX = (7.f + editMode * 40.f + 19.f) * s;
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, topStemX, 28.f * s);
+	nvgLineTo(args.vg, topStemX, 32.5f * s);
+	nvgStroke(args.vg);
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, 7.f * s, 213.f * s);
+	nvgLineTo(args.vg, 165.f * s, 213.f * s);
+	nvgStroke(args.vg);
+	float botStemX = (7.f + editPattern * 20.f + 9.f) * s;
+	nvgBeginPath(args.vg);
+	nvgMoveTo(args.vg, botStemX, 209.f * s);
+	nvgLineTo(args.vg, botStemX, 213.5f * s);
+	nvgStroke(args.vg);
+
+	// Matrix
+	for (int col = 0; col < N_STEPS; col++) {
+		int litRow = (col < editLen && actCols[col % N_STEPS] ?
+			pitches[col] : (col < editLen ? pitches[col] : -1));
+		// All preview cols active
+		litRow = pitches[col];
+		for (int row = 0; row < N_ROWS; row++) {
+			rack::math::Rect cr = cellRectFor(col, row);
+			bool isOctaveRow = (row == scaleSize);
+			bool inScale = (row < scaleSize);
+			bool isLit = (litRow == row);
+			NVGcolor cellBg;
+			if (isLit)                          cellBg = COL_BLUE;
+			else if (row == 0 || isOctaveRow)   cellBg = COL_PURPLE_MID;
+			else if (inScale)                   cellBg = COL_PURPLE;
+			else                                cellBg = COL_PURPLE_DK;
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, cr.pos.x + 0.5f, cr.pos.y + 0.5f,
+				cr.size.x - 1.f, cr.size.y - 1.f, 1.f * s);
+			nvgFillColor(args.vg, cellBg); nvgFill(args.vg);
+		}
+	}
+
+	// Length dots — all lit
+	for (int i = 0; i < N_STEPS; i++) {
+		const rack::math::Rect& dr = lengthDotRect[i];
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, dr.pos.x, dr.pos.y, dr.size.x, dr.size.y, 2.f * s);
+		nvgFillColor(args.vg, COL_BLUE); nvgFill(args.vg);
+	}
+
+	// PATTERN label + ROOT/SCALE/OCT
+	if (font && font->handle >= 0) {
+		nvgFontFaceId(args.vg, font->handle);
+		nvgFontSize(args.vg, 9.f * s);
+		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+		nvgFillColor(args.vg, COL_TEXT_BRIGHT);
+		nvgText(args.vg, 8.f * s, 184.f * s, "PATTERN", NULL);
+	}
+	{
+		const rack::math::Rect* statRects[3] = {&rootRect, &scaleRect, &octRect};
+		const char* statValues[3] = {"C", "Major", "+0"};
+		for (int i = 0; i < 3; i++) {
+			const rack::math::Rect& r = *statRects[i];
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, r.pos.x, r.pos.y, r.size.x, r.size.y, 1.5f * s);
+			nvgFillColor(args.vg, COL_PURPLE_DK); nvgFill(args.vg);
+			if (font && font->handle >= 0) {
+				nvgFontFaceId(args.vg, font->handle);
+				nvgFontSize(args.vg, 9.f * s);
+				nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
+				nvgFillColor(args.vg, COL_TEXT_BRIGHT);
+				nvgText(args.vg, r.pos.x + r.size.x * 0.5f, 184.f * s, statValues[i], NULL);
+			}
+		}
+	}
+
+	// Pattern selector
+	for (int p = 0; p < N_PATTERNS; p++) {
+		const rack::math::Rect& pr = patternRect[p];
+		bool active = activePat[p];
+		bool isEdit = (p == editPattern);
+		NVGcolor bg = !active ? COL_PURPLE_DK : isEdit ? COL_BLUE : COL_PURPLE_MID;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, pr.pos.x, pr.pos.y, pr.size.x, pr.size.y, 2.f * s);
+		nvgFillColor(args.vg, bg); nvgFill(args.vg);
+		if (font && font->handle >= 0) {
+			nvgFontFaceId(args.vg, font->handle);
+			nvgFontSize(args.vg, 9.f * s);
+			nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			NVGcolor tc = active ? COL_TEXT_BRIGHT : COL_TEXT_DIM;
+			nvgFillColor(args.vg, tc);
+			std::string lbl = string::f("%d", p + 1);
+			nvgText(args.vg, pr.pos.x + pr.size.x * 0.5f, pr.pos.y + pr.size.y * 0.42f, lbl.c_str(), NULL);
+		}
+	}
+
+	// Repeats bar — 4 of 8 lit
+	for (int i = 0; i < N_REPEATS; i++) {
+		const rack::math::Rect& rr = repeatsRect[i];
+		NVGcolor c = (i < editReps) ? COL_BLUE : COL_PURPLE;
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, rr.pos.x, rr.pos.y, rr.size.x, rr.size.y, 2.f * s);
+		nvgFillColor(args.vg, c); nvgFill(args.vg);
+	}
 }
 
 

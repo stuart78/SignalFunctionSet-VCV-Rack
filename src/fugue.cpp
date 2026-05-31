@@ -1,66 +1,16 @@
 #include "plugin.hpp"
 #include "fugue-messages.hpp"
+#include "scales.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
-// Order mirrors Note's scale list so SCALE CV values are interchangeable
-// between modules. Two extras (Melodic Minor, Locrian) are appended to
-// preserve them from older Fugue versions.
+// Scales come from the shared canonical list (src/scales.hpp) so SCALE CV
+// values are interchangeable across Note, Fugue, and Muse. `ScaleInfo` is kept
+// as an alias to the shared struct so the existing DSP (scale.intervals /
+// scale.size) compiles unchanged.
+using ScaleInfo = sfs::Scale;
+static const sfs::Scale* const FUGUE_SCALES = sfs::SCALES;
+static const int NUM_SCALES_FUGUE = sfs::NUM_SCALES;
 
-struct ScaleInfo {
-	const float* intervals;
-	int size;
-};
-
-// 12-TET scales (integer semitones, expressed as floats)
-static const float SCALE_CHROMATIC[]   = {0,1,2,3,4,5,6,7,8,9,10,11};
-static const float SCALE_MAJOR[]       = {0,2,4,5,7,9,11};
-static const float SCALE_NAT_MINOR[]   = {0,2,3,5,7,8,10};
-static const float SCALE_PENTA_MAJ[]   = {0,2,4,7,9};
-static const float SCALE_PENTA_MIN[]   = {0,3,5,7,10};
-static const float SCALE_BLUES[]       = {0,3,5,6,7,10};
-static const float SCALE_WHOLE[]       = {0,2,4,6,8,10};
-// Just-intonation harmonics 1..12 (non-12-TET, log2(n)*12)
-static const float SCALE_HARMONIC[]    = {
-	0.f, 12.f, 19.0196f, 24.f, 27.8631f, 31.0196f,
-	33.6883f, 36.f, 38.0392f, 39.8632f, 41.5126f, 43.0196f
-};
-static const float SCALE_DORIAN[]      = {0,2,3,5,7,9,10};
-static const float SCALE_PHRYGIAN[]    = {0,1,3,5,7,8,10};
-static const float SCALE_LYDIAN[]      = {0,2,4,6,7,9,11};
-static const float SCALE_MIXOLYDIAN[]  = {0,2,4,5,7,9,10};
-static const float SCALE_HARM_MINOR[]  = {0,2,3,5,7,8,11};
-static const float SCALE_HIJAZ[]       = {0,1,4,5,7,8,10};
-static const float SCALE_HIRAJOSHI[]   = {0,2,3,7,8};
-// Pelog: Surakarta-style approximation in cents/12 (non-12-TET)
-static const float SCALE_PELOG[]       = {0.f, 1.2f, 2.7f, 5.4f, 7.0f, 8.0f, 10.4f};
-// Slendro: 5 equal divisions of the octave (non-12-TET)
-static const float SCALE_SLENDRO[]     = {0.f, 2.4f, 4.8f, 7.2f, 9.6f};
-// Preserved-from-old-Fugue extras
-static const float SCALE_MELO_MINOR[]  = {0,2,3,5,7,9,11};
-static const float SCALE_LOCRIAN[]     = {0,1,3,5,6,8,10};
-
-static const ScaleInfo SCALES[] = {
-	{SCALE_CHROMATIC, 12},   //  0  Chromatic
-	{SCALE_MAJOR,      7},   //  1  Major
-	{SCALE_NAT_MINOR,  7},   //  2  Minor
-	{SCALE_PENTA_MAJ,  5},   //  3  Pentatonic Major
-	{SCALE_PENTA_MIN,  5},   //  4  Pentatonic Minor
-	{SCALE_BLUES,      6},   //  5  Blues
-	{SCALE_WHOLE,      6},   //  6  Whole tone
-	{SCALE_HARMONIC,  12},   //  7  Harmonic series
-	{SCALE_DORIAN,     7},   //  8  Dorian
-	{SCALE_PHRYGIAN,   7},   //  9  Phrygian
-	{SCALE_LYDIAN,     7},   // 10  Lydian
-	{SCALE_MIXOLYDIAN, 7},   // 11  Mixolydian
-	{SCALE_HARM_MINOR, 7},   // 12  Harmonic Minor
-	{SCALE_HIJAZ,      7},   // 13  Hijaz
-	{SCALE_HIRAJOSHI,  5},   // 14  Hirajoshi
-	{SCALE_PELOG,      7},   // 15  Pelog
-	{SCALE_SLENDRO,    5},   // 16  Slendro
-	{SCALE_MELO_MINOR, 7},   // 17  Melodic Minor (Fugue extra)
-	{SCALE_LOCRIAN,    7},   // 18  Locrian (Fugue extra)
-};
-static const int NUM_SCALES_FUGUE = sizeof(SCALES) / sizeof(SCALES[0]);
 
 static const int NUM_STEPS = 8;
 static const int NUM_VOICES = 3;
@@ -268,17 +218,13 @@ struct Fugue : Module {
 
 		// Scale (snapped) — order matches Note module's SCALES array so
 		// SCALE CV values are interchangeable between modules.
-		configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES_FUGUE - 1), 1.f, "Scale", {
-			"Chromatic", "Major", "Minor",
-			"Pentatonic Major", "Pentatonic Minor",
-			"Blues", "Whole tone", "Harmonic series",
-			"Dorian", "Phrygian", "Lydian", "Mixolydian",
-			"Harmonic Minor", "Hijaz (Arabic)",
-			"Hirajoshi (Japanese)",
-			"Pelog (Gamelan, 7-tone)",
-			"Slendro (Gamelan, 5-equal)",
-			"Melodic Minor", "Locrian"
-		});
+		{
+			std::vector<std::string> scaleNames;
+			for (int i = 0; i < NUM_SCALES_FUGUE; i++)
+				scaleNames.push_back(sfs::SCALES[i].longName);
+			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES_FUGUE - 1), 1.f,
+				"Scale", scaleNames);
+		}
 
 		// Steps (snapped)
 		configSwitch(STEPS_PARAM, 1.f, 8.f, 8.f, "Steps",
@@ -378,7 +324,7 @@ struct Fugue : Module {
 
 	float faderToVoltage(float faderValue, int rootNote, int scaleIndex, float faderRange) {
 		float rawVoltage = faderValue * faderRange;
-		const ScaleInfo& scale = SCALES[scaleIndex];
+		const ScaleInfo& scale = sfs::SCALES[scaleIndex];
 
 		float bestVoltage = 0.f;
 		float bestDist = 999.f;
@@ -442,7 +388,7 @@ struct Fugue : Module {
 		}
 		else {
 			// ── Diatonic / Pentatonic mode: scale-degree-based ──
-			const ScaleInfo& scale = SCALES[scaleIndex];
+			const ScaleInfo& scale = sfs::SCALES[scaleIndex];
 			bool isPenta = (scale.size == 5);
 			const DeviationTier* tiers = isPenta ? PENTATONIC_TIERS : DIATONIC_TIERS;
 			int numTiers = isPenta ? NUM_PENTATONIC_TIERS : NUM_DIATONIC_TIERS;
@@ -628,7 +574,7 @@ struct Fugue : Module {
 		if (inputs[SCALE_CV_INPUT].isConnected()) {
 			scaleIndex += (int)std::round(inputs[SCALE_CV_INPUT].getVoltage());
 		}
-		scaleIndex = clamp(scaleIndex, 0, 11);
+		scaleIndex = clamp(scaleIndex, 0, NUM_SCALES_FUGUE - 1);
 
 		int numSteps = (int)std::round(params[STEPS_PARAM].getValue());
 

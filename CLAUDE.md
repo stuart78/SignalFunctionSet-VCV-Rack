@@ -4,18 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a VCV Rack plugin called "Signal Function Set" that provides modular synthesizer modules. The plugin contains the following modules:
+This is a VCV Rack plugin called "Signal Function Set" that provides modular synthesizer modules. Currently shipping:
 
-1. **Drift** - A phase-shifted LFO with offset, attenuation, and stability controls featuring Lorenz attractor-based chaos functionality
-2. **GSX** - A granular synthesis module based on Barry Truax's pioneering GSX system (1985-86)
-3. **Fugue** - An 8-step harmonic deviation sequencer with three independent CV/gate voices
-4. **Fugue X** - Expander for Fugue: per-voice steps/range/sleep/probability, sorted CV outs, per-step trigger outs
-5. **Phase** - A dual sample looper with sleep-based phase drift, inspired by Steve Reich's phase compositions
-6. **Overtone** - Additive synthesis VCO with 8 individually-toggled harmonics, even/odd filter, binary mask CV
-7. **Intone** - CHANT/FOF formant synthesis voice with vowel morphing, 5 formant cells, dual excitation modes
-8. **Tine** - Tunable 3rd-order pingable resonator based on the Gamelan Resonator circuit
-9. **Meter** - Time-signature-aware musical clock with multiple subdivision outputs, per-output enable/swing, BPM/bar status display
-10. **Beat** - Per-voice pattern sequencer (8 patterns × 16 steps) with on-screen step/velocity/accent/probability editing, per-pattern length and repeats
+1. **Drift** — Phase-shifted LFO with offset, attenuation, and Lorenz-attractor chaos
+2. **GSX** — Granular synthesis (Barry Truax GSX system, 1985-86)
+3. **Fugue** — 8-step harmonic deviation sequencer with three CV/gate voices
+4. **Fugue X** — Expander for Fugue: per-voice steps/range/sleep/probability
+5. **Phase** — Dual sample looper with sleep-based phase drift + live recording
+6. **Overtone** — Additive VCO with 8 togglable harmonics, even/odd filter, binary-mask CV
+7. **Intone** — CHANT/FOF formant synthesis voice with vowel morphing
+8. **Tine** — Tunable 3rd-order pingable resonator (Gamelan Resonator circuit)
+9. **Meter** — Time-signature-aware musical clock with subdivision outputs and per-output swing
+10. **Beat** — Per-voice pattern sequencer (8×16) with on-screen step/velocity/accent/probability editing
+11. **Note** — Monophonic CV/gate pattern sequencer with 12-note pitch matrix and scale/root selection
+12. **Swell** — Ping-driven additive A/D envelope with stacked rises
+13. **Shift** — 4-output CV shift register with per-lane delay/cascade modes
+14. **Wave** — Polaroid wavetable voice: live parametric shape + 8 FIFO snapshots + WANDER macro
+15. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
+16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
+17. **Swing** — Double-pendulum chaos LFO with sector CVs and ray-crossing gates
 
 ## Build Commands
 
@@ -31,18 +38,28 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 ## Code Architecture
 
 ### Plugin Structure
-- `src/plugin.hpp` - Main plugin header with model declarations
-- `src/plugin.cpp` - Plugin initialization and model registration
-- `src/quadlfo.cpp` - Drift module implementation
-- `src/gsx.cpp` - GSX granular synthesis module implementation
-- `src/fugue.cpp` - Fugue module implementation
-- `src/fugue-expander.cpp` - Fugue X expander module implementation
-- `src/phase.cpp` - Phase module implementation
-- `src/overtone.cpp` - Overtone module implementation
-- `src/intone.cpp` - Intone formant synthesis module implementation
-- `src/tine.cpp` - Tine resonator module implementation
-- `src/meter.cpp` - Meter musical clock module implementation
-- `src/beat.cpp` - Beat pattern sequencer module implementation
+- `src/plugin.hpp` — Main plugin header with model declarations
+- `src/plugin.cpp` — Plugin initialization and model registration
+- `src/quadlfo.cpp` — Drift
+- `src/gsx.cpp` — GSX
+- `src/fugue.cpp` — Fugue
+- `src/fugue-expander.cpp` — Fugue X
+- `src/phase.cpp` — Phase
+- `src/overtone.cpp` — Overtone
+- `src/intone.cpp` — Intone
+- `src/tine.cpp` — Tine
+- `src/meter.cpp` — Meter
+- `src/beat.cpp` — Beat
+- `src/note.cpp` — Note
+- `src/swell.cpp` — Swell
+- `src/shift.cpp` — Shift
+- `src/wave.cpp` — Wave
+- `src/vac.cpp` — Vac
+- `src/muse.cpp` — Muse
+- `src/swing.cpp` — Swing
+- `src/dr_wav.h` — Header-only WAV loader (Phase)
+- `src/fugue-messages.hpp` — Fugue ↔ Fugue X expander messages
+- `docs/conventions/` — Cross-module conventions and required patterns
 
 ### Module Development Pattern
 Each module follows the VCV Rack module pattern:
@@ -50,6 +67,16 @@ Each module follows the VCV Rack module pattern:
 - Defines `ParamId`, `InputId`, `OutputId`, and `LightId` enums
 - Implements `process()` method for audio processing
 - Has corresponding widget class for UI
+
+### Display Widget Conventions
+**Any module with a custom NanoVG display widget MUST implement a `drawPreview()` method** for the browser screenshot (`ModuleWidget->module == NULL` during VCV Library thumbnail generation). Without it, the browser thumbnail shows an empty dark slab and tells nothing about what the module does.
+
+See **`docs/conventions/browser-preview-pattern.md`** for the full pattern, examples from every shipped module, and testing instructions. Treat this as a required part of the display widget contract from day one of any new module.
+
+### Scale Conventions
+**Any module exposing a SCALE control MUST use the shared canonical list in `src/scales.hpp`** (namespace `sfs`) — never define its own scale table. The list is append-only; reordering breaks cross-module SCALE CV compatibility and saved patches. Note, Fugue, and Muse all alias `sfs::Scale` / `sfs::SCALES[]`.
+
+See **`docs/conventions/scales.md`** for the 19-scale list, struct fields (longName/shortName/museName, intervals/size, museSemis[8]), and how to add a scale.
 
 ### Drift Module Architecture
 The Drift module implements:
