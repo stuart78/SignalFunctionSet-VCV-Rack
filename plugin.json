@@ -179,9 +179,9 @@
       ]
     },
     {
-      "slug": "Swing",
-      "name": "Swing",
-      "description": "Double-pendulum chaos LFO. A normalized double pendulum read three ways: bipolar X/Y tip position, six morph-crossfaded sector distance CVs, and six retriggerable boundary-ray gates. Speed and chaos controls, plus ragdoll-drag either bob on the display to relaunch the motion.",
+      "slug": "Gravity",
+      "name": "Gravity",
+      "description": "Gravity-driven chaos engine with three modes — double pendulum, orbiting gravity well (a spring-bound rocket perturbed by planets), and elastic billiards — all sharing bipolar X/Y position, radius and angle CVs, six morph-crossfaded sector distance CVs, and six boundary-ray gates. Speed, chaos, and a mode-dependent gravity control; drag on the display to throw/aim.",
       "tags": [
         "Low-frequency oscillator",
         "Random",

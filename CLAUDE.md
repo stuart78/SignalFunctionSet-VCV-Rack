@@ -22,7 +22,7 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 14. **Wave** — Polaroid wavetable voice: live parametric shape + 8 FIFO snapshots + WANDER macro
 15. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
 16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
-17. **Swing** — Double-pendulum chaos LFO with sector CVs and ray-crossing gates
+17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards) with X/Y, radius, angle, sector CVs and ray-crossing gates
 
 ## Build Commands
 
@@ -56,7 +56,7 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/wave.cpp` — Wave
 - `src/vac.cpp` — Vac
 - `src/muse.cpp` — Muse
-- `src/swing.cpp` — Swing
+- `src/gravity.cpp` — Gravity
 - `src/dr_wav.h` — Header-only WAV loader (Phase)
 - `src/fugue-messages.hpp` — Fugue ↔ Fugue X expander messages
 - `docs/conventions/` — Cross-module conventions and required patterns

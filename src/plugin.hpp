@@ -24,4 +24,4 @@ extern Model* modelShift;
 extern Model* modelWave;
 extern Model* modelVac;
 extern Model* modelMuse;
-extern Model* modelSwing;
+extern Model* modelGravity;

@@ -22,7 +22,7 @@ void init(Plugin* p) {
 	p->addModel(modelWave);
 	p->addModel(modelVac);
 	p->addModel(modelMuse);
-	p->addModel(modelSwing);
+	p->addModel(modelGravity);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

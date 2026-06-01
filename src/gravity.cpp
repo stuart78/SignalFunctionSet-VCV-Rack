@@ -2,7 +2,7 @@
 #include <cmath>
 #include <vector>
 
-// SWING — Double-pendulum chaos LFO.
+// GRAVITY — Double-pendulum chaos LFO.
 //
 // A normalized double pendulum (m1=m2=1, l1=l2=1) is integrated with RK4 at
 // audio rate. Its motion is read three ways:
@@ -40,7 +40,7 @@ static inline float wrapPi(float a) {
 }
 
 
-struct Swing : Module {
+struct Gravity : Module {
 	enum ParamId {
 		SPEED_PARAM,
 		CHAOS_PARAM,
@@ -150,7 +150,7 @@ struct Swing : Module {
 	float gateHoldSec = 0.06f;       // retriggerable gate hold time
 	int trailLength = 90;            // trail ring-buffer length (frames); 0 = off
 
-	Swing() {
+	Gravity() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam(SPEED_PARAM, 0.f, 1.f, 0.4f, "Speed", "");
 		configParam(CHAOS_PARAM, 0.f, 1.f, 0.6f, "Chaos", "");
@@ -668,8 +668,8 @@ struct Swing : Module {
 // Display: circular field, hex overlay, two tumbling arms, fading tip + elbow
 // trails, gate-ray flashes, sector morph readout. Ragdoll drag on either bob.
 // ---------------------------------------------------------------------------
-struct SwingDisplay : OpaqueWidget {
-	Swing* module = nullptr;
+struct GravityDisplay : OpaqueWidget {
+	Gravity* module = nullptr;
 	std::shared_ptr<Font> font;
 	// Trails are UI-only: sampled once per frame, never persisted.
 	std::vector<Vec> tipTrail, elbowTrail;
@@ -709,14 +709,14 @@ struct SwingDisplay : OpaqueWidget {
 	}
 
 	static const int DRAG_GRAV = 99;   // dragging the gravity marker on the rim
-	int dragging = Swing::DRAG_NONE;
+	int dragging = Gravity::DRAG_NONE;
 	Vec dragPos;   // widget-local cursor, kept current through the drag
 
 	// Set the GRAVITY param so the centre of gravity points at the cursor.
 	void setGravFromPos(Vec p) {
 		float mx, my; toModel(p, mx, my);
 		float ang = std::atan2(mx, my);              // 0 = down, matches field
-		if (module) module->params[Swing::GRAVITY_PARAM].setValue(clamp(ang / (float) M_PI, -1.f, 1.f));
+		if (module) module->params[Gravity::GRAVITY_PARAM].setValue(clamp(ang / (float) M_PI, -1.f, 1.f));
 	}
 
 	float radiusPx() { return std::min(box.size.x, box.size.y) * 0.5f - 6.f; }
@@ -742,7 +742,7 @@ struct SwingDisplay : OpaqueWidget {
 			dragPos = e.pos;
 
 			// Billiards: click near the cue starts a slingshot aim.
-			if (module->mode == Swing::MODE_BILLIARDS) {
+			if (module->mode == Gravity::MODE_BILLIARDS) {
 				Vec cue = toPx(module->trackedX, module->trackedY);
 				if (e.pos.minus(cue).norm() < 14.f) {
 					dragging = DRAG_CUE;
@@ -755,16 +755,16 @@ struct SwingDisplay : OpaqueWidget {
 			}
 
 			// Pendulum: grab a joint (ragdoll).
-			if (module->mode == Swing::MODE_PENDULUM) {
+			if (module->mode == Gravity::MODE_PENDULUM) {
 				Vec tip = toPx(module->dispB2x, module->dispB2y);
 				Vec elbow = toPx(module->dispB1x, module->dispB1y);
 				float dTip = e.pos.minus(tip).norm();
 				float dElbow = e.pos.minus(elbow).norm();
 				float thresh = 11.f;
-				int joint = Swing::DRAG_NONE;
-				if (dTip <= dElbow && dTip < thresh) joint = Swing::DRAG_TIP;
-				else if (dElbow < thresh) joint = Swing::DRAG_ELBOW;
-				if (joint != Swing::DRAG_NONE) {
+				int joint = Gravity::DRAG_NONE;
+				if (dTip <= dElbow && dTip < thresh) joint = Gravity::DRAG_TIP;
+				else if (dElbow < thresh) joint = Gravity::DRAG_ELBOW;
+				if (joint != Gravity::DRAG_NONE) {
 					dragging = joint;
 					float mx, my; toModel(e.pos, mx, my);
 					module->dragTargetX = mx; module->dragTargetY = my;
@@ -791,7 +791,7 @@ struct SwingDisplay : OpaqueWidget {
 	void onDragStart(const DragStartEvent& e) override { OpaqueWidget::onDragStart(e); }
 
 	void onDragMove(const DragMoveEvent& e) override {
-		if (module && dragging != Swing::DRAG_NONE) {
+		if (module && dragging != Gravity::DRAG_NONE) {
 			float zoom = getAbsoluteZoom();
 			if (zoom <= 0.f) zoom = 1.f;
 			dragPos = dragPos.plus(e.mouseDelta.div(zoom));
@@ -809,14 +809,14 @@ struct SwingDisplay : OpaqueWidget {
 	}
 
 	void onDragEnd(const DragEndEvent& e) override {
-		if (module && dragging != Swing::DRAG_NONE) {
+		if (module && dragging != Gravity::DRAG_NONE) {
 			if (dragging == DRAG_CUE) {
 				module->billiardsLaunch(module->bzAimX, module->bzAimY);
 				module->bzAiming = false;
 			} else if (dragging != DRAG_GRAV) {
-				module->dragJoint = Swing::DRAG_NONE;   // release -> let it fly
+				module->dragJoint = Gravity::DRAG_NONE;   // release -> let it fly
 			}
-			dragging = Swing::DRAG_NONE;
+			dragging = Gravity::DRAG_NONE;
 		}
 		OpaqueWidget::onDragEnd(e);
 	}
@@ -1015,7 +1015,7 @@ struct SwingDisplay : OpaqueWidget {
 		// dot showing the direction gravity pulls.
 		{
 			NVGcolor gold = nvgRGBA(0xD0, 0xA8, 0x50, 0xFF);
-			if (module->mode == Swing::MODE_GRAVWELL) {
+			if (module->mode == Gravity::MODE_GRAVWELL) {
 				float sunR = 4.f + module->gwSunPull * 12.f;   // 4..16 px by pull
 				// soft halo
 				nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, sunR + 3.f);
@@ -1044,7 +1044,7 @@ struct SwingDisplay : OpaqueWidget {
 		drawTrail(vg, tipTrail, COL_TIP);
 
 		// --- Per-mode body rendering ---
-		if (module->mode == Swing::MODE_PENDULUM) {
+		if (module->mode == Gravity::MODE_PENDULUM) {
 			Vec b1 = toPx(module->dispB1x, module->dispB1y);
 			Vec b2 = toPx(module->dispB2x, module->dispB2y);
 			nvgBeginPath(vg);
@@ -1062,7 +1062,7 @@ struct SwingDisplay : OpaqueWidget {
 			nvgBeginPath(vg); nvgCircle(vg, b2.x, b2.y, 5.f);
 			nvgFillColor(vg, COL_TIP); nvgFill(vg);
 		}
-		else if (module->mode == Swing::MODE_GRAVWELL) {
+		else if (module->mode == Gravity::MODE_GRAVWELL) {
 			// Planets (gold) on their orbits, rocket = tracked tip (orange).
 			NVGcolor gold = nvgRGBA(0xD0, 0xA8, 0x50, 0xFF);
 			for (int i = 0; i < module->gwPlanetCount; i++) {
@@ -1086,10 +1086,10 @@ struct SwingDisplay : OpaqueWidget {
 			drawRocket(vg, r.x, r.y, heading, 16.f);
 		}
 		else { // MODE_BILLIARDS
-			for (int i = 0; i < module->bzCount && i < Swing::MAX_BALLS; i++) {
+			for (int i = 0; i < module->bzCount && i < Gravity::MAX_BALLS; i++) {
 				Vec p = toPx((float) module->bzX[i], (float) module->bzY[i]);
 				bool cue = (i == 0);
-				float rad = (float)(Swing::BALL_R * ppu()) * (cue ? 1.15f : 1.f);
+				float rad = (float)(Gravity::BALL_R * ppu()) * (cue ? 1.15f : 1.f);
 				nvgBeginPath(vg); nvgCircle(vg, p.x, p.y, rad);
 				nvgFillColor(vg, cue ? COL_TIP : COL_ELBOW); nvgFill(vg);
 			}
@@ -1117,7 +1117,7 @@ struct SwingDisplay : OpaqueWidget {
 
 // Panel labels drawn in code — VCV's SVG renderer ignores <text>, so SFS panels
 // carry their labels as the display widget / nanovg text rather than in the SVG.
-struct SwingLabels : Widget {
+struct GravityLabels : Widget {
 	std::shared_ptr<Font> font;
 
 	void label(NVGcontext* vg, float mmx, float mmy, const char* s, float px, int align) {
@@ -1155,19 +1155,19 @@ struct SwingLabels : Widget {
 
 		// Wordmark
 		nvgFillColor(vg, nvgRGB(0x23, 0x1f, 0x20));
-		label(vg, 76.f, 119.f, "SWING", 12.f, C);
+		label(vg, 76.f, 119.f, "GRAVITY", 12.f, C);
 
 		Widget::draw(args);
 	}
 };
 
 
-struct SwingWidget : ModuleWidget {
-	SwingWidget(Swing* module) {
+struct GravityWidget : ModuleWidget {
+	GravityWidget(Gravity* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/swing.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/gravity.svg")));
 
-		SwingLabels* labels = new SwingLabels();
+		GravityLabels* labels = new GravityLabels();
 		labels->box.pos = Vec(0, 0);
 		labels->box.size = box.size;
 		addChild(labels);
@@ -1180,7 +1180,7 @@ struct SwingWidget : ModuleWidget {
 		// Centred circular display (centred at 76,64 on the 30HP panel)
 		const float CX = 76.f, CY = 64.f;
 		const float Rg = 38.f, Rs = 49.f;   // gate ring, sector ring radii
-		SwingDisplay* display = new SwingDisplay();
+		GravityDisplay* display = new GravityDisplay();
 		display->module = module;
 		display->box.pos = mm2px(Vec(CX - 30.f, CY - 30.f));
 		display->box.size = mm2px(Vec(60.f, 60.f));
@@ -1193,18 +1193,18 @@ struct SwingWidget : ModuleWidget {
 			float as = (k * 60.f + 30.f) * DEG;
 			Vec gp(CX + std::sin(ag) * Rg, CY + std::cos(ag) * Rg);
 			Vec sp(CX + std::sin(as) * Rs, CY + std::cos(as) * Rs);
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(gp), module, Swing::GATE_OUTPUT + k));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(sp), module, Swing::SECTOR_OUTPUT + k));
+			addOutput(createOutputCentered<PJ301MPort>(mm2px(gp), module, Gravity::GATE_OUTPUT + k));
+			addOutput(createOutputCentered<PJ301MPort>(mm2px(sp), module, Gravity::SECTOR_OUTPUT + k));
 		}
 
 		// Left column: 4 pot + CV-jack pairs (SPEED / CHAOS / GRAV / MODE).
 		const float colL = 11.f;
 		struct LCtl { int param; int input; float py; float jy; };
 		const LCtl lc[4] = {
-			{Swing::SPEED_PARAM,   Swing::SPEED_INPUT,   16.f, 27.f},
-			{Swing::CHAOS_PARAM,   Swing::CHAOS_INPUT,   42.f, 53.f},
-			{Swing::GRAVITY_PARAM, Swing::GRAVITY_INPUT, 68.f, 79.f},
-			{Swing::MODE_PARAM,    Swing::MODE_INPUT,    94.f, 105.f},
+			{Gravity::SPEED_PARAM,   Gravity::SPEED_INPUT,   16.f, 27.f},
+			{Gravity::CHAOS_PARAM,   Gravity::CHAOS_INPUT,   42.f, 53.f},
+			{Gravity::GRAVITY_PARAM, Gravity::GRAVITY_INPUT, 68.f, 79.f},
+			{Gravity::MODE_PARAM,    Gravity::MODE_INPUT,    94.f, 105.f},
 		};
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(colL, lc[i].py)), module, lc[i].param));
@@ -1213,14 +1213,14 @@ struct SwingWidget : ModuleWidget {
 
 		// Right column: 4 output jacks (X / Y / RADIUS / ANGLE).
 		const float colR = 141.f;
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 20.f)), module, Swing::X_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 46.f)), module, Swing::Y_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 72.f)), module, Swing::RADIUS_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 98.f)), module, Swing::ANGLE_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 20.f)), module, Gravity::X_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 46.f)), module, Gravity::Y_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 72.f)), module, Gravity::RADIUS_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 98.f)), module, Gravity::ANGLE_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
-		Swing* module = dynamic_cast<Swing*>(this->module);
+		Gravity* module = dynamic_cast<Gravity*>(this->module);
 		assert(module);
 
 		menu->addChild(new MenuSeparator);
@@ -1251,4 +1251,4 @@ struct SwingWidget : ModuleWidget {
 };
 
 
-Model* modelSwing = createModel<Swing, SwingWidget>("Swing");
+Model* modelGravity = createModel<Gravity, GravityWidget>("Gravity");
