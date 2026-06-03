@@ -14,9 +14,12 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 - [Tine](#tine) — Tunable pingable resonator (Gamelan Resonator circuit)
 - [Meter](#meter) — Time-signature-aware musical clock with swing
 - [Beat](#beat) — Per-voice pattern sequencer (8 patterns × 16 steps)
-- [Note](#note) — Pitched CV/gate sequencer with 17 scales
+- [Note](#note) — Pitched CV/gate sequencer with 19 scales
 - [Swell](#swell) — Ping-driven additive A/D envelope
 - [Shift](#shift) — 4-output CV shift register with cascade chain
+- [Muse](#muse) — Faithful Triadex Muse recreation (Fredkin/Minsky, 1972)
+- [Gravity](#gravity) — Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
+- [Other Platforms](#other-platforms)
 - [Building](#building)
 - [License](#license)
 
@@ -92,7 +95,7 @@ An 8-step harmonic deviation sequencer with three independent CV/gate voices (A,
 - **Harmonic Deviation** — Wander control selects notes from musically-informed tiers: chord tones, extensions, chromatic neighbors
 - **Harmonic Lock** — Voices bias toward consonance with each other, creating soft harmonic gravity (enabled by default)
 - **Clock Normalling** — Clock B normalled to A, Clock C normalled to B. Patch separate clocks for polyrhythmic effects.
-- **17 Scales** — Chromatic, Major, Minor, Pentatonic Major/Minor, Blues, Whole tone, Harmonic series, Dorian, Phrygian, Lydian, Mixolydian, Harmonic Minor, Hijaz, Hirajoshi, Pelog, Slendro (plus Melodic Minor and Locrian preserved from older Fugue versions)
+- **19 Scales** — Drawn from a shared canonical scale list used across Fugue, Note, and Muse, so SCALE CV is interchangeable between them (sequence scale changes for the whole rig at once): Chromatic, Major, Minor, Pentatonic Major/Minor, Blues, Whole Tone, Harmonic Series, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Melodic Minor, Hijaz, Hirajoshi, Pelog, Slendro
 - **Adaptive Slew** — Portamento that always resolves before the next note arrives
 - **Per-Voice Gate Patterns** — 24 toggle buttons (8 steps × 3 voices) for independent rhythmic patterns
 
@@ -353,7 +356,7 @@ A monophonic CV/gate pattern sequencer — Beat's pitched cousin. Eight patterns
 **Features:**
 - **8 Patterns × 8 Steps** — 64-step melodic memory
 - **12-Row Pitch Matrix** — Click any cell to set the pitch for a step (or use a ROOT/SCALE quantizer mode)
-- **17 Scales** — Including non-12-TET options: Slendro (5 equal divisions), Pelog (Surakarta-style), Harmonic Series (just-intonation harmonics 1–12), Hijaz, Hirajoshi, plus the standard modes and pentatonics
+- **19 Scales** — From the shared canonical list (interchangeable with Fugue and Muse), including non-12-TET options: Slendro (5 equal divisions), Pelog (Surakarta-style), Harmonic Series (just-intonation harmonics 1–12), Hijaz, Hirajoshi, plus the standard modes and pentatonics
 - **Per-Step Velocity, Accent, Probability** — Same edit modes as Beat
 - **ROOT / SCALE / OCT** — Trimpots + CV inputs, with ROOT trimpot tooltip showing the actual note name
 
@@ -430,6 +433,80 @@ A 4-output CV shift register with per-lane controls. Sample input CV at the cloc
 
 **Context Menu:**
 - "Clear all" — Wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
+
+### Muse
+
+A faithful recreation of the **Triadex Muse**, the legendary algorithmic sequencer designed by Edward Fredkin and Marvin Minsky in 1972 (US Patent 3,610,801). It's not a step sequencer — there are no notes to program. Eight sliders tap into a network of binary counters and a 31-bit feedback shift register, and the *interaction* of those digital signals generates long, surprisingly musical melodies that can run for hundreds of steps before repeating. Small slider changes produce dramatically different tunes, but the results are always structured and deterministic.
+
+**Features:**
+- **Two Slider Banks** — 4 THEME sliders (XNOR'd together to drive the shift register — the pattern's "DNA") and 4 INTERVAL sliders (form a 4-bit pitch address each clock)
+- **40 Taps Per Slider** — OFF, ON, raw clock (C ½), binary counter bits (C1/C2/C4/C8), mod-12 counter taps (C3/C6), and the 31 shift-register bits (B1–B31)
+- **Live State Display** — Triadex-style label column with LEDs showing each tap's current value as the engine evolves
+- **Scale + Root** — Quantize the output to a selectable scale (shared canonical list, interchangeable with Note and Fugue) with a ±24-semitone root
+- **17 Classic Presets** — Slider snapshots straight from the original 1972 manual ("Birds", "Christmas Bells", "Marvin's Yodel", and more)
+- **Randomize** — Button + CV; scope to all 8 sliders, theme only, or interval only
+- **Expander Linking** — Place a second Muse to the right and it follows the first; chain several for layered voices
+- **Selectable Output Range** — Standard 1V/oct, or scale-quantized 1V/2V/5V modes for using Muse as a modulation source
+
+**Controls:**
+- **THEME 1–4 / INTERVAL 1–4** (sliders): Tap selection for each bank
+- **ROOT** (±24 semitones) / **SCALE**: Output quantization
+- **RUN / RESET / RANDOMIZE**: Transport + re-roll
+
+**Inputs:**
+- **CLOCK** — Advances one step per rising edge (Muse has no internal clock)
+- **RESET / RUN / RANDOMIZE** — Trigger / gate / trigger
+- **THEME 1–4 CV, INTERVAL 1–4 CV** (±5V) — Offset each slider's tap
+- **ROOT CV** (1V/oct), **SCALE CV** (interchangeable with Note/Fugue)
+
+**Outputs:**
+- **V/OCT** — Melody pitch (1V/oct, with Scale + Root)
+- **GATE** — Trigger per clocked step
+
+**Context Menu:**
+- Presets (from the Triadex manual), Output range (V/oct / 1V / 2V / 5V), Allow expander linking, Gate mode (every clock / only when pitch changes), Randomize scope + Randomize now
+
+See [docs/muse-manual.md](docs/muse-manual.md) for the full manual.
+
+### Gravity
+
+A multi-mode chaos and motion engine. A single moving point — driven by one of six very different physical or generative systems — is read out as a rich set of control voltages: bipolar X/Y position, radius, angle, six "sector" distance CVs, and six boundary-ray gates. One small set of controls (Speed, Chaos, and a mode-dependent Gravity) reshapes whatever engine is running, and a large circular display shows exactly what the voltages are doing.
+
+**The six modes:**
+- **Pendulum** — A double pendulum (RK4). The lower bob is the tracked point; Chaos sets the energy. Drag either joint to relaunch (ragdoll).
+- **Gravity Well** — A spring-bound rocket orbits a central sun, perturbed by heavy outer planets. Always bounded — it can't escape or get captured.
+- **Billiards** — Elastic balls in the circle; the cue is the tracked point, any ball fires gates. Drag the cue for a slingshot launch.
+- **Hungry Man** — A random single-width Pac-Man maze; chases big dots, eats small ones, scores (1/5) and advances levels with a fresh maze each time. Chaos = big-dot count, Gravity = center/edge bias.
+- **Turtle** — A LOGO-style turtle drawing generative artwork. Gravity biases common vs esoteric commands; a live instruction log and long-persistence trail are shown.
+- **Pattern** — A turtle tracing spirograph / Maurer-rose figures, always built from integer-degree divisions of 360 so each figure closes cleanly. Gravity sets the form (simple roses → woven rose-stars → dense webs); Chaos sets the intricacy.
+
+**Controls:**
+- **MODE** (snap): Selects the active engine (also CV-selectable, 0–10V spans all six)
+- **SPEED**: Time scale / draw speed
+- **CHAOS** (0–1): Complexity — energy, ball/dot count, command rate, or figure intricacy depending on mode
+- **GRAVITY** (±1): Mode-dependent — pull direction, sun strength, dot bias, command bias, or pattern form
+
+**Inputs:**
+- **SPEED CV, CHAOS CV, GRAVITY CV, MODE CV** — One per knob, in the left-hand column
+
+**Outputs:**
+- **X / Y** (±5V) — Position of the tracked point
+- **RADIUS** (±5V) — Distance from center (−5 = center, +5 = rim)
+- **ANGLE** (±5V) — Angle relative to the gravity direction
+- **SECTOR 1–6** (0–10V) — Six morph-crossfaded distance CVs, one per 60° wedge
+- **GATE 1–6** (0/10V) — Retriggerable gates as the point crosses each boundary ray (with activity LEDs)
+
+**Context Menu:**
+- Relaunch (kick), Clear drawing (Turtle/Pattern), Gate hold (tight/medium/gluey), Trail length
+
+See [docs/gravity-manual.md](docs/gravity-manual.md) for the full manual.
+
+## Other Platforms
+
+Signal Function Set modules have been ported to other hardware/software platforms:
+
+- **[MetaModule port](https://github.com/stuart78/metamodule-SignalFunctionSet)** — Signal Function Set running on the [4ms MetaModule](https://4mscompany.com/metamodule.php).
+- **[Disting NT port](https://github.com/stuart78/SignalFunctionSet-DistingNT)** — Signal Function Set ported to the [Expert Sleepers disting NT](https://www.expert-sleepers.co.uk/distingNT.html).
 
 ## Building
 
