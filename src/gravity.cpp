@@ -1697,88 +1697,87 @@ struct GravityDisplay : OpaqueWidget {
 		drawTurtleIcon(vg, hp.x, hp.y, module->tuHeading, module->tuPenDown);
 	}
 
+	// Browser thumbnail: a representative Hungry Man maze. No module state
+	// exists here, so carve a fixed-seed maze locally and draw it like the
+	// live mode (walls, dots, a big dot or two, the chomping wedge, score).
+	void drawHungryPreview(NVGcontext* vg) {
+		const int S = Gravity::HM_SPOKES, RINGS = Gravity::HM_RINGS, NODES = S * RINGS;
+		const float RMAX = REACH * 0.92f, TAU = 2.f * (float) M_PI;
+		Vec c = centerPx();
+		const NVGcolor COL_WALL = nvgRGBA(0x3a, 0x4a, 0x9a, 0xFF);
+		const NVGcolor COL_DOT  = nvgRGBA(0xF0, 0xC0, 0x60, 0xF0);
+		const NVGcolor COL_BIG  = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
+		const NVGcolor COL_PAC  = nvgRGBA(0xF5, 0xD0, 0x30, 0xFF);
+
+		auto cell = [&](int r, int s) { return r * S + ((s % S) + S) % S; };
+
+		// Fixed-seed spanning-tree maze (same algorithm as initHungry).
+		bool passRing[64] = {}, passRad[64] = {};
+		struct Cand { int a, b; bool ring; int idx; };
+		Cand cand[128]; int nc = 0;
+		for (int r = 0; r < RINGS - 1; r++) for (int s = 0; s < S; s++)
+			cand[nc++] = {cell(r, s), cell(r + 1, s), true, r * S + s};
+		for (int r = 0; r < RINGS; r++) for (int s = 0; s < S; s++)
+			cand[nc++] = {cell(r, s), cell(r, s + 1), false, r * S + s};
+		unsigned st = 0x9E3779B1u;
+		auto rnd = [&]() { st = st * 1664525u + 1013904223u; return st; };
+		for (int i = nc - 1; i > 0; i--) { int j = rnd() % (i + 1); Cand t = cand[i]; cand[i] = cand[j]; cand[j] = t; }
+		int parent[64]; for (int n = 0; n < NODES; n++) parent[n] = n;
+		for (int i = 0; i < nc; i++) {
+			int ra = cand[i].a, rb = cand[i].b;
+			while (parent[ra] != ra) { parent[ra] = parent[parent[ra]]; ra = parent[ra]; }
+			while (parent[rb] != rb) { parent[rb] = parent[parent[rb]]; rb = parent[rb]; }
+			if (ra != rb) { parent[ra] = rb; if (cand[i].ring) passRing[cand[i].idx] = true; else passRad[cand[i].idx] = true; }
+		}
+
+		auto ringR = [&](int b) { return Gravity::hmRingFrac((float) b) * RMAX * ppu(); };
+		auto arcWall = [&](int b, int s) {
+			float rpx = ringR(b), a0 = s * (TAU / S), a1 = (s + 1) * (TAU / S);
+			nvgBeginPath(vg);
+			for (int i = 0; i <= 10; i++) { float a = a0 + (a1 - a0) * i / 10.f; float px = c.x + std::sin(a) * rpx, py = c.y + std::cos(a) * rpx; if (i == 0) nvgMoveTo(vg, px, py); else nvgLineTo(vg, px, py); }
+			nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f); nvgLineCap(vg, NVG_ROUND); nvgStroke(vg);
+		};
+		auto radWall = [&](int s, int r) {
+			float a = (s + 1) * (TAU / S), r0 = ringR(r), r1 = ringR(r + 1);
+			nvgBeginPath(vg); nvgMoveTo(vg, c.x + std::sin(a) * r0, c.y + std::cos(a) * r0); nvgLineTo(vg, c.x + std::sin(a) * r1, c.y + std::cos(a) * r1);
+			nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f); nvgLineCap(vg, NVG_ROUND); nvgStroke(vg);
+		};
+
+		nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, ringR(RINGS)); nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f); nvgStroke(vg);
+		nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, ringR(0));     nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.2f); nvgStroke(vg);
+		for (int r = 0; r < RINGS - 1; r++) for (int s = 0; s < S; s++) if (!passRing[r * S + s]) arcWall(r + 1, s);
+		for (int r = 0; r < RINGS; r++)     for (int s = 0; s < S; s++) if (!passRad[r * S + s])  radWall(s, r);
+
+		auto nodePos = [&](int n, float& x, float& y) {
+			int r = n / S, s = n % S; float rad = Gravity::hmRingFrac(r + 0.5f) * RMAX; float ang = (s + 0.5f) * (TAU / S);
+			x = rad * std::sin(ang); y = rad * std::cos(ang);
+		};
+		int pac = cell(2, 4), big1 = cell(1, 8), big2 = cell(3, 1);
+		for (int n = 0; n < NODES; n++) {
+			if (n == pac) continue;
+			float x, y; nodePos(n, x, y); Vec p = toPx(x, y);
+			if (n == big1 || n == big2) { nvgBeginPath(vg); nvgCircle(vg, p.x, p.y, 3.4f); nvgFillColor(vg, COL_BIG); nvgFill(vg); }
+			else                        { nvgBeginPath(vg); nvgCircle(vg, p.x, p.y, 1.4f); nvgFillColor(vg, COL_DOT); nvgFill(vg); }
+		}
+
+		float px, py; nodePos(pac, px, py); Vec hp = toPx(px, py);
+		float scr = (float) M_PI * 0.5f, mouth = 0.30f * (float) M_PI;   // facing along +ring
+		nvgBeginPath(vg); nvgMoveTo(vg, hp.x, hp.y); nvgArc(vg, hp.x, hp.y, 6.f, scr + mouth, scr + TAU - mouth, NVG_CW); nvgClosePath(vg);
+		nvgFillColor(vg, COL_PAC); nvgFill(vg);
+
+		if (!font || font->handle < 0)
+			font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
+		if (font && font->handle >= 0) {
+			nvgFontFaceId(vg, font->handle); nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			nvgFontSize(vg, 11.f); nvgFillColor(vg, nvgRGBA(0xF0, 0xC0, 0x60, 0xE0)); nvgText(vg, c.x, c.y - 7.f, "128", NULL);
+			nvgFontSize(vg, 8.f);  nvgFillColor(vg, nvgRGBA(0xF0, 0xC0, 0x60, 0x90)); nvgText(vg, c.x, c.y + 7.f, "LV 2", NULL);
+		}
+	}
+
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) { OpaqueWidget::drawLayer(args, layer); return; }
 		if (!module) {
-			// Browser-preview: pendulum mid-swing, two sector arcs lit, trails
-			// faked as straight segments.
-			NVGcontext* vg = args.vg;
-			const NVGcolor COL_BLUE   = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
-			const NVGcolor COL_GRID   = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-			const NVGcolor COL_TIP    = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
-			const NVGcolor COL_ELBOW  = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
-			Vec c = centerPx();
-			float R = radiusPx();
-			// Outer circle
-			nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, R);
-			nvgStrokeColor(vg, COL_GRID); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
-			// Six rays
-			for (int k = 0; k < NUM_SECTORS; k++) {
-				float a = k * 60.f * DEG;
-				float ex = c.x + std::sin(a) * R;
-				float ey = c.y + std::cos(a) * R;
-				nvgBeginPath(vg); nvgMoveTo(vg, c.x, c.y); nvgLineTo(vg, ex, ey);
-				nvgStrokeColor(vg, COL_GRID); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
-			}
-			// Two sector arcs lit
-			const float sectorLevels[NUM_SECTORS] = {0.f, 0.8f, 0.f, 0.f, 0.5f, 0.f};
-			for (int i = 0; i < NUM_SECTORS; i++) {
-				if (sectorLevels[i] < 0.01f) continue;
-				float a0 = (i * 60.f) * DEG, a1 = ((i + 1) * 60.f) * DEG;
-				nvgBeginPath(vg);
-				int seg = 10;
-				for (int s = 0; s <= seg; s++) {
-					float a = a0 + (a1 - a0) * s / seg;
-					float rr = R - 3.f;
-					float px = c.x + std::sin(a) * rr;
-					float py = c.y + std::cos(a) * rr;
-					if (s == 0) nvgMoveTo(vg, px, py); else nvgLineTo(vg, px, py);
-				}
-				nvgStrokeColor(vg, nvgRGBAf(COL_BLUE.r, COL_BLUE.g, COL_BLUE.b, sectorLevels[i]));
-				nvgStrokeWidth(vg, 2.5f); nvgStroke(vg);
-			}
-			// Pendulum: pose at angles theta1=+45°, theta2=-30° (looks swung)
-			float th1 = 0.78f, th2 = -0.52f;
-			float ppuV = ppu();
-			float b1x = c.x + std::sin(th1) * L1 * ppuV;
-			float b1y = c.y + std::cos(th1) * L1 * ppuV;
-			float b2x = b1x + std::sin(th1 + th2) * L2 * ppuV;
-			float b2y = b1y + std::cos(th1 + th2) * L2 * ppuV;
-			// Trail fakes
-			for (int i = 0; i < 12; i++) {
-				float t = i / 11.f;
-				float a = t * t * 0.6f;
-				float tip_t1 = th1 - (1.f - t) * 0.6f;
-				float tip_t2 = th2 - (1.f - t) * 0.4f;
-				float tipx = c.x + std::sin(tip_t1) * L1 * ppuV
-					+ std::sin(tip_t1 + tip_t2) * L2 * ppuV;
-				float tipy = c.y + std::cos(tip_t1) * L1 * ppuV
-					+ std::cos(tip_t1 + tip_t2) * L2 * ppuV;
-				if (i > 0) {
-					nvgBeginPath(vg); nvgMoveTo(vg, c.x, c.y);
-					float prev_t1 = th1 - (1.f - (i-1)/11.f) * 0.6f;
-					float prev_t2 = th2 - (1.f - (i-1)/11.f) * 0.4f;
-					float ptipx = c.x + std::sin(prev_t1) * L1 * ppuV
-						+ std::sin(prev_t1 + prev_t2) * L2 * ppuV;
-					float ptipy = c.y + std::cos(prev_t1) * L1 * ppuV
-						+ std::cos(prev_t1 + prev_t2) * L2 * ppuV;
-					nvgBeginPath(vg); nvgMoveTo(vg, ptipx, ptipy); nvgLineTo(vg, tipx, tipy);
-					nvgStrokeColor(vg, nvgRGBAf(COL_TIP.r, COL_TIP.g, COL_TIP.b, a * 0.7f));
-					nvgStrokeWidth(vg, 1.2f); nvgStroke(vg);
-				}
-			}
-			// Arms
-			nvgBeginPath(vg);
-			nvgMoveTo(vg, c.x, c.y); nvgLineTo(vg, b1x, b1y); nvgLineTo(vg, b2x, b2y);
-			nvgStrokeColor(vg, nvgRGBA(0xC0, 0xC8, 0xD0, 0xFF));
-			nvgStrokeWidth(vg, 2.f); nvgLineCap(vg, NVG_ROUND); nvgStroke(vg);
-			// Bobs
-			nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, 2.5f);
-			nvgFillColor(vg, COL_GRID); nvgFill(vg);
-			nvgBeginPath(vg); nvgCircle(vg, b1x, b1y, 4.f);
-			nvgFillColor(vg, COL_ELBOW); nvgFill(vg);
-			nvgBeginPath(vg); nvgCircle(vg, b2x, b2y, 5.f);
-			nvgFillColor(vg, COL_TIP); nvgFill(vg);
+			drawHungryPreview(args.vg);
 			return;
 		}
 		NVGcontext* vg = args.vg;
