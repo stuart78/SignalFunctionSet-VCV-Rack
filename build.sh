@@ -116,6 +116,9 @@ if [ "$BUILD_TARGET" = "dev" ]; then
     sed -i.tmp 's/"version": *"\([^"]*\)"/"version": "\1-dev"/' "$PLUGIN_JSON"
     sed -i.tmp 's/-dev-dev/-dev/g' "$PLUGIN_JSON"
     sed -i.tmp 's/ (Dev) (Dev)/ (Dev)/g' "$PLUGIN_JSON"
+    # Dev builds always expose every module: un-hide anything flagged
+    # "hidden": true in the source plugin.json (prod keeps the flags).
+    sed -i.tmp 's/"hidden": *true/"hidden": false/g' "$PLUGIN_JSON"
     rm -f "${PLUGIN_JSON}.tmp"
 else
     sed -i.tmp 's/"slug": *"\([^"]*\)-dev"/"slug": "\1"/g' "$PLUGIN_JSON"

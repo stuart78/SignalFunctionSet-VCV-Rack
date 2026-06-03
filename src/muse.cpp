@@ -134,6 +134,41 @@ struct MuseCore {
 };
 
 
+// ─── Triadex Muse manual presets ────────────────────────────────────────────
+// Slider settings from the original Triadex Muse owner's manual (1972), as
+// transcribed via dbRackSequencer's TME presets. Each preset sets all 8
+// sliders to a specific tap index 0..39. Theme is XNOR-symmetric so the
+// per-position order doesn't affect the sonic result; we map left-to-right
+// (T1..T4 ← TME W..Z) for visual consistency.
+
+struct MusePreset {
+	const char* name;
+	uint8_t interval[4];  // A, B, C, D (TME ids 0..3)
+	uint8_t theme[4];     // T1..T4    (TME ids 4..7)
+};
+
+static const MusePreset MUSE_PRESETS[] = {
+	{"240-Note Pattern",  { 9, 10,  5,  6}, { 0,  0, 11, 12}},
+	{"Al's Surprise",     { 9, 13, 15,  2}, { 6,  9, 15, 19}},
+	{"Birds",             { 9, 10, 11,  5}, {38, 39, 39, 39}},
+	{"Christmas Bells",   {39, 38, 37, 36}, {36, 37, 38, 39}},
+	{"Dorian Muse",       { 0,  9, 11,  6}, { 9, 24,  0,  0}},
+	{"Federal Row",       {22, 13, 20, 10}, {29, 32,  4,  0}},
+	{"Flat Baroque",      { 3, 23,  9,  2}, {38, 37, 32,  0}},
+	{"Marvin's Yodel",    { 9, 25, 17, 33}, {24,  0, 23,  3}},
+	{"Meditation",        { 9, 39, 22,  0}, { 0,  0, 24, 39}},
+	{"Mesopotamia",       { 4, 13, 17,  0}, { 6, 17, 32,  5}},
+	{"Michael's Tune",    {15, 16, 13,  0}, { 0, 12, 31,  0}},
+	{"Muser's Waltz",     {18, 16, 15,  0}, { 1,  5,  9, 10}},
+	{"Polka",             { 9, 21, 19,  2}, { 6, 19, 15,  9}},
+	{"Rhyming Couplets",  { 9, 10,  5,  6}, { 0,  0, 39,  5}},
+	{"Ron's Rhapsody",    {14, 17, 14,  2}, {39,  5,  0,  6}},
+	{"Swiss Yodeler",     {16,  3, 24,  0}, {30, 29, 24,  0}},
+	{"The Crazy Cuckoo",  { 3,  9, 39,  6}, { 0,  0,  9, 39}},
+};
+static const int NUM_MUSE_PRESETS = sizeof(MUSE_PRESETS) / sizeof(MUSE_PRESETS[0]);
+
+
 struct Muse;
 
 
@@ -253,6 +288,19 @@ struct Muse : Module {
 	bool followingThisFrame = false;      // true if we read a valid master message this frame
 	int  hopsFromMasterCached = 0;     // for display
 	uint8_t lastMasterFb = 0;          // master's last fb bit (for scope when slaved)
+
+	// --- V/OCT output scaling ---
+	// 0 = standard 1V/oct (pitch use). 1/2/3 = scaled modulation modes that
+	// map pitchAddr 0..15 linearly to 0..1V / 0..2V / 0..5V; in these modes
+	// SCALE and ROOT do not affect the output (it's a modulation source, not
+	// a pitch CV).
+	enum CvScaleMode {
+		CV_SCALE_VOCT = 0,
+		CV_SCALE_1V   = 1,
+		CV_SCALE_2V   = 2,
+		CV_SCALE_5V   = 3,
+	};
+	int cvScaleMode = CV_SCALE_VOCT;
 
 	// Random scope: 0 = both, 1 = theme only, 2 = interval only
 	int  randomScope = 0;
@@ -378,6 +426,19 @@ struct Muse : Module {
 
 	// True when this Muse is currently slaved to a left-neighbor Muse.
 	bool isFollowing() const { return followingThisFrame; }
+
+	// Apply one of the Triadex manual presets — sets all 8 sliders.
+	void loadPreset(int idx) {
+		if (idx < 0 || idx >= NUM_MUSE_PRESETS) return;
+		const MusePreset& p = MUSE_PRESETS[idx];
+		for (int i = 0; i < 4; i++) {
+			params[INTERVAL_PARAM_0 + i].setValue((float)p.interval[i]);
+			params[THEME_PARAM_0    + i].setValue((float)p.theme[i]);
+		}
+		// Fresh start: clear SR so the pattern unfolds from a known seed.
+		core.clearState();
+		lastPitchAddr = -1;
+	}
 
 	int currentScaleIdx() {
 		float v = params[SCALE_PARAM].getValue();
@@ -535,7 +596,32 @@ struct Muse : Module {
 		clockFlash = std::max(0.f, clockFlash - args.sampleTime / 0.10f);
 
 		// --- Outputs ---
-		outputs[VOCT_OUTPUT].setVoltage(voctForPitchAddr(core.pitchAddr()));
+		// V/oct: standard 1V/oct with scale + root applied (VCO use).
+		// 1V/2V/5V: same scale-quantized pitch but rescaled so the natural
+		// 2-octave Muse range fills the chosen target voltage. ROOT is ignored
+		// in scaled modes (modulation use — output should stay within the
+		// stated voltage range no matter what ROOT is set to).
+		float cvOut;
+		int addrNow = core.pitchAddr();
+		if (cvScaleMode == CV_SCALE_VOCT) {
+			cvOut = voctForPitchAddr(addrNow);
+		} else {
+			const MuseScale& sc = MUSE_SCALES[currentScaleIdx()];
+			int idx3 = addrNow & 0x7;
+			int oct  = (addrNow >> 3) & 0x1;
+			float pitchSemis = sc.museSemis[idx3] + 12.f * (float)oct;
+			// The scale's full Muse range (idx3=7, D=1) = sc.museSemis[7] + 12.
+			float scaleMaxSemis = sc.museSemis[7] + 12.f;
+			if (scaleMaxSemis < 0.001f) scaleMaxSemis = 24.f;  // safety
+			float targetV;
+			switch (cvScaleMode) {
+				case CV_SCALE_1V: targetV = 1.f; break;
+				case CV_SCALE_2V: targetV = 2.f; break;
+				default:          targetV = 5.f; break;   // CV_SCALE_5V
+			}
+			cvOut = (pitchSemis / scaleMaxSemis) * targetV;
+		}
+		outputs[VOCT_OUTPUT].setVoltage(cvOut);
 		outputs[GATE_OUTPUT].setVoltage(gatePulse.process(args.sampleTime) ? 10.f : 0.f);
 	}
 
@@ -545,6 +631,7 @@ struct Muse : Module {
 		json_object_set_new(rootJ, "gateOnChangeOnly", json_boolean(gateOnChangeOnly));
 		json_object_set_new(rootJ, "randomScope", json_integer(randomScope));
 		json_object_set_new(rootJ, "linkingEnabled", json_boolean(linkingEnabled));
+		json_object_set_new(rootJ, "cvScaleMode", json_integer(cvScaleMode));
 		// Persist SR + counter state so reload picks up mid-sequence
 		json_object_set_new(rootJ, "sr", json_integer((json_int_t)core.sr));
 		json_object_set_new(rootJ, "binCounter", json_integer(core.binCounter));
@@ -563,6 +650,7 @@ struct Muse : Module {
 		if (json_t* j = json_object_get(rootJ, "gateOnChangeOnly")) gateOnChangeOnly = json_boolean_value(j);
 		if (json_t* j = json_object_get(rootJ, "randomScope"))      randomScope = clamp((int)json_integer_value(j), 0, 2);
 		if (json_t* j = json_object_get(rootJ, "linkingEnabled"))   linkingEnabled = json_boolean_value(j);
+		if (json_t* j = json_object_get(rootJ, "cvScaleMode"))      cvScaleMode = clamp((int)json_integer_value(j), 0, 3);
 		if (json_t* j = json_object_get(rootJ, "sr"))               core.sr = (uint32_t)json_integer_value(j);
 		if (json_t* j = json_object_get(rootJ, "binCounter"))       core.binCounter = (uint8_t)json_integer_value(j) & 0x0F;
 		if (json_t* j = json_object_get(rootJ, "mod12Counter"))     core.mod12Counter = (uint8_t)(json_integer_value(j) % 12);
@@ -578,8 +666,9 @@ struct MuseSlider : app::SvgSlider {
 	MuseSlider() {
 		setBackgroundSvg(Svg::load(asset::plugin(pluginInstance, "res/muse-slider-bg.svg")));
 		setHandleSvg(Svg::load(asset::plugin(pluginInstance, "res/muse-slider-handle.svg")));
-		// Background SVG is 17 wide × 244 tall (SVG units).
-		// Handle is 17 wide × 6 tall, anchored on its center.
+		// Background SVG is 17 wide × 261 tall (SVG units), with a 40-tick rail
+		// at y = 3 .. 258. Handle is 17 wide × 6 tall, anchored on its center,
+		// and we align its centers with the first and last tick.
 		//
 		// Faithful layout puts value 0 (= OFF) at the TOP and value 39 (= B31)
 		// at the BOTTOM, matching the original Muse and till.com. Because
@@ -588,8 +677,8 @@ struct MuseSlider : app::SvgSlider {
 		// value — which visually moves the handle down through the tap list
 		// (the handle follows the finger; up = lower tap index = OFF/ON/C½...).
 		setHandlePosCentered(
-			math::Vec(17.f / 2.f,  6.f / 2.f + 1.f),         // value MIN at top
-			math::Vec(17.f / 2.f,  244.f - 6.f / 2.f - 1.f)  // value MAX at bottom
+			math::Vec(17.f / 2.f,   3.f),    // value MIN aligns with tick 0 (top)
+			math::Vec(17.f / 2.f, 258.f)     // value MAX aligns with tick 39 (bottom)
 		);
 		speed = -1.f;
 	}
@@ -1312,16 +1401,45 @@ struct MuseWidget : ModuleWidget {
 		Muse* module = dynamic_cast<Muse*>(this->module);
 		assert(module);
 
+		// Triadex manual presets (slider snapshots from the original 1972 manual)
 		menu->addChild(new MenuSeparator);
-		menu->addChild(createMenuLabel("Scale"));
-		for (int i = 0; i < NUM_MUSE_SCALES; i++) {
-			int idx = i;
-			menu->addChild(createCheckMenuItem(
-				MUSE_SCALES[i].museName, "",
-				[=]() { return (int)std::round(module->params[Muse::SCALE_PARAM].getValue()) == idx; },
-				[=]() { module->params[Muse::SCALE_PARAM].setValue((float)idx); }
-			));
-		}
+		menu->addChild(createSubmenuItem("Presets (from Triadex manual)", "",
+			[=](Menu* sub) {
+				for (int i = 0; i < NUM_MUSE_PRESETS; i++) {
+					int idx = i;
+					sub->addChild(createMenuItem(
+						MUSE_PRESETS[i].name, "",
+						[=]() { module->loadPreset(idx); }
+					));
+				}
+			}));
+
+		// V/OCT output scaling. V/oct (default) is the standard 1V/oct pitch
+		// CV (with SCALE + ROOT applied); 1V / 2V / 5V are scale-quantized
+		// modes that rescale the Muse's natural range to that voltage span
+		// and ignore ROOT (useful as a modulation source).
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Output range"));
+		menu->addChild(createCheckMenuItem(
+			"V/oct", "",
+			[=]() { return module->cvScaleMode == Muse::CV_SCALE_VOCT; },
+			[=]() { module->cvScaleMode = Muse::CV_SCALE_VOCT; }
+		));
+		menu->addChild(createCheckMenuItem(
+			"1V", "",
+			[=]() { return module->cvScaleMode == Muse::CV_SCALE_1V; },
+			[=]() { module->cvScaleMode = Muse::CV_SCALE_1V; }
+		));
+		menu->addChild(createCheckMenuItem(
+			"2V", "",
+			[=]() { return module->cvScaleMode == Muse::CV_SCALE_2V; },
+			[=]() { module->cvScaleMode = Muse::CV_SCALE_2V; }
+		));
+		menu->addChild(createCheckMenuItem(
+			"5V", "",
+			[=]() { return module->cvScaleMode == Muse::CV_SCALE_5V; },
+			[=]() { module->cvScaleMode = Muse::CV_SCALE_5V; }
+		));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Link"));

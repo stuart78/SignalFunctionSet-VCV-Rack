@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include <cmath>
 #include <vector>
+#include <deque>
 
 // GRAVITY — Double-pendulum chaos LFO.
 //
@@ -65,13 +66,15 @@ struct Gravity : Module {
 		OUTPUTS_LEN
 	};
 	enum LightId {
+		ENUMS(GATE_LIGHT, NUM_SECTORS),
+		ENUMS(SECTOR_LIGHT, NUM_SECTORS),
 		LIGHTS_LEN
 	};
 
 	// --- Modes ---------------------------------------------------------------
 	// Each mode produces a single "tracked point" (drives X/Y/RADIUS/ANGLE/
 	// sectors) plus a set of "gate points" whose ray crossings fire the gates.
-	enum Mode { MODE_PENDULUM = 0, MODE_GRAVWELL = 1, MODE_BILLIARDS = 2, NUM_MODES = 3 };
+	enum Mode { MODE_PENDULUM = 0, MODE_GRAVWELL = 1, MODE_BILLIARDS = 2, MODE_HUNGRY = 3, MODE_TURTLE = 4, MODE_PATTERN = 5, NUM_MODES = 6 };
 	int mode = MODE_PENDULUM;
 	int prevMode = MODE_PENDULUM;
 
@@ -104,6 +107,116 @@ struct Gravity : Module {
 	// Slingshot drag (cue): pull back, release launches opposite the drag.
 	bool   bzAiming = false;
 	double bzAimX = 0.0, bzAimY = 0.0;         // current drag point (pendulum coords)
+
+	// --- Hungry Man (Pac-Man) state -----------------------------------------
+	// A polar-grid maze of CELLS (corridors), with the drawn lines as WALLS.
+	// Cells = nodes Hungry Man walks; a wall between two cells is drawn unless a
+	// passage was carved (spanning tree). 6 sectors aligns the wedges with the
+	// 6 gate rays. Cell (ring r, sector s): r in 0..HM_RINGS-1, s in 0..HM_SPOKES-1.
+	//   node index = r * HM_SPOKES + s
+	// Cell CENTER sits between walls: radius (r+0.5)/HM_RINGS, angle (s+0.5)*60°.
+	static const int HM_SPOKES = 12;   // 12 maze segments (2 per gate sector)
+	static const int HM_RINGS  = 4;
+	static const int HM_NODES  = HM_SPOKES * HM_RINGS;
+	// Passage flags between cells (true = open corridor, false = wall drawn):
+	bool   hmPassRing[HM_NODES] = {};           // open between (r,s) and (r+1,s); idx = r*S+s, r<RINGS-1
+	bool   hmPassRad[HM_NODES]  = {};           // open between (r,s) and (r,(s+1)%S); idx = r*S+s
+	// Adjacency (built from passages) for BFS pathfinding.
+	int    hmAdj[HM_NODES][4];
+	int    hmAdjN[HM_NODES] = {};
+	// Dots live in cell centers: one per cell; big dots replace small on chosen cells.
+	bool   hmBigDot[HM_NODES] = {};
+	bool   hmSmallDot[HM_NODES] = {};
+	int    hmBigCount = 0, hmSmallCount = 0;
+	// Traversal: moving from cell hmFrom to cell hmTo, progress 0..1.
+	int    hmFrom = 0, hmTo = 0;
+	float  hmProg = 0.f;
+	int    hmTarget = -1;
+	float  hmHeading = 0.f;                      // facing (screen radians, set in display)
+	bool   hmInit = false;
+	// Score + leveling. Eating a small dot = 1, big dot = 5. Clearing the board
+	// advances the level: a fresh maze is drawn and "LEVEL N" flashes briefly.
+	int    hmLevel = 1;
+	long   hmScore = 0;
+	float  hmLevelFlash = 0.f;                   // seconds remaining on the banner
+
+	// --- Turtle (LOGO graphics) state ---------------------------------------
+	// The tracked point IS the turtle. It executes random LOGO-style drawing
+	// commands. SPEED = pen speed, CHAOS = how often a new command is issued,
+	// GRAVITY = bias toward common (FD/turn) vs esoteric (spiral/home/hop) moves.
+	enum TurtleCmd {
+		TU_STRAIGHT, TU_VEER_L, TU_VEER_R, TU_ARC_L, TU_ARC_R,
+		TU_CORNER_L, TU_CORNER_R, TU_SPIRAL, TU_SETHEAD, TU_PENHOP, TU_HOME,
+		TU_NUMCMD
+	};
+	float  tuX = 0.f, tuY = 0.f;       // position (model coords)
+	float  tuHeading = (float) M_PI;   // dir vector = (sin h, cos h); PI = up
+	bool   tuPenDown = true;
+	float  tuCmdTime = 0.f;            // elapsed in current command (s)
+	float  tuCmdDur = 0.6f;            // total duration of current command (s)
+	float  tuMoveRate = 0.f;          // model units / s (forward)
+	float  tuTurnRate = 0.f;          // rad / s
+	float  tuTurnAccel = 0.f;         // rad / s^2 (spirals)
+	int    tuCmd = TU_STRAIGHT;
+	int    tuCmdSeq = 0;             // increments each new command (UI watches this)
+	int    tuTeleport = 0;            // increments on jumps (trail break marker)
+	bool   tuInit = false;
+
+	// --- Pattern (turtle spirograph / Maurer rose) state --------------------
+	// A generative pattern engine that shares the turtle's position/trail/icon.
+	// Each figure is a closed rose r = sin(n*theta) walked at integer-degree
+	// steps d (a division of 360) so it always closes into a symmetric picture.
+	// GRAVITY = symmetry (petal count), CHAOS = intricacy (smooth rose -> dense
+	// web -> harmonic/fractal lobes). The turtle traces the precomputed verts.
+	static const int PT_MAXV = 1900;
+	float  ptVx[PT_MAXV] = {};
+	float  ptVy[PT_MAXV] = {};
+	int    ptCount = 0;
+	int    ptSeg = 0;
+	float  ptProg = 0.f;
+	float  ptDwell = 0.f;            // pause after completing a figure (s)
+	int    ptGen = 0;                // increments per new figure (UI clears trail)
+	int    ptN = 6, ptQ = 1, ptD = 24;  // descriptor for the on-screen label (p/q, step)
+	bool   ptInit = false;
+
+	// Radial mapping: an open hub of HM_R0 leaves the center clear (Pac-Man
+	// style) and spreads the inner-ring cells so they don't pile up at center.
+	static constexpr float HM_R0 = 0.30f;       // inner hole as fraction of RMAX
+	static float hmRingFrac(float ringPos) {    // ringPos 0..HM_RINGS -> 0..1
+		return HM_R0 + (1.f - HM_R0) * ringPos / (float) HM_RINGS;
+	}
+	static int hmCell(int r, int s) {
+		return r * HM_SPOKES + ((s % HM_SPOKES) + HM_SPOKES) % HM_SPOKES;
+	}
+	// Cell center -> pendulum coords.
+	void hmNodePos(int node, float& x, float& y) const {
+		int r = node / HM_SPOKES;
+		int s = node % HM_SPOKES;
+		float rad = hmRingFrac(r + 0.5f) * (REACH * 0.92f);
+		float ang = (s + 0.5f) * (2.f * (float) M_PI / HM_SPOKES);
+		x = rad * std::sin(ang);
+		y = rad * std::cos(ang);
+	}
+
+	// Physical length of the from->to segment (model units). Arc moves measure
+	// along the ring arc (matching the visual interpolation); radial moves use
+	// the chord. Used to keep Hungry Man's LINEAR speed constant so he doesn't
+	// sprint along long outer-ring arcs.
+	float hmSegLen(int from, int to) const {
+		if (from == to) return 1e-6f;
+		int ra = from / HM_SPOKES, rb = to / HM_SPOKES;
+		if (ra == rb) {                              // arc along the ring
+			int s0 = from % HM_SPOKES, s1 = to % HM_SPOKES;
+			int ds = s1 - s0;
+			if (ds >  HM_SPOKES / 2) ds -= HM_SPOKES;
+			if (ds < -HM_SPOKES / 2) ds += HM_SPOKES;
+			float rad = hmRingFrac(ra + 0.5f) * (REACH * 0.92f);
+			return std::fabs((float) ds) * rad * (2.f * (float) M_PI / HM_SPOKES);
+		}
+		float xa, ya, xb, yb;                        // radial chord
+		hmNodePos(from, xa, ya); hmNodePos(to, xb, yb);
+		return std::hypot(xb - xa, yb - ya);
+	}
 
 	// Tracked point (filled by the active mode each sample; pendulum coords).
 	float trackedX = 0.f, trackedY = 0.f;
@@ -155,13 +268,13 @@ struct Gravity : Module {
 		configParam(SPEED_PARAM, 0.f, 1.f, 0.4f, "Speed", "");
 		configParam(CHAOS_PARAM, 0.f, 1.f, 0.6f, "Chaos", "");
 		configParam(GRAVITY_PARAM, -1.f, 1.f, 0.f, "Gravity direction", " deg", 0.f, 180.f);
-		configSwitch(MODE_PARAM, 0.f, 2.f, 0.f, "Mode",
-			{"Pendulum", "Gravity Well", "Billiards"});
+		configSwitch(MODE_PARAM, 0.f, 5.f, 0.f, "Mode",
+			{"Pendulum", "Gravity Well", "Billiards", "Hungry Man", "Turtle", "Pattern"});
 		paramQuantities[MODE_PARAM]->snapEnabled = true;
 		configInput(SPEED_INPUT, "Speed CV");
 		configInput(CHAOS_INPUT, "Chaos CV");
 		configInput(GRAVITY_INPUT, "Gravity direction CV");
-		configInput(MODE_INPUT, "Mode CV (0-10V -> 3 modes)");
+		configInput(MODE_INPUT, "Mode CV (0-10V -> 4 modes)");
 		configOutput(X_OUTPUT, "Tip X");
 		configOutput(Y_OUTPUT, "Tip Y");
 		configOutput(RADIUS_OUTPUT, "Radius (folded -5V .. +5V extended)");
@@ -271,10 +384,10 @@ struct Gravity : Module {
 			+ (inputs[GRAVITY_INPUT].isConnected() ? inputs[GRAVITY_INPUT].getVoltage() * 0.1f : 0.f),
 			0.f, 1.f);
 
-		// --- MODE select (knob 0..2 + CV; 0-10V spans the three modes) ---
+		// --- MODE select (knob + CV; 0-10V spans all modes) ---
 		int modeRaw = (int) std::round(params[MODE_PARAM].getValue());
 		if (inputs[MODE_INPUT].isConnected())
-			modeRaw += (int) std::floor(inputs[MODE_INPUT].getVoltage() / (10.f / 3.f) + 0.001f);
+			modeRaw += (int) std::floor(inputs[MODE_INPUT].getVoltage() / (10.f / (float) NUM_MODES) + 0.001f);
 		mode = clamp(modeRaw, 0, (int) NUM_MODES - 1);
 		if (mode != prevMode) { initMode(mode); prevMode = mode; }
 
@@ -343,7 +456,7 @@ struct Gravity : Module {
 			dispB2x = trackedX; dispB2y = trackedY;
 			gatePtX[0] = trackedX; gatePtY[0] = trackedY; gatePtCount = 1;
 		}
-		else { // MODE_BILLIARDS
+		else if (mode == MODE_BILLIARDS) {
 			stepBilliards(hsub, nsub, chaos);
 			trackedX = (float) bzX[0]; trackedY = (float) bzY[0];
 			dispB1x = 0.f; dispB1y = 0.f;
@@ -353,6 +466,29 @@ struct Gravity : Module {
 				gatePtY[i] = (float) bzY[i];
 			}
 			gatePtCount = bzCount;
+		}
+		else if (mode == MODE_HUNGRY) {
+			// Use RAW sample time, not the pendulum's exponential speedMult — the
+			// engine applies its own linear rate. (Feeding the ~1448x speedMult
+			// here made the per-sample while-loop iterate many cells, spiking CPU
+			// and making the UI/pots sluggish.)
+			stepHungry(args.sampleTime, chaos, grav);
+			dispB1x = 0.f; dispB1y = 0.f;
+			dispB2x = trackedX; dispB2y = trackedY;
+			gatePtX[0] = trackedX; gatePtY[0] = trackedY; gatePtCount = 1;
+		}
+		else if (mode == MODE_TURTLE) {
+			// Own linear rate (like Hungry Man) — raw sample time, not speedMult.
+			stepTurtle(args.sampleTime, speed, chaos, grav);
+			dispB1x = 0.f; dispB1y = 0.f;
+			dispB2x = trackedX; dispB2y = trackedY;
+			gatePtX[0] = trackedX; gatePtY[0] = trackedY; gatePtCount = 1;
+		}
+		else { // MODE_PATTERN
+			stepPattern(args.sampleTime, speed, chaos, grav);
+			dispB1x = 0.f; dispB1y = 0.f;
+			dispB2x = trackedX; dispB2y = trackedY;
+			gatePtX[0] = trackedX; gatePtY[0] = trackedY; gatePtCount = 1;
 		}
 
 		// ---- Shared output tail (driven by the tracked point) ----
@@ -376,6 +512,8 @@ struct Gravity : Module {
 			float target = wgt * radV;
 			sectorOut[i] += (target - sectorOut[i]) * 0.02f;
 			outputs[SECTOR_OUTPUT + i].setVoltage(sectorOut[i]);
+			// Sector LED: brightness tracks signal strength (0..10V -> 0..1).
+			lights[SECTOR_LIGHT + i].setBrightness(clamp(sectorOut[i] / 10.f, 0.f, 1.f));
 		}
 
 		// Ray-cross gates: every gate point fires the ray it crosses. Each point
@@ -405,7 +543,10 @@ struct Gravity : Module {
 
 		for (int i = 0; i < NUM_SECTORS; i++) {
 			if (gateTimer[i] > 0.f) gateTimer[i] -= args.sampleTime;
-			outputs[GATE_OUTPUT + i].setVoltage(gateTimer[i] > 0.f ? 10.f : 0.f);
+			bool gateHigh = gateTimer[i] > 0.f;
+			outputs[GATE_OUTPUT + i].setVoltage(gateHigh ? 10.f : 0.f);
+			// Gate LED: simply on while the gate is high.
+			lights[GATE_LIGHT + i].setBrightness(gateHigh ? 1.f : 0.f);
 			if (dispGateFlash[i] > 0.f) dispGateFlash[i] -= args.sampleTime * 6.f;
 		}
 	}
@@ -416,6 +557,216 @@ struct Gravity : Module {
 		for (int p = 0; p < MAX_BALLS; p++) gpInit[p] = false;
 		if (m == MODE_GRAVWELL) initGravWell();
 		else if (m == MODE_BILLIARDS) initBilliards();
+		else if (m == MODE_HUNGRY) initHungry();
+		else if (m == MODE_TURTLE) initTurtle();
+		else if (m == MODE_PATTERN) initPattern();
+	}
+
+	// ===================== Turtle (LOGO graphics) =====================
+	// Commonality of each command (0..1): higher = more conventional. GRAVITY
+	// reshapes the selection weights toward common (high) or esoteric (low).
+	static constexpr float tuCommon(int cmd) {
+		// FD, veer, arc are everyday strokes; corners common; spiral/sethead/
+		// hop/home are the "fancy" moves used sparingly by default.
+		return (cmd == TU_STRAIGHT) ? 1.00f
+		     : (cmd == TU_VEER_L || cmd == TU_VEER_R) ? 0.85f
+		     : (cmd == TU_ARC_L  || cmd == TU_ARC_R)  ? 0.65f
+		     : (cmd == TU_CORNER_L || cmd == TU_CORNER_R) ? 0.55f
+		     : (cmd == TU_SPIRAL)  ? 0.25f
+		     : (cmd == TU_SETHEAD) ? 0.20f
+		     : (cmd == TU_PENHOP)  ? 0.15f
+		     : 0.10f;  // TU_HOME
+	}
+
+	int pickTurtleCmd(float grav) {
+		// alpha > 1 favors common commands, < 1 (and negative) favors esoteric.
+		float alpha = 1.f + grav * 3.f;          // grav +1 -> 4, -1 -> -2
+		float w[TU_NUMCMD]; float sum = 0.f;
+		for (int i = 0; i < TU_NUMCMD; i++) {
+			float c = clamp(tuCommon(i), 0.05f, 1.f);
+			w[i] = std::pow(c, alpha);
+			sum += w[i];
+		}
+		float r = random::uniform() * sum;
+		for (int i = 0; i < TU_NUMCMD; i++) { r -= w[i]; if (r <= 0.f) return i; }
+		return TU_STRAIGHT;
+	}
+
+	void newTurtleCmd(float speed, float chaos, float grav) {
+		int cmd = pickTurtleCmd(grav);
+		tuCmd = cmd;
+		tuCmdTime = 0.f;
+		// Duration: high CHAOS -> short commands (frequent changes of direction).
+		float u = 1.f - clamp(chaos, 0.f, 1.f);
+		tuCmdDur = 0.12f + 1.8f * u * u;          // 0.12 .. 1.92 s
+		float sp = clamp(speed, 0.f, 1.5f);
+		float V = 0.45f + 4.5f * sp;              // forward units/s
+		float W = (55.f + 320.f * sp) * DEG;      // base turn rad/s
+		tuTurnAccel = 0.f;
+		tuPenDown = true;
+		switch (cmd) {
+			case TU_STRAIGHT: tuMoveRate = V;        tuTurnRate = 0.f; break;
+			case TU_VEER_L:   tuMoveRate = V;        tuTurnRate = +W * 0.35f; break;
+			case TU_VEER_R:   tuMoveRate = V;        tuTurnRate = -W * 0.35f; break;
+			case TU_ARC_L:    tuMoveRate = V * 0.85f; tuTurnRate = +W; break;
+			case TU_ARC_R:    tuMoveRate = V * 0.85f; tuTurnRate = -W; break;
+			case TU_CORNER_L: tuMoveRate = V * 0.2f;  tuTurnRate = +W * 2.6f; break;
+			case TU_CORNER_R: tuMoveRate = V * 0.2f;  tuTurnRate = -W * 2.6f; break;
+			case TU_SPIRAL: {
+				float dir = (random::uniform() < 0.5f) ? 1.f : -1.f;
+				tuMoveRate = V; tuTurnRate = dir * W * 0.25f; tuTurnAccel = dir * W * 1.6f;
+				break;
+			}
+			case TU_SETHEAD:  tuHeading = random::uniform() * 2.f * (float) M_PI;
+			                  tuMoveRate = V; tuTurnRate = 0.f; break;
+			case TU_PENHOP:   tuPenDown = false; tuMoveRate = V * 1.6f; tuTurnRate = 0.f; break;
+			case TU_HOME:     tuTeleport++; tuX = 0.f; tuY = 0.f;
+			                  tuHeading = random::uniform() * 2.f * (float) M_PI;
+			                  tuMoveRate = V; tuTurnRate = 0.f; break;
+		}
+		tuCmdSeq++;
+	}
+
+	void initTurtle() {
+		tuX = 0.f; tuY = 0.f;
+		tuHeading = (float) M_PI;     // facing up
+		tuPenDown = true;
+		tuTeleport++;                 // break trail continuity from any prior mode
+		tuInit = true;
+		trackedX = tuX; trackedY = tuY;
+		newTurtleCmd(params[SPEED_PARAM].getValue(),
+		             params[CHAOS_PARAM].getValue(),
+		             params[GRAVITY_PARAM].getValue());
+	}
+
+	void stepTurtle(float h, float speed, float chaos, float grav) {
+		if (!tuInit) initTurtle();
+		tuCmdTime += h;
+		if (tuCmdTime >= tuCmdDur) newTurtleCmd(speed, chaos, grav);
+
+		tuTurnRate += tuTurnAccel * h;
+		tuHeading  += tuTurnRate * h;
+		if (tuHeading > 1e4f || tuHeading < -1e4f) tuHeading = wrapPi(tuHeading);
+
+		float step = tuMoveRate * h;
+		float nx = tuX + std::sin(tuHeading) * step;
+		float ny = tuY + std::cos(tuHeading) * step;
+
+		// Bounce off the circular boundary so the drawing stays in the field.
+		const float lim = REACH * 0.96f;
+		float r = std::sqrt(nx * nx + ny * ny);
+		if (r > lim && r > 1e-6f) {
+			float Nx = nx / r, Ny = ny / r;          // outward normal
+			float Dx = std::sin(tuHeading), Dy = std::cos(tuHeading);
+			float dot = Dx * Nx + Dy * Ny;
+			Dx -= 2.f * dot * Nx; Dy -= 2.f * dot * Ny;  // reflect heading
+			tuHeading = std::atan2(Dx, Dy);
+			nx = Nx * lim; ny = Ny * lim;            // pin just inside the rim
+		}
+		tuX = nx; tuY = ny;
+		trackedX = tuX; trackedY = tuY;
+	}
+
+	// ===================== Pattern (turtle spirograph) =====================
+	static int igcd(int a, int b) { while (b) { int t = a % b; a = b; b = t; } return a < 0 ? -a : a; }
+
+	// Build a fresh rose figure into ptVx/ptVy. All angle steps are integer
+	// degrees (divisions of 360) so the figure closes cleanly.
+	void genPattern(float chaos, float grav) {
+		float g = (grav + 1.f) * 0.5f;          // 0..1
+		float c = clamp(chaos, 0.f, 1.f);
+
+		// GRAVITY -> the FORM: a rational-frequency rose  r = sin((p/q)*theta).
+		// q=1 gives plain few-petal roses; q>1 makes the curve take several turns
+		// to close, weaving self-overlapping multi-loop rose-stars. The list runs
+		// simple -> intricate so gravity genuinely changes the shape, not just its
+		// petal count. (period = q*360, still all integer-degree divisions.)
+		struct Form { int p, q; };
+		static const Form formSet[10] = {
+			{2,1}, {3,1}, {4,1}, {5,1},     // simple roses (low gravity)
+			{5,2}, {7,2}, {7,3}, {9,4},     // multi-loop rose-stars (mid)
+			{11,4}, {12,5}                   // dense webs (high gravity)
+		};
+		int fi = clamp((int) std::round(g * 9.f), 0, 9);
+		int p = formSet[fi].p, q = formSet[fi].q;
+
+		// CHAOS -> degree step d: small/even = smooth curve; coprime/large = web.
+		static const int stepLow[4]  = {2, 3, 4, 6};
+		static const int stepMid[4]  = {12, 18, 24, 36};
+		static const int stepHigh[6] = {31, 47, 59, 73, 97, 131};
+		int d;
+		if      (c < 0.34f) d = stepLow [(int) (random::uniform() * 4) & 3];
+		else if (c < 0.67f) d = stepMid [(int) (random::uniform() * 4) & 3];
+		else                d = stepHigh[(int) (random::uniform() * 6) % 6];
+
+		// High CHAOS adds a harmonic to the radius -> lobed / fractal-ish petals.
+		float harmAmp = (c > 0.6f) ? (c - 0.6f) / 0.4f * 0.5f : 0.f;     // 0..0.5
+		int   harmM   = p + 1 + (int) (random::uniform() * p);
+
+		// Not every figure fills the field edge-to-edge.
+		float fill = 0.55f + 0.42f * random::uniform();                  // 0.55..0.97
+
+		int period = q * 360;                    // degrees until the curve closes
+		int V = period / igcd(d, period);        // vertices before closure
+		if (V > PT_MAXV - 2) V = PT_MAXV - 2;
+
+		float ratio = (float) p / (float) q;
+		float maxr = 1e-6f;
+		for (int k = 0; k <= V; k++) {
+			float th = (float) (k * d) * DEG;
+			float rr = std::sin(ratio * th) * (1.f + harmAmp * std::sin(harmM * th));
+			float x = rr * std::cos(th);
+			float y = rr * std::sin(th);
+			ptVx[k] = x; ptVy[k] = y;
+			float m = std::sqrt(x * x + y * y);
+			if (m > maxr) maxr = m;
+		}
+		float scale = fill * REACH / maxr;
+		for (int k = 0; k <= V; k++) { ptVx[k] *= scale; ptVy[k] *= scale; }
+
+		ptCount = V + 1;
+		ptSeg = 0; ptProg = 0.f; ptDwell = 0.f;
+		ptN = p; ptQ = q; ptD = d;
+		ptGen++;                                // UI clears the trail on change
+		trackedX = ptVx[0]; trackedY = ptVy[0];
+		tuHeading = (ptCount > 1) ? std::atan2(ptVx[1] - ptVx[0], ptVy[1] - ptVy[0]) : 0.f;
+		tuPenDown = true;
+	}
+
+	void initPattern() {
+		ptInit = true;
+		genPattern(params[CHAOS_PARAM].getValue(), params[GRAVITY_PARAM].getValue());
+	}
+
+	void stepPattern(float h, float speed, float chaos, float grav) {
+		if (!ptInit) initPattern();
+
+		float V = 0.4f + 5.0f * clamp(speed, 0.f, 1.5f);   // model units/s
+		float dist = h * V;
+		int guard = 0;
+		while (dist > 0.f && guard++ < 64) {
+			// Reached the end: never stop — clear and start the next figure now.
+			if (ptSeg >= ptCount - 1) { genPattern(chaos, grav); continue; }
+			float ax = ptVx[ptSeg],     ay = ptVy[ptSeg];
+			float bx = ptVx[ptSeg + 1], by = ptVy[ptSeg + 1];
+			float segLen = std::hypot(bx - ax, by - ay);
+			if (segLen < 1e-6f) { ptSeg++; ptProg = 0.f; continue; }
+			float remain = (1.f - ptProg) * segLen;
+			if (dist < remain) { ptProg += dist / segLen; dist = 0.f; }
+			else               { dist -= remain; ptSeg++; ptProg = 0.f; }
+		}
+
+		if (ptSeg < ptCount - 1) {
+			float ax = ptVx[ptSeg],     ay = ptVy[ptSeg];
+			float bx = ptVx[ptSeg + 1], by = ptVy[ptSeg + 1];
+			tuX = ax + (bx - ax) * ptProg;
+			tuY = ay + (by - ay) * ptProg;
+			tuHeading = std::atan2(bx - ax, by - ay);
+		} else if (ptCount > 0) {
+			tuX = ptVx[ptCount - 1]; tuY = ptVy[ptCount - 1];
+		}
+		tuPenDown = true;
+		trackedX = tuX; trackedY = tuY;
 	}
 
 	// ===================== Gravity Well =====================
@@ -636,6 +987,216 @@ struct Gravity : Module {
 		if (d > 1e-6) { bzVx[0] = dx / d * power; bzVy[0] = dy / d * power; }
 	}
 
+	// ===================== Hungry Man (Pac-Man) =====================
+	// Cell neighbors: a cell (r,s) connects to (r-1,s), (r+1,s), (r,s-1), (r,s+1)
+	// IF the wall between them was carved open. Passage flags:
+	//   ring open between (r,s)-(r+1,s): hmPassRing[r*S+s], valid r in 0..RINGS-2
+	//   rad  open between (r,s)-(r,s+1): hmPassRad[r*S+s]  (wraps around)
+	bool hmOpen(int a, int b) const {
+		int ra = a / HM_SPOKES, sa = a % HM_SPOKES;
+		int rb = b / HM_SPOKES, sb = b % HM_SPOKES;
+		if (ra == rb) {                     // same ring -> radial(angular) passage
+			int s0 = sa, s1 = sb;
+			if ((s0 + 1) % HM_SPOKES == s1) return hmPassRad[ra * HM_SPOKES + s0];
+			if ((s1 + 1) % HM_SPOKES == s0) return hmPassRad[ra * HM_SPOKES + s1];
+			return false;
+		}
+		if (sa == sb) {                     // adjacent rings -> ring passage
+			int rlo = ra < rb ? ra : rb;
+			if (rlo + 1 == (ra > rb ? ra : rb) && rlo < HM_RINGS - 1)
+				return hmPassRing[rlo * HM_SPOKES + sa];
+		}
+		return false;
+	}
+
+	void hmRebuildAdj() {
+		for (int n = 0; n < HM_NODES; n++) hmAdjN[n] = 0;
+		for (int r = 0; r < HM_RINGS; r++) for (int s = 0; s < HM_SPOKES; s++) {
+			int n = hmCell(r, s);
+			int nbs[4] = { (r > 0) ? hmCell(r - 1, s) : -1,
+			               (r < HM_RINGS - 1) ? hmCell(r + 1, s) : -1,
+			               hmCell(r, s - 1), hmCell(r, s + 1) };
+			for (int k = 0; k < 4; k++) {
+				if (nbs[k] < 0 || nbs[k] == n) continue;
+				if (hmOpen(n, nbs[k])) hmAdj[n][hmAdjN[n]++] = nbs[k];
+			}
+		}
+	}
+
+	// Carve a perfect maze over the CELL grid (walls between cells). Kruskal
+	// over the cell-adjacency graph; an opened adjacency = no wall drawn.
+	// Full reset: new game at level 1, score 0.
+	void initHungry() {
+		hmLevel = 1;
+		hmScore = 0;
+		hmLevelFlash = 0.f;
+		hmInit = true;
+		hmNewMaze();
+	}
+
+	// Carve a fresh maze + dots and drop Hungry Man at the start. Does NOT touch
+	// level/score (used both at game start and on level advance).
+	void hmNewMaze() {
+		for (int i = 0; i < HM_NODES; i++) { hmPassRing[i] = false; hmPassRad[i] = false; }
+
+		// Candidate passages between adjacent cells.
+		struct Cand { int a, b; bool ring; int idx; };
+		static Cand cand[HM_NODES * 2];
+		int nc = 0;
+		for (int r = 0; r < HM_RINGS - 1; r++) for (int s = 0; s < HM_SPOKES; s++)
+			cand[nc++] = {hmCell(r, s), hmCell(r + 1, s), true, r * HM_SPOKES + s};
+		for (int r = 0; r < HM_RINGS; r++) for (int s = 0; s < HM_SPOKES; s++)
+			cand[nc++] = {hmCell(r, s), hmCell(r, s + 1), false, r * HM_SPOKES + s};
+
+		static int parent[HM_NODES];
+		for (int n = 0; n < HM_NODES; n++) parent[n] = n;
+		for (int i = nc - 1; i > 0; i--) {
+			int j = (int) (random::uniform() * (i + 1)); if (j > i) j = i;
+			Cand t = cand[i]; cand[i] = cand[j]; cand[j] = t;
+		}
+		auto openPass = [&](const Cand& c) {
+			if (c.ring) hmPassRing[c.idx] = true; else hmPassRad[c.idx] = true;
+		};
+		for (int i = 0; i < nc; i++) {
+			int ra = cand[i].a, rb = cand[i].b;
+			while (parent[ra] != ra) { parent[ra] = parent[parent[ra]]; ra = parent[ra]; }
+			while (parent[rb] != rb) { parent[rb] = parent[parent[rb]]; rb = parent[rb]; }
+			if (ra != rb) { parent[ra] = rb; openPass(cand[i]); }
+		}
+		// NOTE: pure spanning tree only — no braiding. Adding extra passages
+		// punches loops, and parallel loops read as confusing double-width
+		// lanes. A perfect maze keeps every corridor exactly one cell wide.
+
+		hmRebuildAdj();
+		hmFrom = hmTo = hmCell(0, 0);
+		hmProg = 0.f;
+		hmTarget = -1;
+		hmSpawnDots(params[CHAOS_PARAM].getValue(), params[GRAVITY_PARAM].getValue());
+		float x, y; hmNodePos(hmFrom, x, y); trackedX = x; trackedY = y;
+	}
+
+	// One dot per cell (small), with CHAOS-count cells upgraded to big dots,
+	// biased toward center (grav low) or edge (grav high).
+	void hmSpawnDots(float chaos, float grav) {
+		hmSmallCount = 0; hmBigCount = 0;
+		for (int n = 0; n < HM_NODES; n++) { hmSmallDot[n] = true; hmBigDot[n] = false; hmSmallCount++; }
+		int want = 1 + (int) std::round(chaos * 6.f);     // 1..7 big dots
+		float bias = (grav + 1.f) * 0.5f;                 // 0 center .. 1 edge
+		int tries = 0;
+		while (hmBigCount < want && tries < 200) {
+			tries++;
+			float u = random::uniform();
+			float shaped = (bias < 0.5f) ? std::pow(u, 1.f + (0.5f - bias) * 3.f)
+			                             : 1.f - std::pow(1.f - u, 1.f + (bias - 0.5f) * 3.f);
+			int r = (int) (shaped * HM_RINGS); if (r >= HM_RINGS) r = HM_RINGS - 1;
+			int s = (int) (random::uniform() * HM_SPOKES) % HM_SPOKES;
+			int node = hmCell(r, s);
+			if (!hmBigDot[node]) { hmBigDot[node] = true; hmBigCount++; }
+		}
+	}
+
+	// BFS from `start` to the nearest cell satisfying `want` (0 = big dot only,
+	// 1 = any dot). Returns the first cell to step toward, or -1 if none exist.
+	// `avoid` is a cell to deprioritize as the first step (so he doesn't reverse
+	// when an equal-distance alternative exists) — pass -1 for none.
+	int hmNextStep(int start, int want, int avoid) {
+		static int prev[HM_NODES];
+		static bool seen[HM_NODES];
+		static int queue[HM_NODES];
+		for (int n = 0; n < HM_NODES; n++) { seen[n] = false; prev[n] = -1; }
+		int qh = 0, qt = 0;
+		queue[qt++] = start; seen[start] = true;
+		// Visit `avoid` last among start's neighbors by seeding it pre-seen only
+		// if there's another option; simplest: just enqueue neighbors with the
+		// avoid cell pushed to the back.
+		int found = -1;
+		while (qh < qt) {
+			int cur = queue[qh++];
+			bool hit = (want == 0) ? hmBigDot[cur] : (hmBigDot[cur] || hmSmallDot[cur]);
+			if (cur != start && hit) { found = cur; break; }
+			// Enqueue neighbors; defer `avoid` if it's a direct neighbor of start.
+			int deferred = -1;
+			for (int k = 0; k < hmAdjN[cur]; k++) {
+				int nb = hmAdj[cur][k];
+				if (seen[nb]) continue;
+				if (cur == start && nb == avoid) { deferred = nb; continue; }
+				seen[nb] = true; prev[nb] = cur; queue[qt++] = nb;
+			}
+			if (deferred >= 0 && !seen[deferred]) { seen[deferred] = true; prev[deferred] = cur; queue[qt++] = deferred; }
+		}
+		if (found < 0) return -1;
+		int node = found;
+		while (prev[node] != start && prev[node] != -1) node = prev[node];
+		return node;
+	}
+
+	void stepHungry(float h, float chaos, float grav) {
+		if (!hmInit) initHungry();
+		// Constant LINEAR speed: spd is in "reference cells" per second, where a
+		// reference cell == one radial step. We convert to model units and then
+		// consume that distance across however many segments it spans, so a long
+		// outer-ring arc takes proportionally longer to traverse.
+		float cellsPerSec = 0.6f + 28.0f * clamp(params[SPEED_PARAM].getValue(), 0.f, 1.f);
+		const float refLen = (1.f - HM_R0) / HM_RINGS * (REACH * 0.92f); // radial step len
+		float dist = h * cellsPerSec * refLen;   // model units to travel this frame
+
+		// Banner countdown (real time, independent of speed).
+		if (hmLevelFlash > 0.f) hmLevelFlash -= h;
+
+		// Safety cap on iterations (prevents any runaway from starving threads).
+		int guard = 0;
+		while (dist > 0.f && guard++ < 16) {
+			float segLen = hmSegLen(hmFrom, hmTo);
+			float remain = (1.f - hmProg) * segLen;
+			if (hmFrom != hmTo && dist < remain) {
+				hmProg += dist / segLen;
+				dist = 0.f;
+				break;
+			}
+			// Reached hmTo (or we were stationary): eat its dots, score, advance.
+			dist -= remain;
+			if (hmSmallDot[hmTo]) { hmSmallDot[hmTo] = false; hmSmallCount--; hmScore += 1; }
+			if (hmBigDot[hmTo])   { hmBigDot[hmTo] = false; hmBigCount--; hmTarget = -1; hmScore += 5; }
+			int prevCell = hmFrom;
+			hmFrom = hmTo;
+			// Board cleared: advance a level — flash "LEVEL N", draw a fresh maze.
+			if (hmBigCount == 0 && hmSmallCount == 0) {
+				hmLevel++;
+				hmLevelFlash = 2.0f;
+				hmNewMaze();
+				dist = 0.f;
+				break;
+			}
+			// Head to nearest big dot; if none, nearest ANY dot (full BFS, so he
+			// can never stall while dots remain). Deprioritize reversing.
+			int next = hmNextStep(hmFrom, 0, prevCell);
+			if (next < 0) next = hmNextStep(hmFrom, 1, prevCell);
+			if (next < 0) next = hmFrom;          // ultimate guard
+			hmTo = next;
+			hmProg = 0.f;
+		}
+
+		// Interpolate position between cell centers. Same-ring moves arc along
+		// the ring; ring moves are straight radial lerps.
+		float ax, ay, bx, by;
+		hmNodePos(hmFrom, ax, ay);
+		hmNodePos(hmTo, bx, by);
+		int ra = hmFrom / HM_SPOKES, rb = hmTo / HM_SPOKES;
+		if (ra == rb && hmFrom != hmTo) {
+			int s0 = hmFrom % HM_SPOKES, s1 = hmTo % HM_SPOKES;
+			int ds = s1 - s0;
+			if (ds > HM_SPOKES / 2) ds -= HM_SPOKES;
+			if (ds < -HM_SPOKES / 2) ds += HM_SPOKES;
+			float rad = hmRingFrac(ra + 0.5f) * (REACH * 0.92f);
+			float ang = (s0 + 0.5f + ds * hmProg) * (2.f * (float) M_PI / HM_SPOKES);
+			trackedX = rad * std::sin(ang);
+			trackedY = rad * std::cos(ang);
+		} else {
+			trackedX = ax + (bx - ax) * hmProg;
+			trackedY = ay + (by - ay) * hmProg;
+		}
+	}
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
 		json_object_set_new(root, "th1", json_real(th1));
@@ -645,6 +1206,8 @@ struct Gravity : Module {
 		json_object_set_new(root, "gateHoldSec", json_real(gateHoldSec));
 		json_object_set_new(root, "trailLength", json_integer(trailLength));
 		json_object_set_new(root, "mode", json_integer(mode));
+		json_object_set_new(root, "hmLevel", json_integer(hmLevel));
+		json_object_set_new(root, "hmScore", json_integer(hmScore));
 		return root;
 	}
 
@@ -660,6 +1223,9 @@ struct Gravity : Module {
 			prevMode = mode;
 			initMode(mode);
 		}
+		// Restore score/level AFTER initMode() (which resets a fresh Hungry game).
+		if (json_t* j = json_object_get(root, "hmLevel")) hmLevel = (int) json_integer_value(j);
+		if (json_t* j = json_object_get(root, "hmScore")) hmScore = (long) json_integer_value(j);
 	}
 };
 
@@ -673,6 +1239,14 @@ struct GravityDisplay : OpaqueWidget {
 	std::shared_ptr<Font> font;
 	// Trails are UI-only: sampled once per frame, never persisted.
 	std::vector<Vec> tipTrail, elbowTrail;
+
+	// Turtle drawing trail (UI-only, long persistence via a big ring buffer).
+	struct TurtlePt { float x, y; bool pen; bool brk; };
+	std::deque<TurtlePt> turtleTrail;
+	int tuLastTeleport = -1;
+	// Instruction log (UI-only): the last few LOGO commands, newest at the end.
+	std::deque<std::string> turtleLog;
+	int tuLastSeq = -1;
 
 	// Draw the rocket centered at (cx,cy), nose pointed along headingRad
 	// (screen angle, y-down), scaled so its long axis ~= sizePx. The shape is
@@ -844,6 +1418,285 @@ struct GravityDisplay : OpaqueWidget {
 		}
 	}
 
+	// Hungry Man: draw the carved maze passages, dots, and Pac-Man.
+	void drawHungry(NVGcontext* vg) {
+		if (!module) return;
+		const NVGcolor COL_WALL = nvgRGBA(0x3a, 0x4a, 0x9a, 0xFF);   // maze walls (blue)
+		const NVGcolor COL_DOT  = nvgRGBA(0xF0, 0xC0, 0x60, 0xF0);   // small dots
+		const NVGcolor COL_BIG  = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);   // big dots (orange)
+		const NVGcolor COL_PAC  = nvgRGBA(0xF5, 0xD0, 0x30, 0xFF);   // hungry man (yellow)
+		const int   S = Gravity::HM_SPOKES;
+		const int   RINGS = Gravity::HM_RINGS;
+		const float RMAX = REACH * 0.92f;
+		const float TAU = 2.f * (float) M_PI;
+		Vec c = centerPx();
+
+		auto ringRadiusPx = [&](int boundary) {        // boundary 0..RINGS
+			return Gravity::hmRingFrac((float) boundary) * RMAX * ppu();
+		};
+		auto arcWall = [&](int boundary, int s) {       // arc across sector s at ring boundary
+			float rpx = ringRadiusPx(boundary);
+			float a0 = s * (TAU / S), a1 = (s + 1) * (TAU / S);
+			nvgBeginPath(vg);
+			int seg = 10;
+			for (int i = 0; i <= seg; i++) {
+				float a = a0 + (a1 - a0) * (float) i / seg;
+				float px = c.x + std::sin(a) * rpx;
+				float py = c.y + std::cos(a) * rpx;
+				if (i == 0) nvgMoveTo(vg, px, py); else nvgLineTo(vg, px, py);
+			}
+			nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f);
+			nvgLineCap(vg, NVG_ROUND); nvgStroke(vg);
+		};
+		auto radWall = [&](int s, int r) {              // radial spoke between sectors s|s+1, ring r
+			float a = (s + 1) * (TAU / S);
+			float r0 = ringRadiusPx(r), r1 = ringRadiusPx(r + 1);
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, c.x + std::sin(a) * r0, c.y + std::cos(a) * r0);
+			nvgLineTo(vg, c.x + std::sin(a) * r1, c.y + std::cos(a) * r1);
+			nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f);
+			nvgLineCap(vg, NVG_ROUND); nvgStroke(vg);
+		};
+
+		// Outer boundary ring + inner hub ring (both always closed).
+		nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, ringRadiusPx(RINGS));
+		nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.6f); nvgStroke(vg);
+		nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, ringRadiusPx(0));
+		nvgStrokeColor(vg, COL_WALL); nvgStrokeWidth(vg, 1.2f); nvgStroke(vg);
+
+		// Ring walls between (r,s) and (r+1,s): draw unless that passage is open.
+		for (int r = 0; r < RINGS - 1; r++)
+			for (int s = 0; s < S; s++)
+				if (!module->hmPassRing[r * S + s]) arcWall(r + 1, s);
+		// Radial walls between (r,s) and (r,s+1): draw unless open. Skip the
+		// innermost ring's radial walls so the center stays an open hub.
+		for (int r = 0; r < RINGS; r++)
+			for (int s = 0; s < S; s++)
+				if (!module->hmPassRad[r * S + s]) radWall(s, r);
+
+		// Dots at cell centers.
+		float t = (float) system::getTime();
+		float pulse = 0.75f + 0.25f * std::sin(t * 6.f);
+		for (int n = 0; n < Gravity::HM_NODES; n++) {
+			float x, y; module->hmNodePos(n, x, y); Vec p = toPx(x, y);
+			if (module->hmBigDot[n]) {
+				nvgBeginPath(vg); nvgCircle(vg, p.x, p.y, 3.6f * pulse);
+				nvgFillColor(vg, COL_BIG); nvgFill(vg);
+			} else if (module->hmSmallDot[n]) {
+				nvgBeginPath(vg); nvgCircle(vg, p.x, p.y, 1.4f);
+				nvgFillColor(vg, COL_DOT); nvgFill(vg);
+			}
+		}
+
+		// Hungry Man: chomping wedge facing its travel direction.
+		Vec hp = toPx(module->trackedX, module->trackedY);
+		float fx, fy, tx, ty;
+		module->hmNodePos(module->hmFrom, fx, fy);
+		module->hmNodePos(module->hmTo, tx, ty);
+		Vec hf = toPx(fx, fy), htn = toPx(tx, ty);
+		float scr = (module->hmFrom == module->hmTo) ? 0.f
+			: std::atan2(htn.y - hf.y, htn.x - hf.x);
+		// Mouth opens/closes 0..~40° each side.
+		float mouth = (0.05f + 0.30f * (0.5f + 0.5f * std::sin(t * 14.f))) * (float) M_PI;
+		float rad = 6.0f;
+		nvgBeginPath(vg);
+		nvgMoveTo(vg, hp.x, hp.y);
+		nvgArc(vg, hp.x, hp.y, rad, scr + mouth, scr + TAU - mouth, NVG_CW);
+		nvgClosePath(vg);
+		nvgFillColor(vg, COL_PAC);
+		nvgFill(vg);
+
+		// HUD: score + level stacked inside the open center hub. Hidden while the
+		// "LEVEL N" banner is flashing (the banner takes the center then).
+		if (font && font->handle >= 0 && module->hmLevelFlash <= 0.f) {
+			nvgFontFaceId(vg, font->handle);
+			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			nvgFontSize(vg, 11.f);
+			nvgFillColor(vg, nvgRGBA(0xF0, 0xC0, 0x60, 0xE0));
+			nvgText(vg, c.x, c.y - 7.f, string::f("%ld", module->hmScore).c_str(), NULL);
+			nvgFontSize(vg, 8.f);
+			nvgFillColor(vg, nvgRGBA(0xF0, 0xC0, 0x60, 0x90));
+			nvgText(vg, c.x, c.y + 7.f, string::f("LV %d", module->hmLevel).c_str(), NULL);
+		}
+
+		// "LEVEL N" banner flashes in the center on a new level.
+		if (module->hmLevelFlash > 0.f && font && font->handle >= 0) {
+			float a = clamp(module->hmLevelFlash / 2.0f, 0.f, 1.f);
+			// gentle blink
+			float blink = 0.55f + 0.45f * std::sin(t * 10.f);
+			float alpha = a * blink;
+			nvgFontFaceId(vg, font->handle);
+			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+			nvgFontSize(vg, 22.f);
+			nvgFillColor(vg, nvgRGBAf(0.96f, 0.82f, 0.19f, alpha));
+			nvgText(vg, c.x, c.y, string::f("LEVEL %d", module->hmLevel).c_str(), NULL);
+		}
+	}
+
+	// Sample the turtle's position into the long-lived trail (once per frame).
+	void recordTurtle() {
+		if (!module) return;
+		bool brk = module->tuTeleport != tuLastTeleport;
+		tuLastTeleport = module->tuTeleport;
+		float x = module->trackedX, y = module->trackedY;
+		if (!turtleTrail.empty() && !brk) {
+			const TurtlePt& last = turtleTrail.back();
+			float dx = x - last.x, dy = y - last.y;
+			const float minD = 0.006f * REACH;
+			if (dx * dx + dy * dy < minD * minD) return;   // barely moved; skip
+		}
+		turtleTrail.push_back({x, y, module->tuPenDown, brk});
+		const size_t MAXLEN = 6000;   // long persistence; oldest strokes age out
+		while (turtleTrail.size() > MAXLEN) turtleTrail.pop_front();
+	}
+
+	// Build a LOGO-style label for the turtle's current command.
+	std::string turtleLabel() {
+		int cmd = module->tuCmd;
+		int dist   = (int) std::round(module->tuMoveRate * module->tuCmdDur * 100.f);
+		int turn   = (int) std::round(std::fabs(module->tuTurnRate * module->tuCmdDur) / DEG);
+		int head   = ((int) std::round(module->tuHeading / DEG) % 360 + 360) % 360;
+		switch (cmd) {
+			case Gravity::TU_STRAIGHT: return string::f("FD %d", dist);
+			case Gravity::TU_VEER_L:   return string::f("LT %d FD %d", turn, dist);
+			case Gravity::TU_VEER_R:   return string::f("RT %d FD %d", turn, dist);
+			case Gravity::TU_ARC_L:    return string::f("ARC L %d", turn);
+			case Gravity::TU_ARC_R:    return string::f("ARC R %d", turn);
+			case Gravity::TU_CORNER_L: return string::f("LT %d", turn);
+			case Gravity::TU_CORNER_R: return string::f("RT %d", turn);
+			case Gravity::TU_SPIRAL:   return string::f("SPIRAL %d", dist);
+			case Gravity::TU_SETHEAD:  return string::f("SETH %d", head);
+			case Gravity::TU_PENHOP:   return string::f("PU FD %d PD", dist);
+			case Gravity::TU_HOME:     return "HOME";
+		}
+		return "FD";
+	}
+
+	// Draw a small top-down turtle at (px,py) facing heading hd (model radians).
+	void drawTurtleIcon(NVGcontext* vg, float px, float py, float hd, bool penDown) {
+		NVGcolor shell = penDown ? nvgRGBA(0x3F, 0xA8, 0x6A, 0xFF) : nvgRGBA(0x70, 0x74, 0x80, 0xFF);
+		NVGcolor limb  = penDown ? nvgRGBA(0x5A, 0xD0, 0x89, 0xFF) : nvgRGBA(0x8A, 0x8E, 0x9A, 0xFF);
+		NVGcolor edge  = nvgRGBA(0x1E, 0x4A, 0x32, penDown ? 0xFF : 0x80);
+		nvgSave(vg);
+		nvgTranslate(vg, px, py);
+		nvgRotate(vg, -hd);          // local +y points along heading
+		// legs (4) + tail + head, drawn under the shell
+		nvgFillColor(vg, limb);
+		const float legX = 3.4f, legY = 3.0f, legR = 1.7f;
+		for (int sx = -1; sx <= 1; sx += 2)
+			for (int sy = -1; sy <= 1; sy += 2) {
+				nvgBeginPath(vg); nvgCircle(vg, sx * legX, sy * legY, legR); nvgFill(vg);
+			}
+		nvgBeginPath(vg); nvgCircle(vg, 0.f, 6.4f, 2.1f); nvgFill(vg);   // head (front)
+		nvgBeginPath(vg);                                                // tail (back)
+		nvgMoveTo(vg, 0.f, -7.0f); nvgLineTo(vg, -1.4f, -4.6f); nvgLineTo(vg, 1.4f, -4.6f);
+		nvgClosePath(vg); nvgFill(vg);
+		// shell (ellipse, longer along travel)
+		nvgBeginPath(vg); nvgEllipse(vg, 0.f, 0.f, 4.3f, 5.2f);
+		nvgFillColor(vg, shell); nvgFill(vg);
+		nvgStrokeColor(vg, edge); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
+		// shell plates
+		nvgBeginPath(vg);
+		nvgMoveTo(vg, -3.6f, 0.f); nvgLineTo(vg, 3.6f, 0.f);
+		nvgMoveTo(vg, 0.f, -4.6f); nvgLineTo(vg, 0.f, 4.6f);
+		nvgStrokeColor(vg, edge); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
+		nvgRestore(vg);
+	}
+
+	// Stroke the recorded turtle trail (shared by Turtle + Pattern modes).
+	void drawTurtlePath(NVGcontext* vg) {
+		const NVGcolor PEN = nvgRGBA(0x4C, 0xC8, 0x8A, 0xBF);  // plotter green, ~75% opacity
+		nvgStrokeColor(vg, PEN);
+		nvgStrokeWidth(vg, 1.4f);
+		nvgLineCap(vg, NVG_ROUND);
+		nvgLineJoin(vg, NVG_ROUND);
+		bool open = false;
+		for (size_t i = 1; i < turtleTrail.size(); i++) {
+			const TurtlePt& a = turtleTrail[i - 1];
+			const TurtlePt& b = turtleTrail[i];
+			bool seg = a.pen && b.pen && !b.brk;   // both ends drawing, no jump
+			if (seg) {
+				Vec pa = toPx(a.x, a.y), pb = toPx(b.x, b.y);
+				if (!open) { nvgBeginPath(vg); nvgMoveTo(vg, pa.x, pa.y); open = true; }
+				nvgLineTo(vg, pb.x, pb.y);
+			} else if (open) {
+				nvgStroke(vg); open = false;
+			}
+		}
+		if (open) nvgStroke(vg);
+	}
+
+	void drawTurtle(NVGcontext* vg) {
+		if (!module) return;
+		recordTurtle();
+
+		// New command? append its instruction to the log (UI thread only).
+		if (module->tuCmdSeq != tuLastSeq) {
+			tuLastSeq = module->tuCmdSeq;
+			turtleLog.push_back(turtleLabel());
+			while (turtleLog.size() > 7) turtleLog.pop_front();
+		}
+
+		drawTurtlePath(vg);
+
+		// Instruction log: small text, top-left, newest brightest at the bottom.
+		if (font && font->handle >= 0 && !turtleLog.empty()) {
+			Vec c = centerPx();
+			float R = radiusPx();
+			nvgFontFaceId(vg, font->handle);
+			nvgFontSize(vg, 7.5f);
+			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+			float x = c.x - R * 0.66f;
+			float y0 = c.y - R * 0.62f;
+			int n = (int) turtleLog.size();
+			for (int i = 0; i < n; i++) {
+				float frac = (i + 1) / (float) n;             // older = dimmer
+				float a = 0.20f + 0.75f * frac;
+				bool newest = (i == n - 1);
+				NVGcolor col = newest ? nvgRGBAf(0.93f, 0.40f, 0.18f, 1.f)  // current = orange
+				                      : nvgRGBAf(0.30f, 0.78f, 0.54f, a);   // history = green
+				nvgFillColor(vg, col);
+				nvgText(vg, x, y0 + i * 9.f, turtleLog[i].c_str(), NULL);
+			}
+		}
+
+		// The turtle itself: a top-down turtle facing its heading.
+		Vec hp = toPx(module->trackedX, module->trackedY);
+		drawTurtleIcon(vg, hp.x, hp.y, module->tuHeading, module->tuPenDown);
+	}
+
+	int ptLastGen = -1;
+	void drawPattern(NVGcontext* vg) {
+		if (!module) return;
+		// A new figure was generated -> wipe the canvas for a clean redraw.
+		if (module->ptGen != ptLastGen) {
+			ptLastGen = module->ptGen;
+			turtleTrail.clear();
+		}
+		recordTurtle();
+		drawTurtlePath(vg);
+
+		// Generating-rule label, top-left.
+		if (font && font->handle >= 0) {
+			Vec c = centerPx();
+			float R = radiusPx();
+			nvgFontFaceId(vg, font->handle);
+			nvgFontSize(vg, 8.f);
+			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+			nvgFillColor(vg, nvgRGBAf(0.30f, 0.78f, 0.54f, 0.9f));
+			std::string form = (module->ptQ > 1)
+				? string::f("ROSE  %d/%d", module->ptN, module->ptQ)
+				: string::f("ROSE  n=%d", module->ptN);
+			nvgText(vg, c.x - R * 0.66f, c.y - R * 0.62f, form.c_str(), NULL);
+			nvgText(vg, c.x - R * 0.66f, c.y - R * 0.62f + 10.f,
+				string::f("step=%d°", module->ptD).c_str(), NULL);
+		}
+
+		// The turtle, tracing the figure.
+		Vec hp = toPx(module->trackedX, module->trackedY);
+		drawTurtleIcon(vg, hp.x, hp.y, module->tuHeading, module->tuPenDown);
+	}
+
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) { OpaqueWidget::drawLayer(args, layer); return; }
 		if (!module) {
@@ -851,7 +1704,6 @@ struct GravityDisplay : OpaqueWidget {
 			// faked as straight segments.
 			NVGcontext* vg = args.vg;
 			const NVGcolor COL_BLUE   = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
-			const NVGcolor COL_ORANGE = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 			const NVGcolor COL_GRID   = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
 			const NVGcolor COL_TIP    = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 			const NVGcolor COL_ELBOW  = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
@@ -950,12 +1802,16 @@ struct GravityDisplay : OpaqueWidget {
 		nvgStrokeWidth(vg, 1.f);
 		nvgStroke(vg);
 
-		// Six boundary rays + gate flash highlight (fixed to the panel jacks)
+		// Six boundary rays + gate flash highlight (fixed to the panel jacks).
+		// In Hungry Man the static rays clutter the maze, so draw a ray ONLY
+		// while it's flashing (i.e. just crossed) — it pulses, then fades out.
+		bool hungry = module->mode == Gravity::MODE_HUNGRY;
 		for (int k = 0; k < NUM_SECTORS; k++) {
 			float a = k * 60.f * DEG;
 			float ex = c.x + std::sin(a) * R;
 			float ey = c.y + std::cos(a) * R;
 			float flash = clamp(module->dispGateFlash[k], 0.f, 1.f);
+			if (hungry && flash < 0.01f) continue;
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, c.x, c.y);
 			nvgLineTo(vg, ex, ey);
@@ -989,26 +1845,8 @@ struct GravityDisplay : OpaqueWidget {
 			nvgStroke(vg);
 		}
 
-		// Index numbers tying the field to the radial jacks: gate id on each ray
-		// (near the rim), sector id at each wedge centre.
-		if (font && font->handle >= 0) {
-			nvgFontFaceId(vg, font->handle);
-			nvgFontSize(vg, 9.f);
-			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-			for (int k = 0; k < NUM_SECTORS; k++) {
-				float ag = k * 60.f * DEG;
-				float gx = c.x + std::sin(ag) * (R - 11.f);
-				float gy = c.y + std::cos(ag) * (R - 11.f);
-				nvgFillColor(vg, nvgRGBA(0x55, 0x55, 0x72, 0xFF));
-				nvgText(vg, gx, gy, string::f("%d", k + 1).c_str(), NULL);
-
-				float as = (k * 60.f + 30.f) * DEG;
-				float sx = c.x + std::sin(as) * (R * 0.62f);
-				float sy = c.y + std::cos(as) * (R * 0.62f);
-				nvgFillColor(vg, nvgRGBA(0x3a, 0x6a, 0x8a, 0xFF));
-				nvgText(vg, sx, sy, string::f("%d", k + 1).c_str(), NULL);
-			}
-		}
+		// (Sector/gate index numbers removed — the LEDs by each jack now convey
+		// activity, so on-screen labels were just visual noise.)
 
 		// Gravity marker. In Gravity Well it's the central SUN, a filled circle
 		// at the origin sized by the pull amount. In the other modes it's a rim
@@ -1022,7 +1860,8 @@ struct GravityDisplay : OpaqueWidget {
 				nvgFillColor(vg, nvgRGBAf(gold.r, gold.g, gold.b, 0.18f)); nvgFill(vg);
 				nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, sunR);
 				nvgFillColor(vg, gold); nvgFill(vg);
-			} else {
+			} else if (module->mode != Gravity::MODE_TURTLE && module->mode != Gravity::MODE_PATTERN) {
+				// (Turtle/Pattern use GRAVITY for weighting/symmetry, not a direction.)
 				float g = (float) module->gravAngle;
 				float mx = c.x + std::sin(g) * R;
 				float my = c.y + std::cos(g) * R;
@@ -1038,10 +1877,13 @@ struct GravityDisplay : OpaqueWidget {
 			}
 		}
 
-		// Trails
-		pushTrail();
-		drawTrail(vg, elbowTrail, COL_ELBOW);
-		drawTrail(vg, tipTrail, COL_TIP);
+		// Trails (skip in Hungry Man + Turtle + Pattern — own visuals)
+		if (module->mode != Gravity::MODE_HUNGRY && module->mode != Gravity::MODE_TURTLE
+		    && module->mode != Gravity::MODE_PATTERN) {
+			pushTrail();
+			drawTrail(vg, elbowTrail, COL_ELBOW);
+			drawTrail(vg, tipTrail, COL_TIP);
+		}
 
 		// --- Per-mode body rendering ---
 		if (module->mode == Gravity::MODE_PENDULUM) {
@@ -1085,7 +1927,7 @@ struct GravityDisplay : OpaqueWidget {
 				? std::atan2(hy, hx) : -(float) M_PI / 2.f;
 			drawRocket(vg, r.x, r.y, heading, 16.f);
 		}
-		else { // MODE_BILLIARDS
+		else if (module->mode == Gravity::MODE_BILLIARDS) {
 			for (int i = 0; i < module->bzCount && i < Gravity::MAX_BALLS; i++) {
 				Vec p = toPx((float) module->bzX[i], (float) module->bzY[i]);
 				bool cue = (i == 0);
@@ -1109,55 +1951,17 @@ struct GravityDisplay : OpaqueWidget {
 				nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 			}
 		}
+		else if (module->mode == Gravity::MODE_HUNGRY) {
+			drawHungry(vg);
+		}
+		else if (module->mode == Gravity::MODE_TURTLE) {
+			drawTurtle(vg);
+		}
+		else { // MODE_PATTERN
+			drawPattern(vg);
+		}
 
 		OpaqueWidget::drawLayer(args, layer);
-	}
-};
-
-
-// Panel labels drawn in code — VCV's SVG renderer ignores <text>, so SFS panels
-// carry their labels as the display widget / nanovg text rather than in the SVG.
-struct GravityLabels : Widget {
-	std::shared_ptr<Font> font;
-
-	void label(NVGcontext* vg, float mmx, float mmy, const char* s, float px, int align) {
-		Vec p = mm2px(Vec(mmx, mmy));
-		nvgFontFaceId(vg, font->handle);
-		nvgFontSize(vg, px);
-		nvgTextAlign(vg, align);
-		nvgText(vg, p.x, p.y, s, NULL);
-	}
-
-	void draw(const DrawArgs& args) override {
-		NVGcontext* vg = args.vg;
-		if (!font || font->handle < 0)
-			font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
-		if (!font || font->handle < 0) return;
-
-		nvgFillColor(vg, nvgRGB(0x23, 0x1f, 0x20));
-		int C = NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE;
-
-		// Left control column (pot label sits just above each pot at x=11)
-		label(vg, 11.f, 10.f, "SPEED", 6.f, C);
-		label(vg, 11.f, 36.f, "CHAOS", 6.f, C);
-		label(vg, 11.f, 62.f, "GRAV",  6.f, C);
-		label(vg, 11.f, 88.f, "MODE",  6.f, C);
-
-		// Right output column (label above each jack at x=141)
-		label(vg, 141.f, 14.f, "X",     6.f, C);
-		label(vg, 141.f, 40.f, "Y",     6.f, C);
-		label(vg, 141.f, 66.f, "RAD",   6.f, C);
-		label(vg, 141.f, 92.f, "ANG",   6.f, C);
-
-		// Ring legend (inner = gates, outer = sector CVs)
-		nvgFillColor(vg, nvgRGB(0x60, 0x60, 0x72));
-		label(vg, 76.f, 12.5f, "INNER GATE  ·  OUTER SECT", 5.2f, C);
-
-		// Wordmark
-		nvgFillColor(vg, nvgRGB(0x23, 0x1f, 0x20));
-		label(vg, 76.f, 119.f, "GRAVITY", 12.f, C);
-
-		Widget::draw(args);
 	}
 };
 
@@ -1166,16 +1970,6 @@ struct GravityWidget : ModuleWidget {
 	GravityWidget(Gravity* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/gravity.svg")));
-
-		GravityLabels* labels = new GravityLabels();
-		labels->box.pos = Vec(0, 0);
-		labels->box.size = box.size;
-		addChild(labels);
-
-		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		// Centred circular display (centred at 76,64 on the 30HP panel)
 		const float CX = 76.f, CY = 64.f;
@@ -1188,6 +1982,10 @@ struct GravityWidget : ModuleWidget {
 
 		// Radial jack mandala: gates on the inner ring at each ray angle, sector
 		// CVs on the outer ring at each wedge centre — aligned with the field.
+		// Each jack gets a small red LED offset OUTWARD (away from center) along
+		// its own radius — same distance for all, so they form two tidy rings
+		// just past the jacks.
+		const float ledOffset = 8.0f;   // mm from jack center, away from panel center
 		for (int k = 0; k < NUM_SECTORS; k++) {
 			float ag = k * 60.f * DEG;
 			float as = (k * 60.f + 30.f) * DEG;
@@ -1195,28 +1993,34 @@ struct GravityWidget : ModuleWidget {
 			Vec sp(CX + std::sin(as) * Rs, CY + std::cos(as) * Rs);
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(gp), module, Gravity::GATE_OUTPUT + k));
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(sp), module, Gravity::SECTOR_OUTPUT + k));
+			Vec gl(CX + std::sin(ag) * (Rg + ledOffset), CY + std::cos(ag) * (Rg + ledOffset));
+			Vec sl(CX + std::sin(as) * (Rs + ledOffset), CY + std::cos(as) * (Rs + ledOffset));
+			addChild(createLightCentered<SmallLight<RedLight>>(
+				mm2px(gl), module, Gravity::GATE_LIGHT + k));
+			addChild(createLightCentered<SmallLight<RedLight>>(
+				mm2px(sl), module, Gravity::SECTOR_LIGHT + k));
 		}
 
-		// Left column: 4 pot + CV-jack pairs (SPEED / CHAOS / GRAV / MODE).
-		const float colL = 11.f;
+		// Left column: 4 pot + CV-jack pairs, top->bottom MODE / GRAVITY /
+		// CHAOS / SPEED (positions from the panel reticules at x=10.16mm).
+		const float colL = 10.16f;
 		struct LCtl { int param; int input; float py; float jy; };
 		const LCtl lc[4] = {
-			{Gravity::SPEED_PARAM,   Gravity::SPEED_INPUT,   16.f, 27.f},
-			{Gravity::CHAOS_PARAM,   Gravity::CHAOS_INPUT,   42.f, 53.f},
-			{Gravity::GRAVITY_PARAM, Gravity::GRAVITY_INPUT, 68.f, 79.f},
-			{Gravity::MODE_PARAM,    Gravity::MODE_INPUT,    94.f, 105.f},
+			{Gravity::MODE_PARAM,    Gravity::MODE_INPUT,     35.55f,  45.72f},
+			{Gravity::GRAVITY_PARAM, Gravity::GRAVITY_INPUT,  60.96f,  71.12f},
+			{Gravity::CHAOS_PARAM,   Gravity::CHAOS_INPUT,    86.36f,  96.52f},
+			{Gravity::SPEED_PARAM,   Gravity::SPEED_INPUT,   111.76f, 121.93f},
 		};
 		for (int i = 0; i < 4; i++) {
-			addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(colL, lc[i].py)), module, lc[i].param));
+			addParam(createParamCentered<Trimpot>(mm2px(Vec(colL, lc[i].py)), module, lc[i].param));
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colL, lc[i].jy)), module, lc[i].input));
 		}
 
-		// Right column: 4 output jacks (X / Y / RADIUS / ANGLE).
-		const float colR = 141.f;
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 20.f)), module, Gravity::X_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 46.f)), module, Gravity::Y_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 72.f)), module, Gravity::RADIUS_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colR, 98.f)), module, Gravity::ANGLE_OUTPUT));
+		// Right outputs: 2x2 plate, bottom-right. X Y on top, ANGLE RADIUS below.
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f, 106.67f)), module, Gravity::X_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f, 106.67f)), module, Gravity::Y_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f, 121.93f)), module, Gravity::ANGLE_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f, 121.93f)), module, Gravity::RADIUS_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
@@ -1225,6 +2029,17 @@ struct GravityWidget : ModuleWidget {
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Relaunch (kick)", "", [=]() { module->relaunch(); }));
+
+		if (module->mode == Gravity::MODE_TURTLE || module->mode == Gravity::MODE_PATTERN) {
+			GravityDisplay* disp = nullptr;
+			for (Widget* w : this->children)
+				if ((disp = dynamic_cast<GravityDisplay*>(w))) break;
+			bool turtle = (module->mode == Gravity::MODE_TURTLE);
+			menu->addChild(createMenuItem("Clear drawing", "", [=]() {
+				if (disp) disp->turtleTrail.clear();
+				if (turtle) module->initTurtle(); else module->initPattern();
+			}));
+		}
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Gate hold"));

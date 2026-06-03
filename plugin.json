@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -181,13 +181,13 @@
     {
       "slug": "Gravity",
       "name": "Gravity",
-      "description": "Gravity-driven chaos engine with three modes — double pendulum, orbiting gravity well (a spring-bound rocket perturbed by planets), and elastic billiards — all sharing bipolar X/Y position, radius and angle CVs, six morph-crossfaded sector distance CVs, and six boundary-ray gates. Speed, chaos, and a mode-dependent gravity control; drag on the display to throw/aim.",
+      "description": "Gravity-driven chaos engine with six modes — double pendulum, orbiting gravity well (a spring-bound rocket perturbed by planets), elastic billiards, a Pac-Man-style maze (Hungry Man), a LOGO Turtle that draws random generative artwork, and a Pattern generator that traces spirograph/Maurer-rose figures — all sharing bipolar X/Y position, radius and angle CVs, six morph-crossfaded sector distance CVs, and six boundary-ray gates. Speed, chaos, and a mode-dependent gravity control; drag on the display to throw/aim.",
       "tags": [
         "Low-frequency oscillator",
         "Random",
-        "Utility"
-      ],
-      "hidden": true
+        "Utility",
+        "Visual"
+      ]
     }
   ]
 }

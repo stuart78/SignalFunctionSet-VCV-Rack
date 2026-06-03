@@ -22,7 +22,7 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 14. **Wave** — Polaroid wavetable voice: live parametric shape + 8 FIFO snapshots + WANDER macro
 15. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
 16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
-17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards) with X/Y, radius, angle, sector CVs and ray-crossing gates
+17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards / Hungry Man Pac-Man maze / LOGO Turtle / Pattern spirograph-rose generator) with X/Y, radius, angle, sector CVs and ray-crossing gates
 
 ## Build Commands
 
