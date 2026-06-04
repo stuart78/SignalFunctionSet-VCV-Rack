@@ -19,9 +19,9 @@
 // stage to zero — and it matches how real vactrols actually drift (LED-driven
 // photoresistor response is multiplicative, not additive).
 //
-// CURVE blends linear-rate / exponential-rate stage shaping, Swell-style.
-// LOOP latches re-triggering when the fall completes (CV input overrides the
-// latch when patched). END pulses 1ms at the end of each fall stage.
+// CURVE blends linear-rate / exponential-rate stage shaping, Swell-style, and
+// has its own CV input. LOOP latches re-triggering when the fall completes.
+// END pulses 1ms at the end of each fall stage.
 // Context-menu opt-in: CONTINUOUS DRIFT — instead of one random factor per
 // stage, the rate wobbles smoothly throughout the stage for an even more
 // "thermal" feel.
@@ -46,7 +46,7 @@ struct Vac : Module {
 		RISE_STAB_CV_INPUT,
 		FALL_CV_INPUT,
 		FALL_STAB_CV_INPUT,
-		LOOP_CV_INPUT,
+		CURVE_CV_INPUT,
 		INPUTS_LEN
 	};
 	enum OutputId {
@@ -113,7 +113,7 @@ struct Vac : Module {
 		configInput(RISE_STAB_CV_INPUT, "Rise stability CV (±5V → ±50%)");
 		configInput(FALL_CV_INPUT,      "Fall CV (±5V → ±50%)");
 		configInput(FALL_STAB_CV_INPUT, "Fall stability CV (±5V → ±50%)");
-		configInput(LOOP_CV_INPUT,      "Loop gate (overrides Loop latch when patched)");
+		configInput(CURVE_CV_INPUT,     "Curve CV (±5V → ±50%)");
 		configOutput(END_OUTPUT,        "End-of-cycle trigger (1ms pulse at end of fall)");
 		configOutput(ENV_OUTPUT,        "Envelope (0–10V)");
 	}
@@ -155,13 +155,10 @@ struct Vac : Module {
 			inputs[RISE_STAB_CV_INPUT], -1.f, 1.f);
 		float fallStab = readParamCV(params[FALL_STAB_PARAM],
 			inputs[FALL_STAB_CV_INPUT], -1.f, 1.f);
-		float curve    = clamp(params[CURVE_PARAM].getValue(), 0.f, 1.f);
+		float curve    = readParamCV(params[CURVE_PARAM], inputs[CURVE_CV_INPUT], 0.f, 1.f);
 
-		// --- LOOP state: latch + CV override ---
-		bool latchLoop = params[LOOP_PARAM].getValue() > 0.5f;
-		bool looping   = inputs[LOOP_CV_INPUT].isConnected()
-			? (inputs[LOOP_CV_INPUT].getVoltage() > 1.f)
-			: latchLoop;
+		// --- LOOP state: latch button ---
+		bool looping = params[LOOP_PARAM].getValue() > 0.5f;
 		lights[LOOP_LIGHT].setBrightness(looping ? 1.f : 0.f);
 
 		// --- TRIG: rising-edge starts a new cycle. Also auto-start when LOOP
@@ -253,34 +250,36 @@ struct VacWidget : ModuleWidget {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/vac.svg")));
 
-		// 2-column layout (Swell-style), centers at xL=7.62, xR=22.86
+		// 2-column layout; row centers read from the reticules in res/vac.svg
+		// (SVG units ÷ 2.83465 → mm). Columns: xL=7.62, xR=22.86.
 		const float xL = 7.62f;
 		const float xR = 22.86f;
 
-		// Rows
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 27.f)), module, Vac::RISE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 27.f)), module, Vac::RISE_CV_INPUT));
+		// Rise group
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 20.32f)), module, Vac::RISE_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 20.32f)), module, Vac::RISE_CV_INPUT));
 
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 40.f)), module, Vac::RISE_STAB_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 40.f)), module, Vac::RISE_STAB_CV_INPUT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 35.56f)), module, Vac::RISE_STAB_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 35.56f)), module, Vac::RISE_STAB_CV_INPUT));
 
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 53.f)), module, Vac::FALL_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 53.f)), module, Vac::FALL_CV_INPUT));
+		// Fall / curve group
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 55.88f)), module, Vac::FALL_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 55.88f)), module, Vac::FALL_CV_INPUT));
 
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 66.f)), module, Vac::FALL_STAB_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 66.f)), module, Vac::FALL_STAB_CV_INPUT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 71.12f)), module, Vac::FALL_STAB_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 71.12f)), module, Vac::FALL_STAB_CV_INPUT));
 
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 79.f)), module, Vac::CURVE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 79.f)), module, Vac::LOOP_CV_INPUT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 86.35f)), module, Vac::CURVE_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 86.35f)), module, Vac::CURVE_CV_INPUT));
 
-		// LOOP — light latch with embedded green LED
+		// LOOP — light latch with embedded green LED + TRIG in
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
-			mm2px(Vec(xL, 92.f)), module, Vac::LOOP_PARAM, Vac::LOOP_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 92.f)), module, Vac::TRIG_INPUT));
+			mm2px(Vec(xL, 106.67f)), module, Vac::LOOP_PARAM, Vac::LOOP_LIGHT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 106.67f)), module, Vac::TRIG_INPUT));
 
 		// END trig out, ENV audio out
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xL, 105.f)), module, Vac::END_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 105.f)), module, Vac::ENV_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xL, 121.92f)), module, Vac::END_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 121.92f)), module, Vac::ENV_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

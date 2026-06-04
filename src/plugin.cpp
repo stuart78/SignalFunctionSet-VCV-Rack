@@ -23,6 +23,7 @@ void init(Plugin* p) {
 	p->addModel(modelVac);
 	p->addModel(modelMuse);
 	p->addModel(modelGravity);
+	p->addModel(modelBand);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

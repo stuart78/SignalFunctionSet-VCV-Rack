@@ -25,3 +25,4 @@ extern Model* modelWave;
 extern Model* modelVac;
 extern Model* modelMuse;
 extern Model* modelGravity;
+extern Model* modelBand;

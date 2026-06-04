@@ -23,6 +23,7 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 15. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
 16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
 17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards / Hungry Man Pac-Man maze / LOGO Turtle / Pattern spirograph-rose generator) with X/Y, radius, angle, sector CVs and ray-crossing gates
+18. **Band** — Harmonic bandpass bank: 4 bands each lock to an integer harmonic of a shared (auto-detected or 1V/oct) fundamental; per-band level/harmonic/enable + CV, spectrum display
 
 ## Build Commands
 
@@ -57,6 +58,7 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/vac.cpp` — Vac
 - `src/muse.cpp` — Muse
 - `src/gravity.cpp` — Gravity
+- `src/band.cpp` — Band
 - `src/dr_wav.h` — Header-only WAV loader (Phase)
 - `src/fugue-messages.hpp` — Fugue ↔ Fugue X expander messages
 - `docs/conventions/` — Cross-module conventions and required patterns
@@ -805,5 +807,5 @@ void fireStepIfActive() {
 JSON saves: editPattern, editMode, playPattern, playStep, currentBar, advanceOnBarOnly, and per-pattern: active, length, repeats, steps[16], velocities[16], accents[16], probabilities[16].
 
 ### Default State
-On Initialize: all 8 patterns active (so a fresh Beat will visibly cycle through patterns even if most are empty). `advanceOnBarOnly = true`. EditMode = STEPS, EditPattern = 0.
+On Initialize: only pattern 1 active (enable more via double-click or the per-cell right-click menu). `advanceOnBarOnly = true`. EditMode = STEPS, EditPattern = 0. Pattern selector right-click menu: Enable/Disable, Copy pattern, Paste pattern (clipboard shared across instances; paste preserves the target's active state). Same for Note.
 - Creates expanding then contracting phase relationships

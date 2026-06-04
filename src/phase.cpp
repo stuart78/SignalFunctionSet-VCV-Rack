@@ -244,8 +244,6 @@ struct PhaseWaveformDisplay : Widget {
 
 		float tickLen = 5.f;    // horizontal tick length at top and bottom
 		float lineW = 1.f;      // vertical line width
-		// Bracket direction: start handle ticks go right, end handle ticks go left
-		float dir = isStart ? 1.f : -1.f;
 
 		// Draw as a single filled path (no transparency stacking)
 		nvgBeginPath(args.vg);
@@ -253,7 +251,6 @@ struct PhaseWaveformDisplay : Widget {
 		// Build bracket shape as a filled polygon
 		// Vertical bar + top tick + bottom tick
 		float barLeft = isStart ? px : px - lineW;
-		float barRight = isStart ? px + lineW : px;
 
 		// Vertical bar
 		nvgRect(args.vg, barLeft, y + 1.f, lineW, h - 2.f);
@@ -1834,6 +1831,42 @@ struct PhaseWidget : ModuleWidget {
 		// Stereo outputs (Y=116.84mm)
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.74f, 116.84f)), module, Phase::LEFT_OUTPUT));
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.9f, 116.84f)), module, Phase::RIGHT_OUTPUT));
+	}
+
+	// Drag-and-drop WAV files onto the module to load samples. Dropping two
+	// files loads A and B; dropping one loads A (cascading to B), unless it's
+	// dropped on the lower half of the waveform display, which targets B.
+	void onPathDrop(const PathDropEvent& e) override {
+		Phase* phase = dynamic_cast<Phase*>(this->module);
+		if (!phase) { ModuleWidget::onPathDrop(e); return; }
+
+		std::vector<std::string> wavs;
+		for (const std::string& p : e.paths)
+			if (string::endsWith(string::lowercase(p), ".wav")) wavs.push_back(p);
+		if (wavs.empty()) { ModuleWidget::onPathDrop(e); return; }
+
+		if (wavs.size() >= 2) {
+			phase->loadSample(phase->sampleA, wavs[0]);
+			phase->loadSample(phase->sampleB, wavs[1]);
+			phase->sampleBExplicitlyLoaded = true;
+			e.consume(this);
+			return;
+		}
+
+		// Single file: lower half of the display targets B, otherwise A.
+		Rect disp;
+		disp.pos  = mm2px(Vec(2.54f, 14.f));
+		disp.size = mm2px(Vec(91.44f, 24.f));
+		bool toB = disp.contains(e.pos) && e.pos.y > disp.pos.y + disp.size.y * 0.5f;
+		if (toB) {
+			phase->loadSample(phase->sampleB, wavs[0]);
+			phase->sampleBExplicitlyLoaded = true;
+		} else {
+			phase->loadSample(phase->sampleA, wavs[0]);
+			if (!phase->sampleBExplicitlyLoaded)
+				phase->loadSample(phase->sampleB, wavs[0]);
+		}
+		e.consume(this);
 	}
 
 	void appendContextMenu(Menu* menu) override {

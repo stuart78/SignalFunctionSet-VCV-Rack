@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.12.1",
+  "version": "2.13.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -88,7 +88,7 @@
     {
       "slug": "FugueX",
       "name": "Fugue X",
-      "description": "Expander for Fugue \u2014 per-voice steps, range, sleep, probability, S&H mode, sorted CV outputs, and per-step trigger outputs",
+      "description": "Expander for Fugue — per-voice steps, range, sleep, probability, S&H mode, sorted CV outputs, and per-step trigger outputs",
       "tags": [
         "Sequencer",
         "Expander",
@@ -160,14 +160,13 @@
     {
       "slug": "Vac",
       "name": "Vac",
-      "description": "Semi-stable A/R envelope with vactrol-like drift. Rise and fall each have a bipolar STAB control: each trigger samples a fresh random factor scaled exponentially by STAB, so cycle-to-cycle timing wanders without ever collapsing. Linear\u2194exponential CURVE, latching LOOP (with CV override), END trigger out.",
+      "description": "Semi-stable A/R envelope with vactrol-like drift. Rise and fall each have a bipolar STAB control: each trigger samples a fresh random factor scaled exponentially by STAB, so cycle-to-cycle timing wanders without ever collapsing. Linear↔exponential CURVE (with CV), latching LOOP, END trigger out.",
       "tags": [
         "Envelope generator",
         "Function generator",
         "Random",
         "Utility"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Muse",
@@ -187,6 +186,16 @@
         "Random",
         "Utility",
         "Visual"
+      ]
+    },
+    {
+      "slug": "Band",
+      "name": "Band",
+      "description": "Harmonic bandpass bank. Eight narrow bands each lock to an integer harmonic of a shared 1V/oct fundamental, so individual harmonics of a rich low wave isolate dead-on every time. Fraction-of-f0 width (constant absolute bandwidth), continuous global harmonic-shift CV, per-band level/enable, mix + polyphonic per-band outputs.",
+      "tags": [
+        "Filter",
+        "Polyphonic",
+        "Effect"
       ]
     }
   ]

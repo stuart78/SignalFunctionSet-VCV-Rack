@@ -19,6 +19,8 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 - [Shift](#shift) — 4-output CV shift register with cascade chain
 - [Muse](#muse) — Faithful Triadex Muse recreation (Fredkin/Minsky, 1972)
 - [Gravity](#gravity) — Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
+- [Vac](#vac) — Semi-stable A/R envelope with vactrol-like timing drift
+- [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
 - [Other Platforms](#other-platforms)
 - [Building](#building)
 - [License](#license)
@@ -101,7 +103,7 @@ An 8-step harmonic deviation sequencer with three independent CV/gate voices (A,
 
 **Controls:**
 - **Root** (C–B): Root note for scale quantization. CV: 1V = 1 semitone.
-- **Scale** (17 modes): Scale selection. CV: 1V = 1 scale index.
+- **Scale** (19 modes): Scale selection. CV: 1V = 1 scale index.
 - **Steps** (1–8): Active sequence length.
 - **Slew** (0–100%): Adaptive portamento.
 - **Pitch Faders** (8): Base pitch per step, quantized to the selected scale.
@@ -500,6 +502,41 @@ A multi-mode chaos and motion engine. A single moving point — driven by one of
 - Relaunch (kick), Clear drawing (Turtle/Pattern), Gate hold (tight/medium/gluey), Trail length
 
 See [docs/gravity-manual.md](docs/gravity-manual.md) for the full manual.
+
+### Vac
+
+A semi-stable attack/release envelope generator. It has the classic A/R shape, but with a per-stage **STAB** control that adds *controlled, musical* cycle-to-cycle variation in timing — the way a real vactrol drifts. At STAB=0 it's a perfectly repeatable envelope; turn it up or down and each trigger's rise and/or fall stretches or shortens by a fresh random amount, so repeated patterns breathe.
+
+**Features:**
+- **Per-stage STAB** — independent bipolar stability for rise and fall. The random factor is `exp(STAB · r · ln 2.5)`, log-symmetric around 1 so a stage never collapses to zero (STAB +1 → 1×–2.5× longer, −1 → 0.4×–1× shorter).
+- **Curve** — linear ↔ exponential stage shaping (with CV).
+- **Loop** — latches auto-retriggering; toggling it on from idle also starts a cycle.
+- **END trigger** — 1ms pulse at the end of each fall, for chaining at the envelope's natural (drifting) rate.
+- **Continuous-drift mode** (context menu) — the rate wobbles smoothly *through* each stage for an even more thermal feel.
+
+**Controls:** Rise, Rise Stab, Fall, Fall Stab, Curve, Loop (LED button).
+**Inputs:** Trig, Rise CV, Rise Stab CV, Fall CV, Fall Stab CV, Curve CV.
+**Outputs:** Env (0–10V), End (1ms trigger).
+
+See [docs/vac-manual.md](docs/vac-manual.md) for the full manual.
+
+### Band
+
+A harmonic bandpass bank for isolating individual harmonics of a sound — inspired by Suzanne Ciani's technique of taking a low, rich wave and filtering out all but one harmonic at a time. Because harmonics are *linearly* spaced (f0, 2·f0, 3·f0…), a normal filter makes them fiddly to find; Band instead locks each of its four bands to an **integer harmonic** of a shared fundamental, so every band lands dead-on a partial.
+
+**Features:**
+- **Four bands (A/B/C/D)** — each isolates an integer harmonic, with its own level, harmonic selector, and enable (anti-click). Each has a colour carried into the display so you always know which control owns which harmonic.
+- **Auto-follow pitch** — detects the source's fundamental from the audio (FFT autocorrelation) and locks the harmonic grid to it, so the bands track whatever you play with no tuning. Manual 1V/oct (standard 0V = C4) tuning is also available.
+- **Width as a fraction of f0** — constant absolute bandwidth, so every harmonic isolates equally cleanly. Narrow = pure single harmonic; wider = neighbours bleed in.
+- **Global SHIFT** — continuously slides all bands between harmonics for scanning/impurity.
+- **Spectrum display** — FFT of the source on a harmonic axis, with each band's coloured bell sitting on its partial (labelled e.g. `A5`).
+- Full CV over every parameter; **MIX** and per-band **POLY** outputs.
+
+**Controls:** per band — Level, Harmonic, Enable; global — Tune, Width.
+**Inputs:** In, V/Oct, Shift, W-CV, and per band — Level CV, Harmonic CV, Enable gate.
+**Outputs:** Mix, Poly (one channel per band).
+
+See [docs/band-manual.md](docs/band-manual.md) for the full manual.
 
 ## Other Platforms
 

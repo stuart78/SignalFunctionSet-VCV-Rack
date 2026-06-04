@@ -185,13 +185,14 @@ struct Note : Module {
 		configOutput(ACCENT_OUTPUT,   "Accent");
 		configOutput(ROOT_OUTPUT,     "Root (relays current root)");
 		configOutput(SCALE_OUTPUT,    "Scale (relays current scale index)");
-		// Default: all 8 patterns active so cycling works out of the box
-		for (int p = 0; p < N_PATTERNS; p++) patterns[p].active = true;
+		// Default: only pattern 1 active. Enable more via double-click or the
+		// per-cell right-click menu.
+		patterns[0].active = true;
 	}
 
 	void onReset() override {
 		for (int p = 0; p < N_PATTERNS; p++) patterns[p] = Pattern();
-		for (int p = 0; p < N_PATTERNS; p++) patterns[p].active = true;
+		patterns[0].active = true;
 		editPattern = 0;
 		playPattern = 0;
 		playStep = 0;
@@ -464,6 +465,11 @@ struct Note : Module {
 };
 
 
+// Pattern clipboard (shared across all Note instances in this process).
+static Note::Pattern g_noteClipboard;
+static bool g_noteClipboardValid = false;
+
+
 // --- NoteDisplay implementation ---
 
 // Mockup units: 174 wide × 227 tall (= 46mm × 60mm). All layout is computed
@@ -578,11 +584,43 @@ int NoteDisplay::hitTestStatus(rack::math::Vec p) {
 void NoteDisplay::onButton(const ButtonEvent& e) {
 	if (!module) { OpaqueWidget::onButton(e); return; }
 	if (e.action != GLFW_PRESS) { OpaqueWidget::onButton(e); return; }
-	if (e.button != GLFW_MOUSE_BUTTON_LEFT) { OpaqueWidget::onButton(e); return; }
 
 	computeLayout();
 	rack::math::Vec p = e.pos;
 	dragPos = p;
+
+	// Right-click a pattern cell: per-pattern menu (enable/disable, copy, paste).
+	if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
+		int patIdx = hitTestPattern(p);
+		if (patIdx >= 0) {
+			Note* mod = module;
+			ui::Menu* menu = createMenu();
+			menu->addChild(createMenuLabel(string::f("Pattern %d", patIdx + 1)));
+			bool act = mod->patterns[patIdx].active;
+			menu->addChild(createMenuItem(act ? "Disable" : "Enable", "", [=]() {
+				mod->patterns[patIdx].active = !act;
+				if (!mod->patterns[mod->playPattern].active) {
+					mod->playPattern = mod->nextActivePattern(mod->playPattern);
+					mod->playStep = 0;
+				}
+			}));
+			menu->addChild(new MenuSeparator);
+			menu->addChild(createMenuItem("Copy pattern", "", [=]() {
+				g_noteClipboard = mod->patterns[patIdx];
+				g_noteClipboardValid = true;
+			}));
+			menu->addChild(createMenuItem("Paste pattern", "", [=]() {
+				bool wasActive = mod->patterns[patIdx].active;
+				mod->patterns[patIdx] = g_noteClipboard;
+				mod->patterns[patIdx].active = wasActive;   // paste content, keep on/off
+			}, !g_noteClipboardValid));
+			e.consume(this);
+			return;
+		}
+		OpaqueWidget::onButton(e);
+		return;
+	}
+	if (e.button != GLFW_MOUSE_BUTTON_LEFT) { OpaqueWidget::onButton(e); return; }
 
 	// (Status cells are now display-only; ROOT/SCALE/OCT are edited via the
 	// panel trimpots and CV inputs.)

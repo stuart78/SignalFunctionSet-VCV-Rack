@@ -161,9 +161,9 @@ struct Beat : Module {
 		configOutput(GATE_OUTPUT, "Gate");
 		configOutput(VELOCITY_OUTPUT, "Velocity (0-10V)");
 		configOutput(ACCENT_OUTPUT, "Accent");
-		// Default: all patterns active. An "active empty" pattern is the
-		// silent option; right-click a cell to skip it from the rotation.
-		for (int p = 0; p < NUM_PATTERNS; p++) patterns[p].active = true;
+		// Default: only pattern 1 active. Enable more via double-click or the
+		// per-cell right-click menu.
+		patterns[0].active = true;
 		currentBar = 1;
 	}
 
@@ -171,7 +171,7 @@ struct Beat : Module {
 		for (int p = 0; p < NUM_PATTERNS; p++) {
 			patterns[p] = Pattern();
 		}
-		for (int p = 0; p < NUM_PATTERNS; p++) patterns[p].active = true;
+		patterns[0].active = true;
 		editPattern = 0;
 		playPattern = 0;
 		playStep = 0;
@@ -402,6 +402,11 @@ struct Beat : Module {
 };
 
 
+// Pattern clipboard (shared across all Beat instances in this process).
+static Beat::Pattern g_beatClipboard;
+static bool g_beatClipboardValid = false;
+
+
 // --- BeatDisplay implementation ---
 
 // Mockup uses a 174 × 155 unit display (= 46 mm × 41 mm). Convert mockup
@@ -502,6 +507,38 @@ void BeatDisplay::onButton(const ButtonEvent& e) {
 	}
 	computeLayout();
 	rack::math::Vec p = e.pos;
+
+	// Right-click a pattern cell: per-pattern menu (enable/disable, copy, paste).
+	if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
+		int patIdx = hitTestPattern(p);
+		if (patIdx >= 0) {
+			Beat* mod = module;
+			ui::Menu* menu = createMenu();
+			menu->addChild(createMenuLabel(string::f("Pattern %d", patIdx + 1)));
+			bool act = mod->patterns[patIdx].active;
+			menu->addChild(createMenuItem(act ? "Disable" : "Enable", "", [=]() {
+				mod->patterns[patIdx].active = !act;
+				if (!mod->patterns[mod->playPattern].active) {
+					mod->playPattern = mod->nextActivePattern(mod->playPattern);
+					mod->playStep = 0;
+				}
+			}));
+			menu->addChild(new MenuSeparator);
+			menu->addChild(createMenuItem("Copy pattern", "", [=]() {
+				g_beatClipboard = mod->patterns[patIdx];
+				g_beatClipboardValid = true;
+			}));
+			menu->addChild(createMenuItem("Paste pattern", "", [=]() {
+				bool wasActive = mod->patterns[patIdx].active;
+				mod->patterns[patIdx] = g_beatClipboard;
+				mod->patterns[patIdx].active = wasActive;   // paste content, keep on/off
+			}, !g_beatClipboardValid));
+			e.consume(this);
+			return;
+		}
+		OpaqueWidget::onButton(e);
+		return;
+	}
 
 	if (e.button != GLFW_MOUSE_BUTTON_LEFT) {
 		OpaqueWidget::onButton(e);
