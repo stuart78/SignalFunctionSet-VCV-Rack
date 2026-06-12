@@ -8,6 +8,7 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 - [GSX](#gsx) — Granular synthesis VCO (Truax 1985–86 lineage)
 - [Fugue](#fugue) — 8-step harmonic deviation sequencer (3 voices)
   - [Fugue X (Expander)](#fugue-x-expander)
+  - [MetaFugue](#metafugue)
 - [Phase](#phase) — Dual sample looper with sleep/rotate phase drift
 - [Overtone](#overtone) — Additive VCO with 8 togglable harmonics
 - [Intone](#intone) — CHANT/FOF formant synthesis voice
@@ -28,6 +29,10 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 ## Modules
 
 ### Drift
+
+<img src="screenshots/Drift.png" alt="Drift panel" height="320"> 
+
+**[Drift on signalfunctionset.com →](https://signalfunctionset.com/projects/drift)**
 
 A 4-channel LFO with chaos capabilities and advanced phase and scaling control.
 
@@ -61,6 +66,10 @@ A 4-channel LFO with chaos capabilities and advanced phase and scaling control.
 
 ### GSX
 
+<img src="screenshots/gsx.png" alt="GSX panel" height="320"> 
+
+**[GSX on signalfunctionset.com →](https://signalfunctionset.com/projects/gsx)**
+
 A real-time granular synthesis module inspired by Barry Truax's groundbreaking GSX system (1985–86), the first implementation of real-time granular synthesis. GSX generates dense textures from hundreds of short sound events called "grains," operating in the microsound domain (1–50ms) where changes in the time domain produce changes in the frequency/spectral domain.
 
 **Features:**
@@ -89,6 +98,10 @@ A real-time granular synthesis module inspired by Barry Truax's groundbreaking G
 - **Left / Right**: Stereo output pair
 
 ### Fugue
+
+<img src="screenshots/Fugue.png" alt="Fugue panel" height="320"> 
+
+**[Fugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
 
 An 8-step harmonic deviation sequencer with three independent CV/gate voices (A, B, C). Each voice reads the same pitch sequence but wanders harmonically according to its own controls — producing shifting counterpoint from a shared origin.
 
@@ -128,6 +141,10 @@ An 8-step harmonic deviation sequencer with three independent CV/gate voices (A,
 
 #### Fugue X (Expander)
 
+<img src="screenshots/FugueX.png" alt="Fugue X panel" height="320"> 
+
+**[Fugue X on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+
 An expander module for Fugue that adds per-voice controls for steps, range, sleep, and probability, plus sorted CV outputs and per-step trigger outputs. Place to the right of Fugue to connect automatically.
 
 **Per-Voice Controls (A, B, C):**
@@ -149,7 +166,19 @@ An expander module for Fugue that adds per-voice controls for steps, range, slee
 
 **All per-voice parameters have CV inputs** (±5V).
 
+#### MetaFugue
+
+<img src="screenshots/MetaFugue.png" alt="MetaFugue panel" height="320"> 
+
+**[MetaFugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+
+A single-module merge of Fugue + Fugue X — all of Fugue's controls plus the per-voice steps/range/sleep/probability, S&H mode, sorted min/mid/max CV outputs, and per-step trigger outputs, in one wider panel. Ideal for hosts that don't support expanders (e.g. MetaModule) or for anyone who prefers everything in one place.
+
 ### Phase
+
+<img src="screenshots/Phase.png" alt="Phase panel" height="320"> 
+
+**[Phase on signalfunctionset.com →](https://signalfunctionset.com/projects/phase)**
 
 A dual sample looper inspired by Steve Reich's phase compositions. Two loops play the same or different audio samples with independent drift controls that create gradual phase relationships. Each loop has a mode switch choosing between Sleep (silence gap after each cycle) and Rotate (continuous tape-style content drift).
 
@@ -198,6 +227,10 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 
 ### Overtone
 
+<img src="screenshots/Overtone.png" alt="Overtone panel" height="320"> 
+
+**[Overtone on signalfunctionset.com →](https://signalfunctionset.com/projects/overtone)**
+
 An additive synthesis VCO that builds waveforms from the harmonic series. The fundamental is always present; 8 toggle switches enable/disable overtones (harmonics 2–9) with natural 1/n amplitude falloff. All overtones on produces a saw-like wave; all off gives a pure sine.
 
 **Features:**
@@ -227,6 +260,10 @@ An additive synthesis VCO that builds waveforms from the harmonic series. The fu
 - Mask CV Mode: Binary (8-bit pattern) or Sweep (bottom-up harmonics)
 
 ### Intone
+
+<img src="screenshots/Intone.png" alt="Intone panel" height="320"> 
+
+**[Intone on signalfunctionset.com →](https://signalfunctionset.com/projects/intone)**
 
 A CHANT/FOF formant synthesis voice inspired by the IRCAM CHANT project (Rodet, Potard, Barriere, 1984). Generates vocal-character sound using 5 parallel formant cells, each producing overlapping FOF (Formant Wave Function) grains — damped sinusoids at formant frequencies.
 
@@ -261,6 +298,10 @@ A CHANT/FOF formant synthesis voice inspired by the IRCAM CHANT project (Rodet, 
 
 ### Tine
 
+<img src="screenshots/Tine.png" alt="Tine panel" height="320"> 
+
+**[Tine on signalfunctionset.com →](https://signalfunctionset.com/projects/tine)**
+
 A tunable 3rd-order pingable resonator based on the Gamelan Resonator circuit from Paul DeMarinis' *Pygmy Gamelan* (1973), analyzed by Werner & Teboul (AES Convention Paper 10542, 2021). The unique 3rd-order active filter topology — distinct from classic Bridged-T and Twin-T designs — produces metallic, bell-like ringing tones when pinged.
 
 **Features:**
@@ -288,6 +329,10 @@ A tunable 3rd-order pingable resonator based on the Gamelan Resonator circuit fr
 - VCA Mode (anti-click): Toggle crossfade envelope on retrigger (default: on)
 
 ### Meter
+
+<img src="screenshots/Meter.png" alt="Meter panel" height="320"> 
+
+**[Meter on signalfunctionset.com →](https://signalfunctionset.com/projects/sfs-sequencer-system)**
 
 A time-signature-aware musical clock. Most VCV clocks output evenly-spaced pulses at fixed ratios; Meter understands the *musical* structure of those pulses — bars, beats, swing, and time signatures with CV control. Designed to be the master clock for a Beat-driven rhythm rig: one Meter feeds many downstream sequencers, each potentially clocked from a different swung or grid subdivision.
 
@@ -326,6 +371,10 @@ A time-signature-aware musical clock. Most VCV clocks output evenly-spaced pulse
 
 ### Beat
 
+<img src="screenshots/Beat.png" alt="Beat panel" height="320"> 
+
+**[Beat on signalfunctionset.com →](https://signalfunctionset.com/projects/sfs-sequencer-system)**
+
 A single-voice pattern sequencer designed to pair with Meter (or any clock + bar source). One Beat instance = one drum/voice. Eight patterns × sixteen steps each, with per-step velocity, accent, and probability. Per-pattern length and per-pattern repeat count define the macro structure. Most editing happens directly on the screen; the panel itself is a narrow 10HP with just the display + jacks.
 
 **Features:**
@@ -353,6 +402,10 @@ A single-voice pattern sequencer designed to pair with Meter (or any clock + bar
 
 ### Note
 
+<img src="screenshots/Note.png" alt="Note panel" height="320"> 
+
+**[Note on signalfunctionset.com →](https://signalfunctionset.com/projects/sfs-sequencer-system)**
+
 A monophonic CV/gate pattern sequencer — Beat's pitched cousin. Eight patterns × eight steps with a 12-row pitch matrix, scale and root selection, octave shift, and per-step velocity, accent, and probability. Designed for melodic and percussion-tonal sequencing alongside Beat.
 
 **Features:**
@@ -377,6 +430,10 @@ A monophonic CV/gate pattern sequencer — Beat's pitched cousin. Eight patterns
 - Patterns: Randomize / Clear
 
 ### Swell
+
+<img src="screenshots/Swell.png" alt="Swell panel" height="320"> 
+
+**[Swell on signalfunctionset.com →](https://signalfunctionset.com/projects/swell)**
 
 A ping-driven envelope generator. Each rising edge on the PING input adds a configurable voltage rise to the current envelope value, then the envelope decays back toward zero. Multiple pings stack — you can build up a slow swell from a stream of triggers, or get a single sharp attack from a single ping.
 
@@ -404,6 +461,10 @@ Where a typical AD/AR envelope produces one fixed-shape ramp per gate, Swell *ac
 - **CV out** — 0–10V soft-saturated envelope
 
 ### Shift
+
+<img src="screenshots/Shift.png" alt="Shift panel" height="320"> 
+
+**[Shift on signalfunctionset.com →](https://signalfunctionset.com/projects/shift)**
 
 A 4-output CV shift register with per-lane controls. Sample input CV at the clock rate; route it through a chain of buffered delay/cascade stages with independent step counts, clock dividers, and step-CV modulation. Designed for generative-sequencer and CV-shaping work where you want a small forest of related-but-distinct CV streams from a single input.
 
@@ -437,6 +498,10 @@ A 4-output CV shift register with per-lane controls. Sample input CV at the cloc
 - "Clear all" — Wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
 
 ### Muse
+
+<img src="screenshots/Muse.png" alt="Muse panel" height="320"> 
+
+**[Muse on signalfunctionset.com →](https://signalfunctionset.com/projects/muse)**
 
 A faithful recreation of the **Triadex Muse**, the legendary algorithmic sequencer designed by Edward Fredkin and Marvin Minsky in 1972 (US Patent 3,610,801). It's not a step sequencer — there are no notes to program. Eight sliders tap into a network of binary counters and a 31-bit feedback shift register, and the *interaction* of those digital signals generates long, surprisingly musical melodies that can run for hundreds of steps before repeating. Small slider changes produce dramatically different tunes, but the results are always structured and deterministic.
 
@@ -472,6 +537,10 @@ See [docs/muse-manual.md](docs/muse-manual.md) for the full manual.
 
 ### Gravity
 
+<img src="screenshots/Gravity.png" alt="Gravity panel" height="320"> 
+
+**[Gravity on signalfunctionset.com →](https://signalfunctionset.com/projects/gravity)**
+
 A multi-mode chaos and motion engine. A single moving point — driven by one of six very different physical or generative systems — is read out as a rich set of control voltages: bipolar X/Y position, radius, angle, six "sector" distance CVs, and six boundary-ray gates. One small set of controls (Speed, Chaos, and a mode-dependent Gravity) reshapes whatever engine is running, and a large circular display shows exactly what the voltages are doing.
 
 **The six modes:**
@@ -505,6 +574,10 @@ See [docs/gravity-manual.md](docs/gravity-manual.md) for the full manual.
 
 ### Vac
 
+<img src="screenshots/Vac.png" alt="Vac panel" height="320"> 
+
+**[Vac on signalfunctionset.com →](https://signalfunctionset.com/projects/vac)**
+
 A semi-stable attack/release envelope generator. It has the classic A/R shape, but with a per-stage **STAB** control that adds *controlled, musical* cycle-to-cycle variation in timing — the way a real vactrol drifts. At STAB=0 it's a perfectly repeatable envelope; turn it up or down and each trigger's rise and/or fall stretches or shortens by a fresh random amount, so repeated patterns breathe.
 
 **Features:**
@@ -521,6 +594,10 @@ A semi-stable attack/release envelope generator. It has the classic A/R shape, b
 See [docs/vac-manual.md](docs/vac-manual.md) for the full manual.
 
 ### Band
+
+<img src="screenshots/Band.png" alt="Band panel" height="320"> 
+
+**[Band on signalfunctionset.com →](https://signalfunctionset.com/projects/band)**
 
 A harmonic bandpass bank for isolating individual harmonics of a sound — inspired by Suzanne Ciani's technique of taking a low, rich wave and filtering out all but one harmonic at a time. Because harmonics are *linearly* spaced (f0, 2·f0, 3·f0…), a normal filter makes them fiddly to find; Band instead locks each of its four bands to an **integer harmonic** of a shared fundamental, so every band lands dead-on a partial.
 
