@@ -15,6 +15,7 @@ void init(Plugin* p) {
 	p->addModel(modelTine);
 	p->addModel(modelMeter);
 	p->addModel(modelFugueX);
+	p->addModel(modelMetaFugue);
 	p->addModel(modelBeat);
 	p->addModel(modelNote);
 	p->addModel(modelSwell);
@@ -24,6 +25,7 @@ void init(Plugin* p) {
 	p->addModel(modelMuse);
 	p->addModel(modelGravity);
 	p->addModel(modelBand);
+	p->addModel(modelCycle);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

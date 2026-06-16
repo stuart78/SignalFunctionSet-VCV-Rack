@@ -1,43 +1,19 @@
 #include "plugin.hpp"
+#include "scales.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
+// Scales come from the shared canonical list (src/scales.hpp) so SCALE CV
+// values are interchangeable across Note, Fugue, and Muse. `ScaleInfo` is kept
+// as an alias to the shared struct so the existing DSP (scale.intervals /
+// scale.size) compiles unchanged.
+using ScaleInfo = sfs::Scale;
+static const sfs::Scale* const FUGUE_SCALES = sfs::SCALES;
+static const int NUM_SCALES_FUGUE = sfs::NUM_SCALES;
 
-struct ScaleInfo {
-	const int* intervals;
-	int size;
-};
-
-static const int SCALE_MAJOR[]        = {0, 2, 4, 5, 7, 9, 11};
-static const int SCALE_NAT_MINOR[]    = {0, 2, 3, 5, 7, 8, 10};
-static const int SCALE_HARM_MINOR[]   = {0, 2, 3, 5, 7, 8, 11};
-static const int SCALE_MELO_MINOR[]   = {0, 2, 3, 5, 7, 9, 11};
-static const int SCALE_DORIAN[]       = {0, 2, 3, 5, 7, 9, 10};
-static const int SCALE_PHRYGIAN[]     = {0, 1, 3, 5, 7, 8, 10};
-static const int SCALE_LYDIAN[]       = {0, 2, 4, 6, 7, 9, 11};
-static const int SCALE_MIXOLYDIAN[]   = {0, 2, 4, 5, 7, 9, 10};
-static const int SCALE_LOCRIAN[]      = {0, 1, 3, 5, 6, 8, 10};
-static const int SCALE_PENTA_MAJ[]    = {0, 2, 4, 7, 9};
-static const int SCALE_PENTA_MIN[]    = {0, 3, 5, 7, 10};
-static const int SCALE_CHROMATIC[]    = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-
-static const ScaleInfo SCALES[] = {
-	{SCALE_MAJOR,      7},
-	{SCALE_NAT_MINOR,  7},
-	{SCALE_HARM_MINOR, 7},
-	{SCALE_MELO_MINOR, 7},
-	{SCALE_DORIAN,     7},
-	{SCALE_PHRYGIAN,   7},
-	{SCALE_LYDIAN,     7},
-	{SCALE_MIXOLYDIAN, 7},
-	{SCALE_LOCRIAN,    7},
-	{SCALE_PENTA_MAJ,  5},
-	{SCALE_PENTA_MIN,  5},
-	{SCALE_CHROMATIC, 12},
-};
 
 static const int NUM_STEPS = 8;
 static const int NUM_VOICES = 3;
-static const int CHROMATIC_SCALE_INDEX = 11;
+static const int CHROMATIC_SCALE_INDEX = 0;
 
 // ─── Harmonic Deviation Tier Tables ──────────────────────────────────────────
 
@@ -117,8 +93,12 @@ static float intervalConsonance(int semitones) {
 }
 
 // ─── Custom ParamQuantity for fader note display ────────────────────────────
+// Wrapped in an anonymous namespace so it doesn't collide with the
+// FaderParamQuantity definition in fugue.cpp (each TU gets its own).
 
-struct Fugue;
+namespace {
+
+struct MetaFugue;
 
 struct FaderParamQuantity : ParamQuantity {
 	std::string getDisplayValueString() override;
@@ -126,9 +106,10 @@ struct FaderParamQuantity : ParamQuantity {
 
 // ─── Module ──────────────────────────────────────────────────────────────────
 
-struct Fugue : Module {
+struct MetaFugue : Module {
 
 	enum ParamId {
+		// ── Fugue (master) ──
 		FADER_PARAM_0,
 		FADER_PARAM_1,
 		FADER_PARAM_2,
@@ -148,7 +129,16 @@ struct Fugue : Module {
 		// 24 gate toggles, voice-major: A0,A1,…,A7, B0,B1,…,B7, C0,C1,…,C7.
 		// Index = voice * NUM_STEPS + step.
 		GATE_TOGGLE_PARAM_0,
-		PARAMS_LEN = GATE_TOGGLE_PARAM_0 + NUM_STEPS * NUM_VOICES
+		// ── FugueX (was expander, now inline) ──
+		FUGUEX_BASE = GATE_TOGGLE_PARAM_0 + NUM_STEPS * NUM_VOICES,
+		RAND_SEQ_BUTTON_PARAM = FUGUEX_BASE,
+		SAMPLE_HOLD_PARAM,
+		// Per-voice FugueX controls, voice-grouped:
+		// Steps_A, Range_A, Sleep_A, Prob_A, then B's, then C's.
+		STEPS_X_A_PARAM, RANGE_X_A_PARAM, SLEEP_X_A_PARAM, PROB_X_A_PARAM,
+		STEPS_X_B_PARAM, RANGE_X_B_PARAM, SLEEP_X_B_PARAM, PROB_X_B_PARAM,
+		STEPS_X_C_PARAM, RANGE_X_C_PARAM, SLEEP_X_C_PARAM, PROB_X_C_PARAM,
+		PARAMS_LEN
 	};
 
 	enum InputId {
@@ -163,6 +153,12 @@ struct Fugue : Module {
 		WANDER_A_INPUT,
 		WANDER_B_INPUT,
 		WANDER_C_INPUT,
+		// ── FugueX inputs (was expander, now inline) ──
+		RAND_SEQ_INPUT,
+		// Per-voice FugueX CVs, voice-grouped.
+		STEPS_X_A_INPUT, RANGE_X_A_INPUT, SLEEP_X_A_INPUT, PROB_X_A_INPUT,
+		STEPS_X_B_INPUT, RANGE_X_B_INPUT, SLEEP_X_B_INPUT, PROB_X_B_INPUT,
+		STEPS_X_C_INPUT, RANGE_X_C_INPUT, SLEEP_X_C_INPUT, PROB_X_C_INPUT,
 		INPUTS_LEN
 	};
 
@@ -171,20 +167,48 @@ struct Fugue : Module {
 		CV_A_OUTPUT, GATE_A_OUTPUT,
 		CV_B_OUTPUT, GATE_B_OUTPUT,
 		CV_C_OUTPUT, GATE_C_OUTPUT,
-		OUTPUTS_LEN
+		// ── FugueX outputs (was expander, now inline) ──
+		MAX_OUTPUT,
+		MID_OUTPUT,
+		MIN_OUTPUT,
+		// Per-step gate triggers: A0..A7, B0..B7, C0..C7
+		GATE_A_STEP_OUTPUT_0,
+		GATE_B_STEP_OUTPUT_0 = GATE_A_STEP_OUTPUT_0 + NUM_STEPS,
+		GATE_C_STEP_OUTPUT_0 = GATE_B_STEP_OUTPUT_0 + NUM_STEPS,
+		OUTPUTS_LEN = GATE_C_STEP_OUTPUT_0 + NUM_STEPS
 	};
-
-	// Per-voice output lookups (enums are no longer contiguous-by-type).
-	static constexpr int CV_OUTS[NUM_VOICES]   = {CV_A_OUTPUT,   CV_B_OUTPUT,   CV_C_OUTPUT};
-	static constexpr int GATE_OUTS[NUM_VOICES] = {GATE_A_OUTPUT, GATE_B_OUTPUT, GATE_C_OUTPUT};
 
 	enum LightId {
 		GATE_LIGHT_0,         // 24 gate toggle LEDs
 		STEP_A_LIGHT_0 = GATE_LIGHT_0 + NUM_STEPS * NUM_VOICES,
 		STEP_B_LIGHT_0 = STEP_A_LIGHT_0 + NUM_STEPS,
 		STEP_C_LIGHT_0 = STEP_B_LIGHT_0 + NUM_STEPS,
-		LIGHTS_LEN = STEP_C_LIGHT_0 + NUM_STEPS
+		SAMPLE_HOLD_LIGHT = STEP_C_LIGHT_0 + NUM_STEPS,
+		// FugueX step indicator matrix: 8 steps × 3 voices red LEDs, indexed
+		// as STEP_LED_X_0 + step * NUM_VOICES + voice
+		STEP_LED_X_0,
+		SLEEP_LED_0 = STEP_LED_X_0 + NUM_STEPS * NUM_VOICES,  // 3 amber sleep LEDs
+		LIGHTS_LEN = SLEEP_LED_0 + NUM_VOICES
 	};
+
+	// FugueX value tables
+	static constexpr int SLEEP_VALUES[10] = {0, 1, 2, 4, 5, 8, 16, 32, 48, 64};
+	static constexpr int NUM_SLEEP_VALUES = 10;
+	static constexpr float RANGE_VALUES[3] = {1.f, 2.f, 5.f};
+
+	// Per-voice lookup arrays — the enums are no longer contiguous in voice
+	// order, so per-voice indexing must use these tables instead of e.g.
+	// CV_A_OUTPUT + v.
+	static constexpr int CV_OUTS[NUM_VOICES]    = {CV_A_OUTPUT,   CV_B_OUTPUT,   CV_C_OUTPUT};
+	static constexpr int GATE_OUTS[NUM_VOICES]  = {GATE_A_OUTPUT, GATE_B_OUTPUT, GATE_C_OUTPUT};
+	static constexpr int STEPS_X_PARAMS[NUM_VOICES] = {STEPS_X_A_PARAM, STEPS_X_B_PARAM, STEPS_X_C_PARAM};
+	static constexpr int RANGE_X_PARAMS[NUM_VOICES] = {RANGE_X_A_PARAM, RANGE_X_B_PARAM, RANGE_X_C_PARAM};
+	static constexpr int SLEEP_X_PARAMS[NUM_VOICES] = {SLEEP_X_A_PARAM, SLEEP_X_B_PARAM, SLEEP_X_C_PARAM};
+	static constexpr int PROB_X_PARAMS[NUM_VOICES]  = {PROB_X_A_PARAM,  PROB_X_B_PARAM,  PROB_X_C_PARAM};
+	static constexpr int STEPS_X_INPUTS[NUM_VOICES] = {STEPS_X_A_INPUT, STEPS_X_B_INPUT, STEPS_X_C_INPUT};
+	static constexpr int RANGE_X_INPUTS[NUM_VOICES] = {RANGE_X_A_INPUT, RANGE_X_B_INPUT, RANGE_X_C_INPUT};
+	static constexpr int SLEEP_X_INPUTS[NUM_VOICES] = {SLEEP_X_A_INPUT, SLEEP_X_B_INPUT, SLEEP_X_C_INPUT};
+	static constexpr int PROB_X_INPUTS[NUM_VOICES]  = {PROB_X_A_INPUT,  PROB_X_B_INPUT,  PROB_X_C_INPUT};
 
 	// ─── Per-voice state ─────────────────────────────────────────────────────
 
@@ -199,6 +223,10 @@ struct Fugue : Module {
 		float currentVoltage = 0.f;
 		float targetVoltage = 0.f;
 		float slewRate = 0.f;
+		// True between Reset and the first clock pulse — makes that first
+		// clock fire step 0 (visually step 1) instead of incrementing past
+		// it to step 1 (visually step 2).
+		bool firstClockPending = true;
 	};
 
 	VoiceState voices[NUM_VOICES];
@@ -207,10 +235,22 @@ struct Fugue : Module {
 	float faderRangeVolts = 1.f;
 	bool harmonicLock = true;
 
+	// ─── Expander state ─────────────────────────────────────────────────────
+	int sleepCounter[NUM_VOICES] = {};       // clocks remaining in sleep
+	bool sleeping[NUM_VOICES] = {};          // voice is in sleep state
+	bool sampleHoldEnabled = false;
+	bool sampleHoldHolding[NUM_VOICES] = {}; // currently holding CV
+	bool probGateSuppress[NUM_VOICES] = {};  // gate suppressed by probability
+	uint32_t probRng = 12345;
+
 	// ─── Constructor ─────────────────────────────────────────────────────────
 
-	Fugue() {
+	MetaFugue() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+
+		// MetaFugue merges Fugue + FugueX into one module. FugueX's controls
+		// are read directly from the param array instead of via expander
+		// messaging (MetaModule doesn't support expanders).
 
 		// 8 pitch faders (custom ParamQuantity shows quantized note name)
 		for (int i = 0; i < NUM_STEPS; i++) {
@@ -222,11 +262,15 @@ struct Fugue : Module {
 		configSwitch(ROOT_PARAM, 0.f, 11.f, 0.f, "Root Note",
 			{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"});
 
-		// Scale (snapped)
-		configSwitch(SCALE_PARAM, 0.f, 11.f, 0.f, "Scale",
-			{"Major", "Natural Minor", "Harmonic Minor", "Melodic Minor",
-			 "Dorian", "Phrygian", "Lydian", "Mixolydian", "Locrian",
-			 "Penta Major", "Penta Minor", "Chromatic"});
+		// Scale (snapped) — order matches Note module's SCALES array so
+		// SCALE CV values are interchangeable between modules.
+		{
+			std::vector<std::string> scaleNames;
+			for (int i = 0; i < NUM_SCALES_FUGUE; i++)
+				scaleNames.push_back(sfs::SCALES[i].longName);
+			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES_FUGUE - 1), 1.f,
+				"Scale", scaleNames);
+		}
 
 		// Steps (snapped)
 		configSwitch(STEPS_PARAM, 1.f, 8.f, 8.f, "Steps",
@@ -243,13 +287,13 @@ struct Fugue : Module {
 		// Reset button (momentary)
 		configParam(RESET_BUTTON_PARAM, 0.f, 1.f, 0.f, "Reset");
 
-		// 24 gate toggle buttons, voice-major: A all 8 steps first, then B's,
-		// then C's. idx = voice * NUM_STEPS + step.
+		// 24 gate toggle buttons, voice-major indexing: A all 8 steps first,
+		// then B's, then C's. idx = voice * NUM_STEPS + step.
 		const char* voiceNames[] = {"A", "B", "C"};
 		for (int v = 0; v < NUM_VOICES; v++) {
 			for (int step = 0; step < NUM_STEPS; step++) {
 				int idx = v * NUM_STEPS + step;
-				float defaultVal = (v == 0) ? 1.f : 0.f;
+				float defaultVal = 1.f;
 				configSwitch(GATE_TOGGLE_PARAM_0 + idx, 0.f, 1.f, defaultVal,
 					string::f("Gate %s Step %d", voiceNames[v], step + 1),
 					{"Off", "On"});
@@ -276,7 +320,50 @@ struct Fugue : Module {
 		configOutput(GATE_A_OUTPUT, "Gate A");
 		configOutput(GATE_B_OUTPUT, "Gate B");
 		configOutput(GATE_C_OUTPUT, "Gate C");
+
+		// ── FugueX (inline) ──
+		configParam(RAND_SEQ_BUTTON_PARAM, 0.f, 1.f, 0.f, "Randomize Sequence");
+		configSwitch(SAMPLE_HOLD_PARAM, 0.f, 1.f, 0.f, "Sample & Hold Mode", {"Off", "On"});
+
+		const char* voiceNamesX[] = {"A", "B", "C"};
+		for (int v = 0; v < NUM_VOICES; v++) {
+			// Per-voice FugueX params (lookups, since enums are voice-grouped
+			// not contiguous-by-control)
+			configSwitch(STEPS_X_PARAMS[v], 1.f, 8.f, 8.f,
+				string::f("Steps %s", voiceNamesX[v]),
+				{"1", "2", "3", "4", "5", "6", "7", "8"});
+			configSwitch(RANGE_X_PARAMS[v], 0.f, 2.f, 0.f,
+				string::f("Range %s", voiceNamesX[v]),
+				{"1V", "2V", "5V"});
+			configSwitch(SLEEP_X_PARAMS[v], 0.f, 9.f, 0.f,
+				string::f("Sleep %s", voiceNamesX[v]),
+				{"0", "1", "2", "4", "5", "8", "16", "32", "48", "64"});
+			configParam(PROB_X_PARAMS[v], 0.f, 1.f, 1.f,
+				string::f("Probability %s", voiceNamesX[v]), "%", 0.f, 100.f);
+
+			configInput(STEPS_X_INPUTS[v], string::f("Steps %s CV", voiceNamesX[v]));
+			configInput(RANGE_X_INPUTS[v], string::f("Range %s CV", voiceNamesX[v]));
+			configInput(SLEEP_X_INPUTS[v], string::f("Sleep %s CV", voiceNamesX[v]));
+			configInput(PROB_X_INPUTS[v], string::f("Probability %s CV", voiceNamesX[v]));
+		}
+		configInput(RAND_SEQ_INPUT, "Randomize Sequence Trigger");
+		configOutput(MAX_OUTPUT, "Max CV");
+		configOutput(MID_OUTPUT, "Mid CV");
+		configOutput(MIN_OUTPUT, "Min CV");
+		for (int v = 0; v < NUM_VOICES; v++) {
+			int gateBase = (v == 0) ? GATE_A_STEP_OUTPUT_0
+			             : (v == 1) ? GATE_B_STEP_OUTPUT_0
+			                        : GATE_C_STEP_OUTPUT_0;
+			for (int s = 0; s < NUM_STEPS; s++) {
+				configOutput(gateBase + s, string::f("Gate %s Step %d", voiceNamesX[v], s + 1));
+			}
+		}
 	}
+
+	// Stable trigger pulses for the per-step gate outputs
+	dsp::PulseGenerator triggerPulses[NUM_VOICES][NUM_STEPS];
+	dsp::SchmittTrigger randSeqTrigger;
+	dsp::SchmittTrigger randSeqButtonTrigger;
 
 	// ─── JSON Persistence ────────────────────────────────────────────────────
 
@@ -284,6 +371,9 @@ struct Fugue : Module {
 		json_t* rootJ = json_object();
 		json_object_set_new(rootJ, "faderRange", json_real(faderRangeVolts));
 		json_object_set_new(rootJ, "harmonicLock", json_boolean(harmonicLock));
+		// Bump on any change to SCALE ordering so dataFromJson can migrate
+		// older saved scaleParam values.
+		json_object_set_new(rootJ, "schemaVersion", json_integer(2));
 		return rootJ;
 	}
 
@@ -292,13 +382,39 @@ struct Fugue : Module {
 		if (j) faderRangeVolts = json_number_value(j);
 		json_t* hlJ = json_object_get(rootJ, "harmonicLock");
 		if (hlJ) harmonicLock = json_boolean_value(hlJ);
+
+		// Schema v1 → v2: SCALE ordering changed to match Note. Remap the
+		// saved scale param so the patch sounds the same as before.
+		json_t* schemaJ = json_object_get(rootJ, "schemaVersion");
+		int schema = schemaJ ? (int)json_integer_value(schemaJ) : 1;
+		if (schema < 2) {
+			// old → new index map
+			static const int REMAP[12] = {
+				1,  // 0 Major          → 1
+				2,  // 1 Natural Minor  → 2
+				12, // 2 Harmonic Minor → 12
+				17, // 3 Melodic Minor  → 17
+				8,  // 4 Dorian         → 8
+				9,  // 5 Phrygian       → 9
+				10, // 6 Lydian         → 10
+				11, // 7 Mixolydian     → 11
+				18, // 8 Locrian        → 18
+				3,  // 9 Penta Major    → 3
+				4,  // 10 Penta Minor   → 4
+				0,  // 11 Chromatic     → 0
+			};
+			int oldVal = (int)std::round(params[SCALE_PARAM].getValue());
+			if (oldVal >= 0 && oldVal < 12) {
+				params[SCALE_PARAM].setValue((float)REMAP[oldVal]);
+			}
+		}
 	}
 
 	// ─── Scale Quantization ──────────────────────────────────────────────────
 
 	float faderToVoltage(float faderValue, int rootNote, int scaleIndex, float faderRange) {
 		float rawVoltage = faderValue * faderRange;
-		const ScaleInfo& scale = SCALES[scaleIndex];
+		const ScaleInfo& scale = sfs::SCALES[scaleIndex];
 
 		float bestVoltage = 0.f;
 		float bestDist = 999.f;
@@ -308,8 +424,8 @@ struct Fugue : Module {
 
 		for (int oct = 0; oct <= maxOctaves; oct++) {
 			for (int d = 0; d < scale.size; d++) {
-				int semitone = oct * 12 + scale.intervals[d];
-				float noteVoltage = (float)semitone / 12.f;
+				float semitone = (float)(oct * 12) + scale.intervals[d];
+				float noteVoltage = semitone / 12.f;
 
 				if (noteVoltage > faderRange + 0.05f) break;
 				if (noteVoltage < -0.05f) continue;
@@ -362,7 +478,7 @@ struct Fugue : Module {
 		}
 		else {
 			// ── Diatonic / Pentatonic mode: scale-degree-based ──
-			const ScaleInfo& scale = SCALES[scaleIndex];
+			const ScaleInfo& scale = sfs::SCALES[scaleIndex];
 			bool isPenta = (scale.size == 5);
 			const DeviationTier* tiers = isPenta ? PENTATONIC_TIERS : DIATONIC_TIERS;
 			int numTiers = isPenta ? NUM_PENTATONIC_TIERS : NUM_DIATONIC_TIERS;
@@ -401,11 +517,15 @@ struct Fugue : Module {
 				if (baseSemiNorm < 0) baseSemiNorm += 12;
 				int baseOctave = (int)std::floor(baseSemiFromRoot / 12.f);
 
+				// Find scale degree closest to baseSemiNorm. Floats are used
+				// so non-12-TET scales (Pelog, Slendro, Harmonic) work too.
 				int baseDegree = 0;
+				float bestDiff = 999.f;
 				for (int d = 0; d < scale.size; d++) {
-					if (scale.intervals[d] == baseSemiNorm) {
+					float diff = std::fabs(scale.intervals[d] - (float)baseSemiNorm);
+					if (diff < bestDiff) {
+						bestDiff = diff;
 						baseDegree = d;
-						break;
 					}
 				}
 
@@ -428,7 +548,7 @@ struct Fugue : Module {
 					targetDegree = raw % scale.size;
 				}
 
-				float targetSemi = targetOctave * 12 + scale.intervals[targetDegree];
+				float targetSemi = (float)(targetOctave * 12) + scale.intervals[targetDegree];
 				float dev = (float)rootNote / 12.f + targetSemi / 12.f;
 				return clamp(dev, baseVoltage - faderRange, baseVoltage + faderRange);
 			}
@@ -526,6 +646,10 @@ struct Fugue : Module {
 	// ─── Step Advance ────────────────────────────────────────────────────────
 
 	void onVoiceStepAdvance(int voiceIdx) {
+		onVoiceStepAdvanceWithRange(voiceIdx, faderRangeVolts);
+	}
+
+	void onVoiceStepAdvanceWithRange(int voiceIdx, float rangeVolts) {
 		VoiceState& voice = voices[voiceIdx];
 
 		// Read root with CV (1V = 1 semitone, wraps 0-11)
@@ -540,7 +664,7 @@ struct Fugue : Module {
 		if (inputs[SCALE_CV_INPUT].isConnected()) {
 			scaleIndex += (int)std::round(inputs[SCALE_CV_INPUT].getVoltage());
 		}
-		scaleIndex = clamp(scaleIndex, 0, 11);
+		scaleIndex = clamp(scaleIndex, 0, NUM_SCALES_FUGUE - 1);
 
 		int numSteps = (int)std::round(params[STEPS_PARAM].getValue());
 
@@ -553,7 +677,7 @@ struct Fugue : Module {
 
 		// Get base voltage from current step's fader
 		float faderValue = params[FADER_PARAM_0 + voice.currentStep].getValue();
-		float baseVolt = faderToVoltage(faderValue, rootNote, scaleIndex, faderRangeVolts);
+		float baseVolt = faderToVoltage(faderValue, rootNote, scaleIndex, rangeVolts);
 
 		// Read wander with CV (0=faithful, 1=wanders; invert for internal stability)
 		float instability = params[WANDER_A_PARAM + voiceIdx].getValue();
@@ -580,7 +704,7 @@ struct Fugue : Module {
 				uint32_t candidateSeed = seed + c * 7919u;
 				if (candidateSeed == 0) candidateSeed = 1;
 				float candidate = selectDeviationNote(
-					baseVolt, stability, rootNote, scaleIndex, faderRangeVolts, candidateSeed);
+					baseVolt, stability, rootNote, scaleIndex, rangeVolts, candidateSeed);
 				float score = scoreConsonance(candidate, voiceIdx);
 				if (score > bestScore) {
 					bestScore = score;
@@ -590,7 +714,7 @@ struct Fugue : Module {
 			voice.targetVoltage = bestVolt;
 		} else {
 			voice.targetVoltage = selectDeviationNote(
-				baseVolt, stability, rootNote, scaleIndex, faderRangeVolts, seed);
+				baseVolt, stability, rootNote, scaleIndex, rangeVolts, seed);
 		}
 
 		// Calculate adaptive slew
@@ -606,6 +730,51 @@ struct Fugue : Module {
 			numSteps = clamp(numSteps, 1, 8);
 		}
 
+		// ── Read FugueX (inline) controls directly from the param array ──
+		struct VoiceOverride {
+			int stepsOverride;    // 1-8 (capped at global)
+			float rangeOverride;  // 1, 2, or 5 volts
+			int sleepDivision;    // 0 = no sleep
+			float probability;    // 0..1
+		};
+		VoiceOverride voiceOv[NUM_VOICES];
+		for (int v = 0; v < NUM_VOICES; v++) {
+			int steps = (int)std::round(params[STEPS_X_PARAMS[v]].getValue());
+			if (inputs[STEPS_X_INPUTS[v]].isConnected()) {
+				steps += (int)std::round(inputs[STEPS_X_INPUTS[v]].getVoltage());
+			}
+			voiceOv[v].stepsOverride = clamp(steps, 1, 8);
+
+			int rangeIdx = (int)std::round(params[RANGE_X_PARAMS[v]].getValue());
+			if (inputs[RANGE_X_INPUTS[v]].isConnected()) {
+				rangeIdx += (int)std::round(inputs[RANGE_X_INPUTS[v]].getVoltage());
+			}
+			voiceOv[v].rangeOverride = RANGE_VALUES[clamp(rangeIdx, 0, 2)];
+
+			int sleepIdx = (int)std::round(params[SLEEP_X_PARAMS[v]].getValue());
+			if (inputs[SLEEP_X_INPUTS[v]].isConnected()) {
+				sleepIdx += (int)std::round(inputs[SLEEP_X_INPUTS[v]].getVoltage());
+			}
+			voiceOv[v].sleepDivision = SLEEP_VALUES[clamp(sleepIdx, 0, NUM_SLEEP_VALUES - 1)];
+
+			float prob = params[PROB_X_PARAMS[v]].getValue();
+			if (inputs[PROB_X_INPUTS[v]].isConnected()) {
+				prob += inputs[PROB_X_INPUTS[v]].getVoltage() / 5.f;
+			}
+			voiceOv[v].probability = clamp(prob, 0.f, 1.f);
+		}
+
+		sampleHoldEnabled = params[SAMPLE_HOLD_PARAM].getValue() > 0.5f;
+
+		// ── Handle randomize request (button or trigger input) ──
+		bool randBtn = randSeqButtonTrigger.process(params[RAND_SEQ_BUTTON_PARAM].getValue());
+		bool randTrig = randSeqTrigger.process(inputs[RAND_SEQ_INPUT].getVoltage(), 0.1f, 1.f);
+		if (randBtn || randTrig) {
+			for (int i = 0; i < NUM_STEPS; i++) {
+				params[FADER_PARAM_0 + i].setValue(random::uniform());
+			}
+		}
+
 		// ── Reset (input or button) ──
 		bool resetTriggered = resetTrigger.process(inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f);
 		bool resetBtnTriggered = resetButtonTrigger.process(params[RESET_BUTTON_PARAM].getValue());
@@ -613,6 +782,14 @@ struct Fugue : Module {
 			for (int v = 0; v < NUM_VOICES; v++) {
 				voices[v].currentStep = 0;
 				voices[v].stepCounter = 0;
+				sleeping[v] = false;
+				sleepCounter[v] = 0;
+				sampleHoldHolding[v] = false;
+				// First clock after Reset should fire step 1 (currentStep=0)
+				// instead of skipping it by incrementing to step 2. The flag
+				// makes the first post-reset clock "land on" step 0 rather
+				// than advance past it.
+				voices[v].firstClockPending = true;
 				onVoiceStepAdvance(v);
 			}
 		}
@@ -622,26 +799,76 @@ struct Fugue : Module {
 			VoiceState& voice = voices[v];
 			float clockVolt = getClockVoltage(v);
 
+			// Per-voice step count (capped at global)
+			int voiceSteps = std::min(voiceOv[v].stepsOverride, numSteps);
+
+			// Per-voice fader range override
+			float voiceRange = voiceOv[v].rangeOverride;
+
 			voice.clockHigh = (clockVolt >= 1.0f);
 			voice.clockTimer += args.sampleTime;
 
+			bool clockRose = false;
 			if (voice.clockTrigger.process(clockVolt, 0.1f, 1.f)) {
+				clockRose = true;
 				if (voice.clockTimer > 0.001f) {
 					voice.clockPeriod = voice.clockTimer;
 				}
 				voice.clockTimer = 0.f;
 
-				voice.stepCounter++;
-				voice.currentStep++;
-				if (voice.currentStep >= numSteps) {
-					voice.currentStep = 0;
-				}
+				// ── Sleep logic ──
+				int sleepDiv = voiceOv[v].sleepDivision;
+				if (sleeping[v]) {
+					sleepCounter[v]--;
+					if (sleepCounter[v] <= 0) {
+						sleeping[v] = false;
+					}
+					// Don't advance step while sleeping
+				} else {
+					if (voice.firstClockPending) {
+						// First clock after Reset: don't increment — sit on
+						// step 0 (visually step 1) so its gate fires now.
+						voice.firstClockPending = false;
+					} else {
+						voice.stepCounter++;
+						voice.currentStep++;
+						if (voice.currentStep >= voiceSteps) {
+							voice.currentStep = 0;
+							// Start sleeping at end of cycle. sleepDiv == 0
+							// means "no sleep" (matches the FugueX dropdown's
+							// "0" entry).
+							if (sleepDiv > 0) {
+								sleeping[v] = true;
+								sleepCounter[v] = sleepDiv;
+							}
+						}
+					}
 
-				onVoiceStepAdvance(v);
+					// ── Probability ──
+					float prob = voiceOv[v].probability;
+					if (prob < 1.f) {
+						float roll = (float)(xorshift32(probRng) & 0x7FFFFFFF) / (float)0x7FFFFFFF;
+						probGateSuppress[v] = (roll >= prob);
+					} else {
+						probGateSuppress[v] = false;
+					}
+
+					onVoiceStepAdvanceWithRange(v, voiceRange);
+				}
 			}
 
-			// ── Slew ──
-			processSlew(v, args.sampleTime);
+			// ── Slew / S&H ──
+			if (sampleHoldEnabled) {
+				// In S&H mode, only update voltage when gate fires
+				int toggleIdx = v * NUM_STEPS + voice.currentStep;
+				bool toggleOn = params[GATE_TOGGLE_PARAM_0 + toggleIdx].getValue() > 0.5f;
+				if (clockRose && toggleOn && !sleeping[v] && !probGateSuppress[v]) {
+					voice.currentVoltage = voice.targetVoltage;
+					sampleHoldHolding[v] = true;
+				}
+			} else {
+				processSlew(v, args.sampleTime);
+			}
 
 			// ── CV output ──
 			outputs[CV_OUTS[v]].setVoltage(voice.currentVoltage);
@@ -649,22 +876,86 @@ struct Fugue : Module {
 			// ── Gate output ──
 			int toggleIdx = v * NUM_STEPS + voice.currentStep;
 			bool toggleOn = params[GATE_TOGGLE_PARAM_0 + toggleIdx].getValue() > 0.5f;
-			outputs[GATE_OUTS[v]].setVoltage((voice.clockHigh && toggleOn) ? 10.f : 0.f);
+			bool gateActive = voice.clockHigh && toggleOn && !sleeping[v] && !probGateSuppress[v];
+			outputs[GATE_OUTS[v]].setVoltage(gateActive ? 10.f : 0.f);
+
+			// ── Per-step trigger pulses (FugueX feature) ──
+			// On the clock that fires a gate, pulse the per-step output that
+			// matches the current step. A separate PulseGenerator per voice ×
+			// step holds the 1ms pulse high.
+			if (clockRose && gateActive) {
+				int step = voice.currentStep;
+				if (step >= 0 && step < NUM_STEPS) {
+					triggerPulses[v][step].trigger(1e-3f);
+				}
+			}
+			int gateBase = (v == 0) ? GATE_A_STEP_OUTPUT_0
+			            : (v == 1) ? GATE_B_STEP_OUTPUT_0
+			                       : GATE_C_STEP_OUTPUT_0;
+			for (int s = 0; s < NUM_STEPS; s++) {
+				bool pulse = triggerPulses[v][s].process(args.sampleTime);
+				outputs[gateBase + s].setVoltage(pulse ? 10.f : 0.f);
+			}
+		}
+
+		// ── Min / Mid / Max outputs (FugueX feature) ──
+		{
+			float v0 = voices[0].currentVoltage;
+			float v1 = voices[1].currentVoltage;
+			float v2 = voices[2].currentVoltage;
+			float minV = std::min({v0, v1, v2});
+			float maxV = std::max({v0, v1, v2});
+			float midV = v0 + v1 + v2 - minV - maxV;
+			outputs[MAX_OUTPUT].setVoltage(maxV);
+			outputs[MID_OUTPUT].setVoltage(midV);
+			outputs[MIN_OUTPUT].setVoltage(minV);
+		}
+
+		// ── Sample-and-hold LED ──
+		lights[SAMPLE_HOLD_LIGHT].setBrightness(sampleHoldEnabled ? 1.f : 0.f);
+
+		// ── FugueX sleep LEDs (amber) ──
+		// Brightness ramps from a min of 0.15 (start of sleep) up to 1.0 (wake),
+		// so users can see the voice "filling up" toward the wake point.
+		for (int v = 0; v < NUM_VOICES; v++) {
+			float sleepBrightness = 0.f;
+			if (sleeping[v]) {
+				int sleepDiv = voiceOv[v].sleepDivision;
+				float progress = (sleepDiv > 0) ? 1.f - (float)sleepCounter[v] / (float)sleepDiv : 1.f;
+				sleepBrightness = std::max(0.15f, progress);
+			}
+			lights[SLEEP_LED_0 + v].setBrightness(sleepBrightness);
+		}
+
+		// ── FugueX step indicator matrix (8 cols × 3 voices, red) ──
+		// Mirrors original FugueX: lights the current step's cell at 1.0 if
+		// the gate is firing right now, 0.3 if it's the playhead but no gate.
+		// All cells dark while the voice is sleeping.
+		for (int step = 0; step < NUM_STEPS; step++) {
+			for (int v = 0; v < NUM_VOICES; v++) {
+				int lightIdx = STEP_LED_X_0 + step * NUM_VOICES + v;
+				if (step == voices[v].currentStep && !sleeping[v]) {
+					int toggleIdx = v * NUM_STEPS + step;
+					bool toggleOn = params[GATE_TOGGLE_PARAM_0 + toggleIdx].getValue() > 0.5f;
+					bool gateActive = voices[v].clockHigh && toggleOn && !probGateSuppress[v];
+					lights[lightIdx].setBrightness(gateActive ? 1.f : 0.3f);
+				} else {
+					lights[lightIdx].setBrightness(0.f);
+				}
+			}
 		}
 
 		// ── Update lights ──
-		// Gate toggle LEDs (voice-major to match the param layout)
+		// Gate-toggle LEDs use the same voice-major layout as the params.
 		for (int v = 0; v < NUM_VOICES; v++) {
 			for (int step = 0; step < NUM_STEPS; step++) {
 				int idx = v * NUM_STEPS + step;
 				float brightness = params[GATE_TOGGLE_PARAM_0 + idx].getValue();
-				// Dim steps beyond active count
 				if (step >= numSteps) brightness *= 0.15f;
 				lights[GATE_LIGHT_0 + idx].setBrightness(brightness);
 			}
 		}
 
-		// Step indicator LEDs (3 rows) — only illuminate when gate toggle is ON
 		for (int step = 0; step < NUM_STEPS; step++) {
 			for (int v = 0; v < NUM_VOICES; v++) {
 				int toggleIdx = v * NUM_STEPS + step;
@@ -680,11 +971,11 @@ struct Fugue : Module {
 // ─── FaderParamQuantity Implementation ───────────────────────────────────────
 
 std::string FaderParamQuantity::getDisplayValueString() {
-	Fugue* m = dynamic_cast<Fugue*>(this->module);
+	MetaFugue* m = dynamic_cast<MetaFugue*>(this->module);
 	if (!m) return ParamQuantity::getDisplayValueString();
 
-	int rootNote = (int)std::round(m->params[Fugue::ROOT_PARAM].getValue());
-	int scaleIndex = (int)std::round(m->params[Fugue::SCALE_PARAM].getValue());
+	int rootNote = (int)std::round(m->params[MetaFugue::ROOT_PARAM].getValue());
+	int scaleIndex = (int)std::round(m->params[MetaFugue::SCALE_PARAM].getValue());
 	float faderValue = getValue();
 	float voltage = m->faderToVoltage(faderValue, rootNote, scaleIndex, m->faderRangeVolts);
 
@@ -713,16 +1004,11 @@ struct WanderSlider : app::SvgSlider {
 
 // ─── Widget ──────────────────────────────────────────────────────────────────
 
-struct FugueWidget : ModuleWidget {
-	FugueWidget(Fugue* module) {
+struct MetaFugueWidget : ModuleWidget {
+	MetaFugueWidget(MetaFugue* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/fugue.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/metafugue.svg")));
 
-		// Screws
-		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 2 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT - RACK_GRID_WIDTH)));
 
 		// ══════════════════════════════════════════════════════════════════════
 		// LAYOUT CONSTANTS (mm)
@@ -769,24 +1055,24 @@ struct FugueWidget : ModuleWidget {
 		// ══════════════════════════════════════════════════════════════════════
 
 		// ── Knob row 1: Root, Scale ──
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow1Y)), module, Fugue::ROOT_PARAM));
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol2X, knobRow1Y)), module, Fugue::SCALE_PARAM));
+		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow1Y)), module, MetaFugue::ROOT_PARAM));
+		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol2X, knobRow1Y)), module, MetaFugue::SCALE_PARAM));
 
 		// ── CV row 1: Root CV, Scale CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow1Y)), module, Fugue::ROOT_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow1Y)), module, Fugue::SCALE_CV_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow1Y)), module, MetaFugue::ROOT_CV_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow1Y)), module, MetaFugue::SCALE_CV_INPUT));
 
 		// ── Knob row 2: Steps, Slew ──
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow2Y)), module, Fugue::STEPS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(knobCol2X, knobRow2Y)), module, Fugue::SLEW_PARAM));
+		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow2Y)), module, MetaFugue::STEPS_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(knobCol2X, knobRow2Y)), module, MetaFugue::SLEW_PARAM));
 
 		// ── CV row 2: Steps CV, Slew CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow2Y)), module, Fugue::STEPS_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow2Y)), module, Fugue::SLEW_CV_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow2Y)), module, MetaFugue::STEPS_CV_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow2Y)), module, MetaFugue::SLEW_CV_INPUT));
 
 		// ── Reset: jack + momentary button ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, resetY)), module, Fugue::RESET_INPUT));
-		addParam(createParamCentered<VCVButton>(mm2px(Vec(knobCol2X, resetY)), module, Fugue::RESET_BUTTON_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, resetY)), module, MetaFugue::RESET_INPUT));
+		addParam(createParamCentered<VCVButton>(mm2px(Vec(knobCol2X, resetY)), module, MetaFugue::RESET_BUTTON_PARAM));
 
 		// ══════════════════════════════════════════════════════════════════════
 		// SEQUENCER AREA (top-right)
@@ -796,29 +1082,29 @@ struct FugueWidget : ModuleWidget {
 			float x = faderStartX + i * faderSpacing;
 
 			// ── Step indicator LEDs (above faders) — all red ──
-			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_A)), module, Fugue::STEP_A_LIGHT_0 + i));
-			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_B)), module, Fugue::STEP_B_LIGHT_0 + i));
-			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_C)), module, Fugue::STEP_C_LIGHT_0 + i));
+			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_A)), module, MetaFugue::STEP_A_LIGHT_0 + i));
+			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_B)), module, MetaFugue::STEP_B_LIGHT_0 + i));
+			addChild(createLightCentered<SmallLight<RedLight>>(mm2px(Vec(x, stepLedY_C)), module, MetaFugue::STEP_C_LIGHT_0 + i));
 
 			// ── Pitch fader ──
-			addParam(createParamCentered<VCVSlider>(mm2px(Vec(x, faderY)), module, Fugue::FADER_PARAM_0 + i));
+			addParam(createParamCentered<VCVSlider>(mm2px(Vec(x, faderY)), module, MetaFugue::FADER_PARAM_0 + i));
 
 			// ── Gate toggle buttons (3 rows, all red) ──
 			// Voice-major indexing: idx = voice * NUM_STEPS + step (i is step)
 			int idxA = 0 * NUM_STEPS + i;
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedLight>>>(
 				mm2px(Vec(x, gateRowY_A)), module,
-				Fugue::GATE_TOGGLE_PARAM_0 + idxA, Fugue::GATE_LIGHT_0 + idxA));
+				MetaFugue::GATE_TOGGLE_PARAM_0 + idxA, MetaFugue::GATE_LIGHT_0 + idxA));
 
 			int idxB = 1 * NUM_STEPS + i;
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedLight>>>(
 				mm2px(Vec(x, gateRowY_B)), module,
-				Fugue::GATE_TOGGLE_PARAM_0 + idxB, Fugue::GATE_LIGHT_0 + idxB));
+				MetaFugue::GATE_TOGGLE_PARAM_0 + idxB, MetaFugue::GATE_LIGHT_0 + idxB));
 
 			int idxC = 2 * NUM_STEPS + i;
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedLight>>>(
 				mm2px(Vec(x, gateRowY_C)), module,
-				Fugue::GATE_TOGGLE_PARAM_0 + idxC, Fugue::GATE_LIGHT_0 + idxC));
+				MetaFugue::GATE_TOGGLE_PARAM_0 + idxC, MetaFugue::GATE_LIGHT_0 + idxC));
 		}
 
 		// ══════════════════════════════════════════════════════════════════════
@@ -826,11 +1112,11 @@ struct FugueWidget : ModuleWidget {
 		// ══════════════════════════════════════════════════════════════════════
 
 		const float voiceYs[] = {voiceA_Y, voiceB_Y, voiceC_Y};
-		const int clockInputs[] = {Fugue::CLOCK_A_INPUT, Fugue::CLOCK_B_INPUT, Fugue::CLOCK_C_INPUT};
-		const int wanderParams[] = {Fugue::WANDER_A_PARAM, Fugue::WANDER_B_PARAM, Fugue::WANDER_C_PARAM};
-		const int wanderInputs[] = {Fugue::WANDER_A_INPUT, Fugue::WANDER_B_INPUT, Fugue::WANDER_C_INPUT};
-		const int gateOutputs[] = {Fugue::GATE_A_OUTPUT, Fugue::GATE_B_OUTPUT, Fugue::GATE_C_OUTPUT};
-		const int cvOutputs[] = {Fugue::CV_A_OUTPUT, Fugue::CV_B_OUTPUT, Fugue::CV_C_OUTPUT};
+		const int clockInputs[] = {MetaFugue::CLOCK_A_INPUT, MetaFugue::CLOCK_B_INPUT, MetaFugue::CLOCK_C_INPUT};
+		const int wanderParams[] = {MetaFugue::WANDER_A_PARAM, MetaFugue::WANDER_B_PARAM, MetaFugue::WANDER_C_PARAM};
+		const int wanderInputs[] = {MetaFugue::WANDER_A_INPUT, MetaFugue::WANDER_B_INPUT, MetaFugue::WANDER_C_INPUT};
+		const int gateOutputs[] = {MetaFugue::GATE_A_OUTPUT, MetaFugue::GATE_B_OUTPUT, MetaFugue::GATE_C_OUTPUT};
+		const int cvOutputs[] = {MetaFugue::CV_A_OUTPUT, MetaFugue::CV_B_OUTPUT, MetaFugue::CV_C_OUTPUT};
 
 		for (int v = 0; v < NUM_VOICES; v++) {
 			float y = voiceYs[v];
@@ -850,11 +1136,106 @@ struct FugueWidget : ModuleWidget {
 			// CV output
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(cvOutX, y)), module, cvOutputs[v]));
 		}
+
+		// ══════════════════════════════════════════════════════════════════════
+		// FUGUEX SECTION
+		// ══════════════════════════════════════════════════════════════════════
+		// Mirrors the original FugueX panel layout exactly — each widget is
+		// at the same (x, y) as in fugue-expander.cpp but shifted right by
+		// the Fugue panel width (101.6mm) so it sits in the right half of the
+		// combined MetaFugue panel.
+		const float xOff = 101.6f;
+		const float topRowY = 27.94f;
+
+		// LED matrix anchors (mirrored from fugue-expander.cpp)
+		const float ledStartX  = 71.12f;
+		const float ledSpacing = 5.08f;
+		const float ledRowYs[] = {17.78f, 22.86f, 27.94f};  // A, B, C
+
+		// Per-voice param grid X positions (from fugue-expander.cpp)
+		const float stpKnobX = 10.16f;   const float stpCvX = 20.32f;
+		const float rngKnobX = 40.64f;   const float rngCvX = 50.80f;
+		const float slpKnobX = 71.24f;   const float slpCvX = 81.28f;
+		const float prbKnobX = 101.60f;  const float prbCvX = 111.76f;
+
+		const float voiceXA_Y = 45.72f;
+		const float voiceXB_Y = 60.96f;
+		const float voiceXC_Y = 76.20f;
+
+		// Bottom row (per-step gate outputs + min/mid/max)
+		const float gateStartX  = 10.16f;
+		const float gateSpacing = 10.16f;
+		const float gateAY = 96.52f;
+		const float gateBY = 106.68f;
+		const float gateCY = 116.83f;
+		const float minMidMaxX = 111.76f;
+
+		// ── Top row: Random button + jack + S&H toggle ──
+		addParam(createParamCentered<VCVButton>(mm2px(Vec(10.16f + xOff, topRowY)), module, MetaFugue::RAND_SEQ_BUTTON_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f + xOff, topRowY)), module, MetaFugue::RAND_SEQ_INPUT));
+		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(
+			mm2px(Vec(40.64f + xOff, topRowY)), module,
+			MetaFugue::SAMPLE_HOLD_PARAM, MetaFugue::SAMPLE_HOLD_LIGHT));
+
+		// ── LED matrix (8 cols × 3 rows red step indicators) ──
+		for (int step = 0; step < NUM_STEPS; step++) {
+			float x = ledStartX + step * ledSpacing + xOff;
+			for (int v = 0; v < NUM_VOICES; v++) {
+				int lightIdx = MetaFugue::STEP_LED_X_0 + step * NUM_VOICES + v;
+				addChild(createLightCentered<SmallLight<RedLight>>(
+					mm2px(Vec(x, ledRowYs[v])), module, lightIdx));
+			}
+		}
+		// Sleep LEDs (col 9, amber)
+		float sleepLedX = ledStartX + 8 * ledSpacing + xOff; // = 111.76 + xOff
+		for (int v = 0; v < NUM_VOICES; v++) {
+			addChild(createLightCentered<SmallLight<YellowLight>>(
+				mm2px(Vec(sleepLedX, ledRowYs[v])), module, MetaFugue::SLEEP_LED_0 + v));
+		}
+
+		// ── Per-voice parameter grid (knob + CV × 4 cols × 3 voices) ──
+		// Use the per-voice lookup arrays since the enums are voice-grouped.
+		const float voiceXYs[] = {voiceXA_Y, voiceXB_Y, voiceXC_Y};
+		for (int v = 0; v < NUM_VOICES; v++) {
+			float y = voiceXYs[v];
+
+			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(stpKnobX + xOff, y)), module, MetaFugue::STEPS_X_PARAMS[v]));
+			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(stpCvX  + xOff, y)), module, MetaFugue::STEPS_X_INPUTS[v]));
+
+			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(rngKnobX + xOff, y)), module, MetaFugue::RANGE_X_PARAMS[v]));
+			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(rngCvX  + xOff, y)), module, MetaFugue::RANGE_X_INPUTS[v]));
+
+			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(slpKnobX + xOff, y)), module, MetaFugue::SLEEP_X_PARAMS[v]));
+			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(slpCvX  + xOff, y)), module, MetaFugue::SLEEP_X_INPUTS[v]));
+
+			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(prbKnobX + xOff, y)), module, MetaFugue::PROB_X_PARAMS[v]));
+			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(prbCvX  + xOff, y)), module, MetaFugue::PROB_X_INPUTS[v]));
+		}
+
+		// ── Per-step trigger outputs (3 rows × 8 cols) ──
+		const float gateYs[] = {gateAY, gateBY, gateCY};
+		const int gateBaseOuts[] = {
+			MetaFugue::GATE_A_STEP_OUTPUT_0,
+			MetaFugue::GATE_B_STEP_OUTPUT_0,
+			MetaFugue::GATE_C_STEP_OUTPUT_0,
+		};
+		for (int s = 0; s < NUM_STEPS; s++) {
+			float x = gateStartX + s * gateSpacing + xOff;
+			for (int v = 0; v < NUM_VOICES; v++) {
+				addOutput(createOutputCentered<PJ301MPort>(
+					mm2px(Vec(x, gateYs[v])), module, gateBaseOuts[v] + s));
+			}
+		}
+
+		// ── Max / Mid / Min outputs (right of the per-step gates) ──
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateAY)), module, MetaFugue::MAX_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateBY)), module, MetaFugue::MID_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateCY)), module, MetaFugue::MIN_OUTPUT));
 	}
 
 	// ── Context Menu ──
 	void appendContextMenu(Menu* menu) override {
-		Fugue* module = dynamic_cast<Fugue*>(this->module);
+		MetaFugue* module = dynamic_cast<MetaFugue*>(this->module);
 		assert(module);
 
 		menu->addChild(new MenuSeparator);
@@ -881,11 +1262,13 @@ struct FugueWidget : ModuleWidget {
 		menu->addChild(createMenuItem("Randomize Sequence", "",
 			[=]() {
 				for (int i = 0; i < NUM_STEPS; i++) {
-					module->params[Fugue::FADER_PARAM_0 + i].setValue(random::uniform());
+					module->params[MetaFugue::FADER_PARAM_0 + i].setValue(random::uniform());
 				}
 			}
 		));
 	}
 };
 
-Model* modelFugue = createModel<Fugue, FugueWidget>("Fugue");
+} // namespace
+
+Model* modelMetaFugue = createModel<MetaFugue, MetaFugueWidget>("MetaFugue");

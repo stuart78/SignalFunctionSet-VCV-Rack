@@ -22,6 +22,7 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 - [Gravity](#gravity) — Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
 - [Vac](#vac) — Semi-stable A/R envelope with vactrol-like timing drift
 - [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
+- [Cycle](#cycle) — Bar-synced quad LFO with morphing shapes
 - [Other Platforms](#other-platforms)
 - [Building](#building)
 - [License](#license)
@@ -614,6 +615,28 @@ A harmonic bandpass bank for isolating individual harmonics of a sound — inspi
 **Outputs:** Mix, Poly (one channel per band).
 
 See [docs/band-manual.md](docs/band-manual.md) for the full manual.
+
+### Cycle
+
+<img src="screenshots/Cycle.png" alt="Cycle panel" height="320"> 
+
+**[Cycle on signalfunctionset.com →](https://signalfunctionset.com/projects/cycle)**
+
+A four-channel LFO that thinks in bars, not Hertz. All four outputs (A/B/C/D) run the same cycle but can be spread, scaled, and shaped independently, and the whole bank locks to a musical bar via clock + bar inputs — patch it into Meter and every modulation lands on the grid. Unpatched, it free-runs in Hz like an ordinary LFO. It's the tempo-synced companion to Drift.
+
+**Features:**
+- **Bar-locked timing** — BAR is the timing authority: Cycle hard-aligns its cycle to every downbeat, so it can't drift out of phase. FREQUENCY becomes a musical divider/multiplier (64 bars … ⅛ bar) when locked, or 0.02–20 Hz when free.
+- **Shape ring** — each channel morphs through sine → triangle → saw → square → staircase → stepped-random → back to sine. The loop is closed, so shape CV and link offsets wrap continuously instead of clamping.
+- **Clock-quantized steps** — patch CLOCK and the staircase / stepped-random shapes advance one step per pulse, so they land on real beats. Stepped-random generates a fresh set of voltages each cycle, shared by all four channels.
+- **Per-channel depth** — bipolar SCALE per channel (negative inverts), plus global PHASE spread to fan the channels across the cycle and Drift-style STABILITY for amplitude wander.
+- **Linking with offsets** — shape/scale link buttons gang adjacent channels (on by default); a linked channel's knob becomes a wrapping (shape) or bounded (scale) offset from the group leader.
+- **Display** — all four waveforms with a playhead, bar gridlines, a bar-position readout, and bipolar/unipolar voltage scales on the edges.
+
+**Controls:** per channel — Shape, Scale; global — Frequency, Phase, Stability, Reset, plus shape/scale link buttons.
+**Inputs:** Bar, Clock, Reset, Frequency CV, Phase CV, Stability CV, and per channel — Shape CV, Scale CV.
+**Outputs:** per channel — Uni (0–5V) and Bi (±5V); End-of-cycle trigger.
+
+See [docs/cycle-manual.md](docs/cycle-manual.md) for the full manual.
 
 ## Other Platforms
 

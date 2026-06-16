@@ -275,10 +275,10 @@ struct VacWidget : ModuleWidget {
 		// LOOP — light latch with embedded green LED + TRIG in
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(xL, 106.67f)), module, Vac::LOOP_PARAM, Vac::LOOP_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 106.67f)), module, Vac::TRIG_INPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 106.67f)), module, Vac::END_OUTPUT));
 
 		// END trig out, ENV audio out
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xL, 121.92f)), module, Vac::END_OUTPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, 121.92f)), module, Vac::TRIG_INPUT));
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 121.92f)), module, Vac::ENV_OUTPUT));
 	}
 

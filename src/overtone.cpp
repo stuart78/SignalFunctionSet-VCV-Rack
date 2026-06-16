@@ -75,6 +75,9 @@ struct Overtone : Module {
 	bool harmonicTarget[NUM_OVERTONES] = {true, true, true, true, true, true, true, true};
 	bool harmonicActive[NUM_OVERTONES] = {true, true, true, true, true, true, true, true};
 	float prevHarmonicSample[NUM_OVERTONES] = {};
+	// Smoothed output gain (1/normSum). When a harmonic gates in/out the
+	// normalization changes; slewing it prevents the whole output from stepping.
+	float gainSmooth = 0.f;
 
 	// Display buffers
 	float displayBuffer[DISPLAY_POINTS] = {};
@@ -240,8 +243,15 @@ struct Overtone : Module {
 			lights[INDICATOR_1_LIGHT + i].setBrightness(harmonicActive[i] ? 1.f : 0.f);
 		}
 
-		// Normalize to ±5V
-		out = (out / normSum) * 5.f;
+		// Normalize to ±5V. The harmonics themselves switch at their zero
+		// crossings (above), but normSum still steps when one toggles, which
+		// rescales the rest of the signal — so slew the gain (~5ms) to glide
+		// that amplitude change instead of clicking.
+		float targetGain = 5.f / normSum;
+		if (gainSmooth == 0.f) gainSmooth = targetGain;   // initialize on first sample
+		float coeff = 1.f - std::exp(-args.sampleTime / 0.005f);
+		gainSmooth += (targetGain - gainSmooth) * coeff;
+		out *= gainSmooth;
 
 		outputs[AUDIO_OUTPUT].setVoltage(clamp(out, -10.f, 10.f));
 	}
