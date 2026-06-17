@@ -654,9 +654,16 @@ See [build-doc.md](build-doc.md) for detailed build instructions.
 ./build.sh dev   # Development build + auto-install
 ./build.sh prod  # Production build for distribution
 
-# Windows (cross-compile from Mac, requires MinGW + GNU coreutils)
+# Windows — native (run from the MSYS2 MinGW64 shell)
+./build.sh dev  win   # Build + auto-install to %LOCALAPPDATA%\Rack2\plugins-win-x64
+./build.sh prod win   # Production build for distribution
+
+# Windows — cross-compile from Mac (requires MinGW + GNU coreutils)
 ./build.sh prod win
 ```
+
+`./build.sh ... win` auto-detects whether it's running natively on Windows
+(MSYS2/MinGW64) or cross-compiling from macOS.
 
 ## License
 

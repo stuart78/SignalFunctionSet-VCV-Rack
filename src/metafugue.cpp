@@ -968,6 +968,24 @@ struct MetaFugue : Module {
 	}
 };
 
+// Out-of-line definitions for the static constexpr arrays above. Required under
+// C++11/14 (the Rack SDK builds with -std=c++11): each of these is indexed by a
+// runtime value, which odr-uses it, so it needs a namespace-scope definition.
+// Apple clang elides the references, but MinGW gcc (the Windows build) emits
+// them — without these the plugin fails to link on Windows.
+constexpr int   MetaFugue::SLEEP_VALUES[];
+constexpr float MetaFugue::RANGE_VALUES[];
+constexpr int   MetaFugue::CV_OUTS[];
+constexpr int   MetaFugue::GATE_OUTS[];
+constexpr int   MetaFugue::STEPS_X_PARAMS[];
+constexpr int   MetaFugue::RANGE_X_PARAMS[];
+constexpr int   MetaFugue::SLEEP_X_PARAMS[];
+constexpr int   MetaFugue::PROB_X_PARAMS[];
+constexpr int   MetaFugue::STEPS_X_INPUTS[];
+constexpr int   MetaFugue::RANGE_X_INPUTS[];
+constexpr int   MetaFugue::SLEEP_X_INPUTS[];
+constexpr int   MetaFugue::PROB_X_INPUTS[];
+
 // ─── FaderParamQuantity Implementation ───────────────────────────────────────
 
 std::string FaderParamQuantity::getDisplayValueString() {

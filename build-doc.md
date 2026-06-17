@@ -43,6 +43,38 @@ This will:
 - Create `dist/SignalFunctionSet-{version}-mac-arm64.vcvplugin`
 - Does NOT auto-install (manual install or GitHub release)
 
+### Windows Build (native, MSYS2 / MinGW64)
+
+Build on Windows itself — useful for reproducing VCV Library Windows-build
+failures locally (the library uses the same MinGW64 toolchain) before
+resubmitting.
+
+**One-time setup:**
+
+1. Install [MSYS2](https://www.msys2.org/) (e.g. `winget install MSYS2.MSYS2`).
+2. From the **MSYS2 MinGW64** shell, install the toolchain:
+   ```bash
+   pacman -S --needed make tar zip unzip zstd mingw-w64-x86_64-gcc mingw-w64-x86_64-jq
+   ```
+3. Download the **Windows** Rack SDK (`Rack-SDK-latest-win-x64.zip`) from
+   <https://vcvrack.com/downloads> and unzip it to `../Rack-SDK` (next to the
+   repo), or point `WIN_RACK_DIR` at wherever you put it.
+
+**Build (from the MSYS2 MinGW64 shell, in the repo root):**
+
+```bash
+./build.sh dev  win   # Build + auto-install to %LOCALAPPDATA%\Rack2\plugins-win-x64
+./build.sh prod win   # Production .vcvplugin in dist/ (the resubmission artifact)
+```
+
+`build.sh` auto-detects the native-Windows environment via `uname`. The plugin
+is statically linked (libstdc++ / libgcc / winpthread) so the resulting `.dll`
+is self-contained; the script runs `objdump` afterward to confirm it pulls in no
+MinGW runtime DLLs. Restart VCV Rack after a dev build to load the plugin.
+
+> The same `./build.sh ... win` invocation **cross-compiles** when run on macOS
+> instead (requires `brew install mingw-w64 coreutils zstd`).
+
 ### Manual Make (without build script)
 
 ```bash

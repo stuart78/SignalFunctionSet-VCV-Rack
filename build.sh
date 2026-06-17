@@ -8,12 +8,24 @@
 # Examples:
 #   ./build.sh dev          # Mac arm64 dev build, installed to local Rack
 #   ./build.sh prod         # Mac arm64 prod build for distribution
-#   ./build.sh dev  win     # Windows x64 dev build (cross-compiled, packaged only)
-#   ./build.sh prod win     # Windows x64 prod build (cross-compiled, packaged only)
+#   ./build.sh dev  win     # Windows x64 dev build
+#   ./build.sh prod win     # Windows x64 prod build for distribution
 #
-# Windows builds require MinGW + the Windows Rack SDK. By default the script
-# looks for the SDK at $WIN_RACK_DIR (default /Users/sfs/code/Rack-SDK-win-x64).
-# It also requires GNU coreutils (`gcp`) for the SDK's `cp --parents` step.
+# A "win" build is NATIVE when this script runs from the MSYS2 MinGW64 shell on
+# Windows, and a CROSS-COMPILE when it runs on macOS. The mode is auto-detected
+# from `uname`.
+#
+#   Native (Windows / MSYS2 MinGW64):
+#     - Needs the MinGW64 toolchain + the Windows Rack SDK.
+#       pacman -S --needed make tar zip unzip zstd mingw-w64-x86_64-gcc mingw-w64-x86_64-jq
+#     - SDK location defaults to ../Rack-SDK (override with $WIN_RACK_DIR).
+#     - Dev builds install to %LOCALAPPDATA%\Rack2\plugins-win-x64.
+#
+#   Cross-compile (macOS):
+#     - Needs MinGW + GNU coreutils (`gcp`) + the win-x64 Rack SDK.
+#       brew install mingw-w64 coreutils zstd
+#     - SDK location defaults to $WIN_RACK_DIR (/Users/sfs/code/Rack-SDK-win-x64).
+#     - Packaged only (no auto-install).
 
 set -e
 
@@ -45,19 +57,52 @@ case "$PLATFORM" in mac|win) ;; *)
     exit 1
 ;; esac
 
-# ---------- platform-specific setup ----------
-WIN_RACK_DIR="${WIN_RACK_DIR:-/Users/sfs/code/Rack-SDK-win-x64}"
+# ---------- host + platform setup ----------
+# Detect whether we're running ON Windows (MSYS2/MinGW) or cross-compiling from macOS.
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) HOST_OS="windows" ;;
+    Darwin)               HOST_OS="mac" ;;
+    *)                    HOST_OS="other" ;;
+esac
+
+# A "win" build is native when run on Windows, else a macOS cross-compile.
+if [ "$PLATFORM" = "win" ] && [ "$HOST_OS" = "windows" ]; then
+    WIN_NATIVE=1
+    WIN_RACK_DIR="${WIN_RACK_DIR:-../Rack-SDK}"
+else
+    WIN_NATIVE=0
+    WIN_RACK_DIR="${WIN_RACK_DIR:-/Users/sfs/code/Rack-SDK-win-x64}"
+fi
 
 if [ "$PLATFORM" = "win" ]; then
-    # Sanity-check the cross-compile toolchain before disturbing files.
-    for tool in x86_64-w64-mingw32-gcc x86_64-w64-mingw32-g++ x86_64-w64-mingw32-strip gcp zstd; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            echo -e "${RED}Error: '$tool' not found in PATH.${NC}"
-            echo "  Required for Windows cross-compile."
-            echo "  Install: brew install mingw-w64 coreutils zstd"
+    if [ "$WIN_NATIVE" = "1" ]; then
+        # Native MSYS2/MinGW64 toolchain. gcc must be the *mingw64* gcc
+        # (targets x86_64-w64-mingw32) — run from the "MSYS2 MinGW64" shell.
+        for tool in gcc g++ strip make zstd tar jq; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                echo -e "${RED}Error: '$tool' not found in PATH.${NC}"
+                echo "  Required for native Windows build (use the MSYS2 MinGW64 shell)."
+                echo "  Install: pacman -S --needed make tar zip unzip zstd \\"
+                echo "             mingw-w64-x86_64-gcc mingw-w64-x86_64-jq"
+                exit 1
+            fi
+        done
+        if ! gcc -dumpmachine | grep -q 'mingw32'; then
+            echo -e "${RED}Error: 'gcc' is not a MinGW compiler ($(gcc -dumpmachine)).${NC}"
+            echo "  Open the 'MSYS2 MinGW64' shell (not 'MSYS2 MSYS')."
             exit 1
         fi
-    done
+    else
+        # Sanity-check the cross-compile toolchain before disturbing files.
+        for tool in x86_64-w64-mingw32-gcc x86_64-w64-mingw32-g++ x86_64-w64-mingw32-strip gcp zstd; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+                echo -e "${RED}Error: '$tool' not found in PATH.${NC}"
+                echo "  Required for Windows cross-compile."
+                echo "  Install: brew install mingw-w64 coreutils zstd"
+                exit 1
+            fi
+        done
+    fi
     if [ ! -d "$WIN_RACK_DIR" ]; then
         echo -e "${RED}Error: Windows Rack SDK not found at $WIN_RACK_DIR${NC}"
         echo "  Set WIN_RACK_DIR or download from https://vcvrack.com/downloads"
@@ -138,7 +183,11 @@ echo -e "  Version: ${YELLOW}$VERSION${NC}\n"
 
 # ---------- build ----------
 echo "Cleaning previous build..."
-make clean
+if [ "$PLATFORM" = "win" ]; then
+    RACK_DIR="$WIN_RACK_DIR" make clean
+else
+    make clean
+fi
 
 if [ "$PLATFORM" = "mac" ]; then
     # ----- Mac build: use the default Mac toolchain + SDK; SDK's `make
@@ -154,8 +203,44 @@ if [ "$PLATFORM" = "mac" ]; then
 
     OUT_FILE="dist/$SLUG-$VERSION-mac-arm64.vcvplugin"
     INSTALL_DIR="$HOME/Library/Application Support/Rack2/plugins-mac-arm64/"
+elif [ "$WIN_NATIVE" = "1" ]; then
+    # ----- Native Windows build (MSYS2 / MinGW64) -----
+    # The SDK's plugin.mk already targets win-x64 and adds -static-libstdc++.
+    # We also force libgcc + winpthread static so the .dll is fully self-contained
+    # (Rack on Windows ships neither libgcc_s_seh-1.dll nor libwinpthread-1.dll).
+    # `make dist` packages natively here — cp --parents, tar and zstd all exist
+    # in MSYS2, so the macOS-only `gcp` hack isn't needed.
+    EXTRA_LD='-static-libgcc -Wl,--whole-archive,-l:libwinpthread.a,--no-whole-archive'
+
+    echo -e "\n${GREEN}Building (native win x64) against $WIN_RACK_DIR...${NC}"
+    RACK_DIR="$WIN_RACK_DIR" EXTRA_LDFLAGS="$EXTRA_LD" make dist
+
+    # Sanity-check: the plugin should NOT depend on MinGW runtime DLLs.
+    if objdump -p plugin.dll 2>/dev/null | \
+            grep -qE 'libgcc_s|libwinpthread|libstdc\+\+'; then
+        echo -e "${RED}WARNING: plugin.dll has MinGW runtime DLL dependencies.${NC}"
+        echo "  It will likely fail to load on machines without those DLLs."
+        objdump -p plugin.dll | grep "DLL Name:"
+    fi
+
+    OUT_FILE="dist/$SLUG-$VERSION-win-x64.vcvplugin"
+    INSTALL_DIR=""
+
+    # Dev install: copy directly to the Rack plugins folder. (We bypass the
+    # Makefile's `install` target because its DEV form hardcodes a macOS path.)
+    if [ "$BUILD_TARGET" = "dev" ]; then
+        if [ -z "$LOCALAPPDATA" ]; then
+            echo -e "${YELLOW}LOCALAPPDATA unset; skipping dev install.${NC}"
+        else
+            INSTALL_DIR="$(cygpath -u "$LOCALAPPDATA")/Rack2/plugins-win-x64"
+            echo -e "\n${GREEN}Installing to VCV Rack plugins folder...${NC}"
+            mkdir -p "$INSTALL_DIR"
+            cp "$OUT_FILE" "$INSTALL_DIR/"
+            echo -e "${GREEN}Dev build installed!${NC}"
+        fi
+    fi
 else
-    # ----- Windows cross-compile -----
+    # ----- Windows cross-compile (from macOS) -----
     # MinGW (Homebrew) defaults to posix threads + dynamic libgcc, so the
     # plugin would otherwise depend on libwinpthread-1.dll and libgcc_s_seh-1.dll
     # at runtime — neither shipped with Rack on Windows. The EXTRA_LDFLAGS
