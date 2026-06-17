@@ -711,6 +711,14 @@ struct WanderSlider : app::SvgSlider {
 	}
 };
 
+// Out-of-line definitions for the odr-used static constexpr member arrays.
+// Required under the Rack SDK's C++11 build standard; without them an
+// optimizer that doesn't fold the references away produces "undefined
+// reference" link errors (see issue #5, which hit the equivalent arrays in
+// MetaFugue on the Windows/MinGW toolchain). C++17 would make them inline.
+constexpr int Fugue::CV_OUTS[NUM_VOICES];
+constexpr int Fugue::GATE_OUTS[NUM_VOICES];
+
 // ─── Widget ──────────────────────────────────────────────────────────────────
 
 struct FugueWidget : ModuleWidget {
