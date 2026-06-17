@@ -968,6 +968,24 @@ struct MetaFugue : Module {
 	}
 };
 
+// Out-of-line definitions for the static constexpr member arrays. Under C++11
+// (the Rack SDK build standard) a static constexpr data member that is odr-used
+// — e.g. subscripted or otherwise accessed at runtime — still requires a
+// namespace-scope definition. Without these the Windows/MinGW link fails with
+// "undefined reference" (see issue #5). C++17 would make them implicitly inline.
+constexpr int   MetaFugue::SLEEP_VALUES[10];
+constexpr float MetaFugue::RANGE_VALUES[3];
+constexpr int   MetaFugue::CV_OUTS[NUM_VOICES];
+constexpr int   MetaFugue::GATE_OUTS[NUM_VOICES];
+constexpr int   MetaFugue::STEPS_X_PARAMS[NUM_VOICES];
+constexpr int   MetaFugue::RANGE_X_PARAMS[NUM_VOICES];
+constexpr int   MetaFugue::SLEEP_X_PARAMS[NUM_VOICES];
+constexpr int   MetaFugue::PROB_X_PARAMS[NUM_VOICES];
+constexpr int   MetaFugue::STEPS_X_INPUTS[NUM_VOICES];
+constexpr int   MetaFugue::RANGE_X_INPUTS[NUM_VOICES];
+constexpr int   MetaFugue::SLEEP_X_INPUTS[NUM_VOICES];
+constexpr int   MetaFugue::PROB_X_INPUTS[NUM_VOICES];
+
 // ─── FaderParamQuantity Implementation ───────────────────────────────────────
 
 std::string FaderParamQuantity::getDisplayValueString() {
