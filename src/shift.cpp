@@ -26,12 +26,13 @@
 // All four outputs share a single optional N CV input that sums into every
 // per-output N pot (so you can sweep the whole register's rate at once).
 
-static const int NUM_OUTS = 4;
-static const int MAX_N    = 16;
+static const int NUM_OUTS  = 4;
+static const int MAX_N     = 16;   // delay-line / history ring size
+static const int MAX_STEPS = 15;   // max selectable delay in steps; 0 = passthrough
 
-// Per-lane clock divider values (selected by a 5-position snapped trimpot).
-static const int DIV_VALUES[]   = { 1, 2, 3, 4, 8 };
-static const int NUM_DIV_VALUES = 5;
+// Per-lane clock divider values (selected by a snapped trimpot).
+static const int DIV_VALUES[]   = { 1, 2, 3, 4, 5, 8 };
+static const int NUM_DIV_VALUES = 6;
 
 
 struct Shift : Module {
@@ -125,24 +126,24 @@ struct Shift : Module {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		const char* labels[NUM_OUTS] = {"A", "B", "C", "D"};
 		for (int i = 0; i < NUM_OUTS; i++) {
-			configParam<NParamQuantity>(N_PARAM_A + i, 1.f, (float)MAX_N, 4.f,
-				string::f("Step count %s", labels[i]));
+			configParam<NParamQuantity>(N_PARAM_A + i, 0.f, (float)MAX_STEPS, 0.f,
+				string::f("Step count %s (0 = no delay)", labels[i]));
 			paramQuantities[N_PARAM_A + i]->snapEnabled = true;
 			configSwitch(MODE_PARAM_A + i, 0.f, 1.f, 0.f,
 				string::f("Mode %s", labels[i]),
 				{"Parallel", "Cascade"});
 			configSwitch(DIV_PARAM_A + i, 0.f, (float)(NUM_DIV_VALUES - 1), 0.f,
 				string::f("Clock divider %s", labels[i]),
-				{"÷1", "÷2", "÷3", "÷4", "÷8"});
+				{"÷1", "÷2", "÷3", "÷4", "÷5", "÷8"});
 			paramQuantities[DIV_PARAM_A + i]->snapEnabled = true;
 			configInput(STEP_CV_INPUT_A + i,
-				string::f("Step CV %s (±5V → ±16, summed with N pot)", labels[i]));
+				string::f("Step CV %s (±5V → ±15, summed with N pot)", labels[i]));
 			configOutput(OUT_A + i, string::f("Output %s", labels[i]));
 		}
 		configInput(CV_INPUT,    "CV (data, sampled on each tap fire)");
 		configInput(CLOCK_INPUT, "Clock (advances all taps in parallel mode, "
 		                        "and the cascade chain root)");
-		configInput(N_CV_INPUT,  "N CV (±5V → ±16, summed into every N pot — "
+		configInput(N_CV_INPUT,  "N CV (±5V → ±15, summed into every N pot — "
 		                        "global modulator on top of per-lane Step CVs)");
 		configInput(RESET_INPUT, "Reset (clears all counters and held values)");
 		configButton(RESET_PARAM, "Reset (button)");
@@ -185,7 +186,7 @@ struct Shift : Module {
 	void process(const ProcessArgs& args) override {
 		// Global N CV — added to every per-output N pot before clamping.
 		float nCv = inputs[N_CV_INPUT].isConnected()
-			? inputs[N_CV_INPUT].getVoltage() * (float)MAX_N / 5.f
+			? inputs[N_CV_INPUT].getVoltage() * (float)MAX_STEPS / 5.f
 			: 0.f;
 
 		int targetN[NUM_OUTS];
@@ -193,11 +194,11 @@ struct Shift : Module {
 		for (int i = 0; i < NUM_OUTS; i++) {
 			float n = params[N_PARAM_A + i].getValue() + nCv;
 			if (inputs[STEP_CV_INPUT_A + i].isConnected()) {
-				n += inputs[STEP_CV_INPUT_A + i].getVoltage() * (float)MAX_N / 5.f;
+				n += inputs[STEP_CV_INPUT_A + i].getVoltage() * (float)MAX_STEPS / 5.f;
 			}
 			int ni = (int)std::round(n);
-			if (ni < 1)     ni = 1;
-			if (ni > MAX_N) ni = MAX_N;
+			if (ni < 0)         ni = 0;
+			if (ni > MAX_STEPS) ni = MAX_STEPS;
 			targetN[i] = ni;
 
 			int divIdx = (int)std::round(params[DIV_PARAM_A + i].getValue());
@@ -262,29 +263,45 @@ struct Shift : Module {
 						// Cascade tape loop: read at lane-clock rate, write
 						// on parent tick. CV cycles through the active
 						// N-slot buffer continuously.
-						int rIdx = readIdx[i] % N;
-						held[i] = delayLine[i][rIdx];
-						readIdx[i] = (rIdx + 1) % N;
+						// N==0 = zero-length loop: pass the parent straight through.
+						if (N == 0) {
+							held[i] = held[i - 1];
+							if (tickFired[i - 1]) {
+								historyLine[i][historyWriteIdx[i]] = held[i - 1];
+								historyWriteIdx[i] = (historyWriteIdx[i] + 1) % MAX_N;
+								tickFired[i] = true;
+							}
+						} else {
+							int rIdx = readIdx[i] % N;
+							held[i] = delayLine[i][rIdx];
+							readIdx[i] = (rIdx + 1) % N;
 
-						if (tickFired[i - 1]) {
-							int wIdx = writeIdx[i] % N;
-							delayLine[i][wIdx] = held[i - 1];
-							writeIdx[i] = (wIdx + 1) % N;
-							historyLine[i][historyWriteIdx[i]] = held[i - 1];
-							historyWriteIdx[i] = (historyWriteIdx[i] + 1) % MAX_N;
-							tickFired[i] = true;
+							if (tickFired[i - 1]) {
+								int wIdx = writeIdx[i] % N;
+								delayLine[i][wIdx] = held[i - 1];
+								writeIdx[i] = (wIdx + 1) % N;
+								historyLine[i][historyWriteIdx[i]] = held[i - 1];
+								historyWriteIdx[i] = (historyWriteIdx[i] + 1) % MAX_N;
+								tickFired[i] = true;
+							}
 						}
 					} else {
 						// Parallel (or cascade-on-A): N-step delay line.
-						// On each lane-clock: read out the value from N
-						// lane-steps ago, then overwrite that slot with
-						// the current input. Output therefore lags the
-						// input by exactly N lane-steps. Mirror to the
-						// full-depth history ring for disconnect playback.
-						int wIdx = writeIdx[i] % N;
-						held[i] = delayLine[i][wIdx];
-						delayLine[i][wIdx] = inCV;
-						writeIdx[i] = (wIdx + 1) % N;
+						// Read the value from N lane-steps ago out of the
+						// always-written full-depth history ring, then write
+						// the current input. Using the continuously-written
+						// ring (lookback = N) rather than an N-sized buffer
+						// keeps the delay correct even when N is modulated on
+						// the fly via the Step CV — otherwise a changing N
+						// indexes slots that were never written at that N and
+						// the output reads stale/zero values (looks frozen).
+						// N==0 = no delay: the input passes straight through.
+						if (N == 0) {
+							held[i] = inCV;
+						} else {
+							int rIdx = (historyWriteIdx[i] - N + MAX_N) % MAX_N;
+							held[i] = historyLine[i][rIdx];
+						}
 						historyLine[i][historyWriteIdx[i]] = inCV;
 						historyWriteIdx[i] = (historyWriteIdx[i] + 1) % MAX_N;
 						tickFired[i] = true;
