@@ -124,9 +124,22 @@ Recorded samples are **not** saved with the patch (they can be megabytes of audi
 ## Transient Detection
 
 Right-click menu controls:
-- **Re-detect Transients** — Re-run with current settings (overrides WAV cue points)
+- **Re-detect Transients** — Re-run with current settings (overrides WAV cue points and any manual edits)
 - **Sensitivity**: High / Medium (default) / Low
 - **Min Transient Gap**: 10ms / 50ms / 100ms (default)
+
+WAV cue points are read from the file (their sample-frame positions, resampled to 48kHz) and used as the transient markers when present, in place of auto-detection.
+
+## Cue Points (manual editing)
+
+The transient markers double as cue points you can edit directly on the waveform (top half = Sample A, bottom half = Sample B):
+
+- **Double-click an empty spot** — add a cue there.
+- **Double-click an existing cue** — remove it.
+- **Click and drag a cue** — move it (loop-region handles take priority where they overlap).
+- Right-click menu: **Clear cue points A / B**.
+
+Manual edits are saved with the patch and restored on load, overriding the file-derived cues. (Re-detect Transients or loading a new file replaces them.)
 
 ## VCA Mode (Anti-Click)
 

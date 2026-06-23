@@ -2,6 +2,7 @@
 #include <osdialog.h>
 #include <thread>
 #include <atomic>
+#include <mutex>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -84,6 +85,7 @@ struct SampleData {
 	// reads of sd.samples whenever the buffer is in flux.
 	std::atomic<bool> loaded{false};
 	bool hasCuePoints = false; // true if transients came from WAV cue points
+	bool cuesEdited = false;   // true once cues were manually edited; persist them
 	// Loop region (normalized 0-1)
 	float loopStart = 0.f;
 	float loopEnd = 1.f;
@@ -136,9 +138,13 @@ struct PhaseWaveformDisplay : Widget {
 		LOOP_START_A,
 		LOOP_END_A,
 		LOOP_START_B,
-		LOOP_END_B
+		LOOP_END_B,
+		CUE_A,
+		CUE_B
 	};
 	DragTarget dragTarget = NONE;
+	int dragCueIdx = -1;   // index into the dragged sample's transients
+	Vec lastButtonPos;     // last left-press position (onDoubleClick carries none)
 
 	PhaseWaveformDisplay() {}
 
@@ -268,7 +274,9 @@ struct PhaseWaveformDisplay : Widget {
 	}
 
 	DragTarget hitTestHandle(Vec pos);
+	int hitTestCue(Vec pos, bool& isB);   // nearest cue index within hit radius, or -1
 	void onButton(const ButtonEvent& e) override;
+	void onDoubleClick(const DoubleClickEvent& e) override;
 	void onDragMove(const DragMoveEvent& e) override;
 	void onDragEnd(const DragEndEvent& e) override;
 
@@ -597,11 +605,11 @@ struct Phase : Module {
 			if (wav.pMetadata[m].type == drwav_metadata_type_cue) {
 				drwav_cue* cue = &wav.pMetadata[m].data.cue;
 				for (drwav_uint32 c = 0; c < cue->cuePointCount; c++) {
-					// sampleByteOffset is byte offset into audio data
-					// Convert to frame position
+					// dr_wav's sampleByteOffset is the raw dwSampleOffset, a SAMPLE-FRAME
+					// offset (despite the name) — use it directly so markers match other apps
 					uint32_t bytesPerFrame = channels * (bitsPerSample / 8);
 					if (bytesPerFrame > 0) {
-						size_t framePos = (size_t)(cue->pCuePoints[c].sampleByteOffset / bytesPerFrame);
+						size_t framePos = (size_t)cue->pCuePoints[c].sampleByteOffset;
 						if (framePos < totalFrames) {
 							cuePositions.push_back(framePos);
 						}
@@ -947,6 +955,20 @@ struct Phase : Module {
 		json_object_set_new(rootJ, "loopStartB", json_real(sampleB.loopStart));
 		json_object_set_new(rootJ, "loopEndB", json_real(sampleB.loopEnd));
 
+		// Manually-edited cue points (override the file-derived transients on
+		// reload). Only persisted once the user has edited them.
+		auto saveCues = [&](SampleData& sd, const char* flagKey, const char* arrKey) {
+			if (!sd.cuesEdited) return;
+			json_object_set_new(rootJ, flagKey, json_boolean(true));
+			json_t* arr = json_array();
+			std::lock_guard<std::mutex> lk(cueMutex);
+			for (size_t t : sd.transients)
+				json_array_append_new(arr, json_integer((json_int_t)t));
+			json_object_set_new(rootJ, arrKey, arr);
+		};
+		saveCues(sampleA, "cuesEditedA", "cuesA");
+		saveCues(sampleB, "cuesEditedB", "cuesB");
+
 		return rootJ;
 	}
 
@@ -1019,6 +1041,28 @@ struct Phase : Module {
 		if (leA) sampleA.loopEnd = (float)json_real_value(leA);
 		if (lsB) sampleB.loopStart = (float)json_real_value(lsB);
 		if (leB) sampleB.loopEnd = (float)json_real_value(leB);
+
+		// Restore manually-edited cues, overriding the file-derived transients
+		// that loadSample() just produced above.
+		auto restoreCues = [&](SampleData& sd, const char* flagKey, const char* arrKey) {
+			json_t* flagJ = json_object_get(rootJ, flagKey);
+			if (!flagJ || !json_boolean_value(flagJ)) return;
+			json_t* arr = json_object_get(rootJ, arrKey);
+			std::lock_guard<std::mutex> lk(cueMutex);
+			sd.transients.clear();
+			if (arr) {
+				size_t n = json_array_size(arr);
+				for (size_t i = 0; i < n; i++) {
+					size_t t = (size_t)json_integer_value(json_array_get(arr, i));
+					if (t < sd.length) sd.transients.push_back(t);
+				}
+			}
+			std::sort(sd.transients.begin(), sd.transients.end());
+			sd.cuesEdited = true;
+			sd.hasCuePoints = !sd.transients.empty();
+		};
+		restoreCues(sampleA, "cuesEditedA", "cuesA");
+		restoreCues(sampleB, "cuesEditedB", "cuesB");
 	}
 
 	// --- DSP ---
@@ -1238,7 +1282,52 @@ struct Phase : Module {
 		}
 	}
 
+	// Guards sd.transients against concurrent edits (UI thread) while the
+	// audio thread reads them on clock edges. UI edits take a full lock; the
+	// audio reader takes a try-lock and simply skips the jump if it's busy.
+	std::mutex cueMutex;
+
+	// --- Manual cue editing (UI thread) ---
+	void addCue(SampleData& sd, size_t frame) {
+		if (!sd.loaded || sd.length == 0) return;
+		if (frame >= sd.length) frame = sd.length - 1;
+		std::lock_guard<std::mutex> lk(cueMutex);
+		sd.transients.push_back(frame);
+		std::sort(sd.transients.begin(), sd.transients.end());
+		sd.cuesEdited = true;
+		sd.hasCuePoints = true;
+	}
+	void removeCue(SampleData& sd, int idx) {
+		std::lock_guard<std::mutex> lk(cueMutex);
+		if (idx >= 0 && idx < (int)sd.transients.size())
+			sd.transients.erase(sd.transients.begin() + idx);
+		sd.cuesEdited = true;
+	}
+	// Move one cue by index without re-sorting (called continuously during a
+	// drag; sortCues() is called once on drag end to restore order).
+	void moveCue(SampleData& sd, int idx, size_t frame) {
+		if (sd.length == 0) return;
+		if (frame >= sd.length) frame = sd.length - 1;
+		std::lock_guard<std::mutex> lk(cueMutex);
+		if (idx >= 0 && idx < (int)sd.transients.size())
+			sd.transients[idx] = frame;
+	}
+	void sortCues(SampleData& sd) {
+		std::lock_guard<std::mutex> lk(cueMutex);
+		std::sort(sd.transients.begin(), sd.transients.end());
+		sd.cuesEdited = true;
+	}
+	void clearCues(SampleData& sd) {
+		std::lock_guard<std::mutex> lk(cueMutex);
+		sd.transients.clear();
+		sd.cuesEdited = true;
+		sd.hasCuePoints = false;
+	}
+
 	double findNextTransient(const LoopState& loop, const SampleData& sd) {
+		// Skip the jump rather than block audio if the UI is mid-edit.
+		std::unique_lock<std::mutex> lk(cueMutex, std::try_to_lock);
+		if (!lk.owns_lock()) return -1.0;
 		if (sd.transients.empty()) return -1.0;
 
 		size_t currentPos = (size_t)loop.playhead;
@@ -1477,15 +1566,65 @@ PhaseWaveformDisplay::DragTarget PhaseWaveformDisplay::hitTestHandle(Vec pos) {
 	return NONE;
 }
 
+int PhaseWaveformDisplay::hitTestCue(Vec pos, bool& isB) {
+	if (!module) return -1;
+	float w = box.size.x;
+	float halfH = box.size.y * 0.5f;
+	float hitRadius = 4.f;
+	isB = pos.y >= halfH;
+	SampleData& sd = isB ? module->sampleB : module->sampleA;
+	if (!sd.loaded || sd.length == 0) return -1;
+	int best = -1;
+	float bestDist = hitRadius;
+	for (int i = 0; i < (int)sd.transients.size(); i++) {
+		float px = (float)sd.transients[i] / (float)sd.length * w;
+		float d = std::fabs(pos.x - px);
+		if (d < bestDist) { bestDist = d; best = i; }
+	}
+	return best;
+}
+
 void PhaseWaveformDisplay::onButton(const ButtonEvent& e) {
 	if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+		lastButtonPos = e.pos;
+		// Loop handles take priority, then existing cues (for dragging).
 		dragTarget = hitTestHandle(e.pos);
-		if (dragTarget != NONE) {
-			APP->event->setSelectedWidget(this);
-			e.consume(this);
+		dragCueIdx = -1;
+		if (dragTarget == NONE) {
+			bool isB = false;
+			int cue = hitTestCue(e.pos, isB);
+			if (cue >= 0) {
+				dragTarget = isB ? CUE_B : CUE_A;
+				dragCueIdx = cue;
+			}
 		}
+		// Consume all left presses on the display so we also receive the
+		// double-click that follows (add/remove cue). Right-click is left
+		// untouched so VCV's context menu still opens.
+		APP->event->setSelectedWidget(this);
+		e.consume(this);
 	}
 	Widget::onButton(e);
+}
+
+void PhaseWaveformDisplay::onDoubleClick(const DoubleClickEvent& e) {
+	if (!module) return;
+	// Don't drop a cue when double-clicking a loop handle.
+	if (hitTestHandle(lastButtonPos) != NONE) return;
+	float w = box.size.x;
+	float halfH = box.size.y * 0.5f;
+	bool isB = lastButtonPos.y >= halfH;
+	SampleData& sd = isB ? module->sampleB : module->sampleA;
+	if (!sd.loaded || sd.length == 0) return;
+
+	bool hitIsB = false;
+	int cue = hitTestCue(lastButtonPos, hitIsB);
+	if (cue >= 0 && hitIsB == isB) {
+		module->removeCue(sd, cue);          // double-click a cue → remove it
+	} else {
+		float norm = clamp(lastButtonPos.x / w, 0.f, 1.f);
+		module->addCue(sd, (size_t)(norm * sd.length));   // double-click empty → add
+	}
 }
 
 void PhaseWaveformDisplay::onDragMove(const DragMoveEvent& e) {
@@ -1509,13 +1648,33 @@ void PhaseWaveformDisplay::onDragMove(const DragMoveEvent& e) {
 		case LOOP_END_B:
 			module->sampleB.loopEnd = clamp(module->sampleB.loopEnd + delta, module->sampleB.loopStart + 0.01f, 1.f);
 			break;
+		case CUE_A: {
+			SampleData& sd = module->sampleA;
+			if (sd.length == 0 || dragCueIdx < 0 || dragCueIdx >= (int)sd.transients.size()) break;
+			float cur = (float)sd.transients[dragCueIdx] / (float)sd.length;
+			float n = clamp(cur + delta, 0.f, 1.f);
+			module->moveCue(sd, dragCueIdx, (size_t)(n * sd.length));
+			break;
+		}
+		case CUE_B: {
+			SampleData& sd = module->sampleB;
+			if (sd.length == 0 || dragCueIdx < 0 || dragCueIdx >= (int)sd.transients.size()) break;
+			float cur = (float)sd.transients[dragCueIdx] / (float)sd.length;
+			float n = clamp(cur + delta, 0.f, 1.f);
+			module->moveCue(sd, dragCueIdx, (size_t)(n * sd.length));
+			break;
+		}
 		default:
 			break;
 	}
 }
 
 void PhaseWaveformDisplay::onDragEnd(const DragEndEvent& e) {
+	// Re-sort after a cue drag so findNextTransient() stays in order.
+	if (dragTarget == CUE_A) module->sortCues(module->sampleA);
+	else if (dragTarget == CUE_B) module->sortCues(module->sampleB);
 	dragTarget = NONE;
+	dragCueIdx = -1;
 }
 
 
@@ -1915,6 +2074,17 @@ struct PhaseWidget : ModuleWidget {
 				}
 			));
 		}
+
+		// Cue points (manual editing)
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Cue Points"));
+		menu->addChild(createMenuLabel("(double-click waveform to add/remove, drag to move)"));
+		if (module->sampleA.loaded)
+			menu->addChild(createMenuItem("Clear cue points A", "",
+				[=]() { module->clearCues(module->sampleA); }));
+		if (module->sampleB.loaded)
+			menu->addChild(createMenuItem("Clear cue points B", "",
+				[=]() { module->clearCues(module->sampleB); }));
 
 		// Transient detection settings
 		menu->addChild(new MenuSeparator);
