@@ -72,6 +72,13 @@ Each module follows the VCV Rack module pattern:
 - Implements `process()` method for audio processing
 - Has corresponding widget class for UI
 
+### Panel Conventions
+**NEVER add virtual screws to a panel.** Signal Function Set faceplates omit the
+`ScrewSilver`/`ScrewBlack` corner screws by design — do not call
+`createWidget<ScrewSilver>(...)` (or any screw widget) in a `ModuleWidget`
+constructor, for new modules or existing ones. This is intentional and applies
+to every module in the plugin.
+
 ### Display Widget Conventions
 **Any module with a custom NanoVG display widget MUST implement a `drawPreview()` method** for the browser screenshot (`ModuleWidget->module == NULL` during VCV Library thumbnail generation). Without it, the browser thumbnail shows an empty dark slab and tells nothing about what the module does.
 
