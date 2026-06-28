@@ -88,8 +88,10 @@ struct Shift : Module {
 	dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger resetTrigger;
 	dsp::SchmittTrigger resetButtonTrigger;
-	dsp::PulseGenerator gatePulse[NUM_OUTS];
-	dsp::PulseGenerator jumblePulse;
+	// Gates pass the input clock's pulse shape through (not fixed triggers).
+	// gateOpen[i] is armed on the lane's firing (divided) clock and closes when
+	// that input clock pulse falls, so the gate width == the input clock width.
+	bool  gateOpen[NUM_OUTS] = {false, false, false, false};
 	float jumbleHeld = 0.f;
 	float jumbleLedFlash = 0.f;
 
@@ -148,11 +150,11 @@ struct Shift : Module {
 		configInput(RESET_INPUT, "Reset (clears all counters and held values)");
 		configButton(RESET_PARAM, "Reset (button)");
 		for (int i = 0; i < NUM_OUTS; i++) {
-			configOutput(GATE_A + i, string::f("Gate %s (1ms pulse on each tap fire)", labels[i]));
+			configOutput(GATE_A + i, string::f("Gate %s (follows input clock shape on each tap fire)", labels[i]));
 		}
 		configOutput(JUMBLE_CV,  "Jumble CV (random pick from A/B/C/D, "
 		                        "re-rolled on each input clock)");
-		configOutput(JUMBLE_CLK, "Jumble clock (1ms pulse on each re-roll)");
+		configOutput(JUMBLE_CLK, "Jumble clock (mirrors the input clock shape)");
 	}
 
 	// Wipes the active delay-line buffers and the full-depth history rings
@@ -229,6 +231,7 @@ struct Shift : Module {
 
 		// --- Clock processing ---
 		bool clockRose = clockTrigger.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
+		bool clockHigh = clockTrigger.isHigh();   // for clock-shape passthrough
 		bool tickFired[NUM_OUTS] = {false, false, false, false};
 		bool cvConnected = inputs[CV_INPUT].isConnected();
 		float inCV = inputs[CV_INPUT].getVoltage();
@@ -318,23 +321,20 @@ struct Shift : Module {
 			}
 		}
 
-		// --- Per-channel gate pulses (1ms on each lane clock tick) + LED ---
+		// --- Per-channel gates (pass the input clock's shape) + LED ---
 		// Gate + LED follow the divided input clock for that lane, so they
-		// keep firing even when the CV input is disconnected. tickFired[]
-		// (used for cascade chain propagation) only fires on actual data
-		// events — gate output is driven by laneTick[] instead.
+		// keep firing even when the CV input is disconnected. The gate mirrors
+		// the firing input-clock pulse's width: armed on the lane tick, held
+		// while the input clock stays high, released when it falls (so divided
+		// lanes only gate on their firing pulses).
 		float decay = args.sampleTime / 0.12f;
 		for (int i = 0; i < NUM_OUTS; i++) {
-			if (laneTick[i]) {
-				ledFlash[i] = 1.f;
-				gatePulse[i].trigger(0.001f);
-			} else {
-				ledFlash[i] = std::max(0.f, ledFlash[i] - decay);
-			}
+			if (laneTick[i]) { ledFlash[i] = 1.f; gateOpen[i] = true; }
+			else             ledFlash[i] = std::max(0.f, ledFlash[i] - decay);
+			if (!clockHigh) gateOpen[i] = false;   // close with the input clock pulse
 			lights[LIGHT_A + i].setBrightness(ledFlash[i]);
 			outputs[OUT_A + i].setVoltage(held[i]);
-			bool gateHi = gatePulse[i].process(args.sampleTime);
-			outputs[GATE_A + i].setVoltage(gateHi ? 10.f : 0.f);
+			outputs[GATE_A + i].setVoltage((gateOpen[i] && clockHigh) ? 10.f : 0.f);
 		}
 
 		// --- Jumble: re-roll on each input clock pulse, picking a random
@@ -347,14 +347,14 @@ struct Shift : Module {
 			if (pick < 0)         pick = 0;
 			if (pick >= NUM_OUTS) pick = NUM_OUTS - 1;
 			jumbleHeld = held[pick];
-			jumblePulse.trigger(0.001f);
 			jumbleLedFlash = 1.f;
 		} else {
 			jumbleLedFlash = std::max(0.f, jumbleLedFlash - decay);
 		}
 		lights[LIGHT_JUMBLE].setBrightness(jumbleLedFlash);
 		outputs[JUMBLE_CV].setVoltage(jumbleHeld);
-		outputs[JUMBLE_CLK].setVoltage(jumblePulse.process(args.sampleTime) ? 10.f : 0.f);
+		// Jumble re-rolls every input clock, so its clock mirrors the input shape.
+		outputs[JUMBLE_CLK].setVoltage(clockHigh ? 10.f : 0.f);
 	}
 
 	json_t* dataToJson() override {

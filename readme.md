@@ -23,6 +23,8 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 - [Vac](#vac) — Semi-stable A/R envelope with vactrol-like timing drift
 - [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
 - [Cycle](#cycle) — Bar-synced quad LFO with morphing shapes
+- [Operator](#operator) — DX7-style 6-operator FM voice (.syx cartridges)
+- [OP ENV](#op-env) — Standalone DX7 operator envelope generator
 - [Other Platforms](#other-platforms)
 - [Building](#building)
 - [License](#license)
@@ -637,6 +639,48 @@ A four-channel LFO that thinks in bars, not Hertz. All four outputs (A/B/C/D) ru
 **Outputs:** per channel — Uni (0–5V) and Bi (±5V); End-of-cycle trigger.
 
 See [docs/cycle-manual.md](docs/cycle-manual.md) for the full manual.
+
+### Operator
+
+<img src="screenshots/Bell.png" alt="Operator panel" height="320"> 
+
+**[Operator on signalfunctionset.com →](https://signalfunctionset.com/projects/operator)**
+
+A 6-operator FM synth voice in the Yamaha DX7 lineage. Operator loads DX7 `.syx` cartridges (or your own banks exported from [Dexed](https://asb2m10.github.io/dexed/)), lets you pick a voice, and plays it polyphonically on Google's msfa DX7 core — so patches sound faithful to the hardware, with all six operators, every algorithm, feedback, key scaling, and the DX7 envelopes. It ships with four classic Brian Eno DX7 patches so it makes sound the moment you patch a gate.
+
+**Features:**
+- **Faithful DX7 voicing** — reads packed VMEM exactly as the hardware stores it; cartridges and Dexed banks play as intended.
+- **Three outputs** — AUDIO (the voice with its internal DX7 envelope), VCO (the raw tone, no envelope, for shaping with an external EG/VCA), and ENV (a 0–10V envelope follower of the audio).
+- **One-knob timbre** — BRIGHTNESS tilts the whole sound darker/brighter; FEEDBACK offsets the patch's feedback buzz; TUNE is ±12 semitones.
+- **Tabbed display** — an OPERATORS view that shows the algorithm and lets you click operators to mute/un-mute them, and an ENVELOPE view with the carrier EG shape plus a live trace.
+- **Polyphonic** (up to 16 voices), with velocity input and sample-rate-corrected envelopes.
+
+**Controls:** Voice, Bank, ◀/▶ voice (on screen), Tune, Brightness, Feedback.
+**Inputs:** V/Oct (poly), Gate (poly), Vel (poly), Voice CV, Bank CV, Tune CV, Brightness CV, Feedback CV.
+**Outputs:** Audio (poly), VCO (poly), Env (poly).
+
+See [docs/operator-manual.md](docs/operator-manual.md) for the full manual.
+
+### OP ENV
+
+<img src="screenshots/OpEnv.png" alt="OP ENV panel" height="320"> 
+
+**[OP ENV on signalfunctionset.com →](https://signalfunctionset.com/projects/op-env)**
+
+The DX7 operator envelope, freed from the oscillator. OP ENV loads a voice from a DX7 `.syx` bank (just like Operator), takes that voice's carrier envelope, and turns it into a gate-driven 0–10V CV envelope for shaping any VCA, filter, or modulation target. On top of the loaded shape you can offset all eight DX7 EG attributes — four rates and four levels — by trimpot or CV, key-track the rates with a V/oct input, and add the DX7's global LFO tremolo.
+
+**Features:**
+- **Loads any DX7 carrier envelope** — pick a voice and its 4-rate / 4-level EG becomes the envelope shape, drawn live on screen.
+- **Eight offsettable attributes** — R1–R4 and L1–L4, each ±99 by trimpot and CV, clamped to the DX7 range.
+- **Key-tracked rates** — patch pitch into V/OCT for DX7 rate scaling (faster envelopes higher up the keyboard).
+- **DX7 LFO tremolo** — LFO rate / depth / delay and carrier AM sensitivity, with a selectable LFO waveform.
+- **Release to 0V** (default) so it behaves like an envelope generator, or switch it off for the authentic DX7 L4 release level.
+
+**Controls:** L1–L4, R1–R4, Voice, Bank, LFO, Depth, Delay, AM Sens, Out Lvl.
+**Inputs:** Gate, V/Oct, L1–L4 CV, R1–R4 CV, Voice CV, Bank CV, LFO CV, Depth CV, Out Lvl CV.
+**Outputs:** Env (0–10V).
+
+See [docs/op-env-manual.md](docs/op-env-manual.md) for the full manual.
 
 ## Other Platforms
 

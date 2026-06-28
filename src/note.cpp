@@ -107,6 +107,7 @@ struct Note : Module {
 		float velocities[N_STEPS];
 		bool  accents[N_STEPS];
 		float probabilities[N_STEPS];
+		bool  legato[N_STEPS];         // tie: extend the held note into this step
 		int   length;                  // 1..N_STEPS
 		int   repeats;                 // 1..N_REPEATS
 		bool  active;
@@ -116,6 +117,7 @@ struct Note : Module {
 				velocities[i] = 1.f;
 				accents[i] = false;
 				probabilities[i] = 1.f;
+				legato[i] = false;
 			}
 			length = N_STEPS;
 			repeats = 1;
@@ -144,6 +146,18 @@ struct Note : Module {
 
 	dsp::SchmittTrigger clockTrigger, barTrigger, resetTrigger;
 	dsp::PulseGenerator gatePulse, accentPulse;
+
+	// Gate length / duty cycle. 0 = legacy 1ms trigger; >0 = fraction of the
+	// step interval the gate stays high (so it actually sustains a synth voice).
+	// The step interval is measured from the time between successive step
+	// advances, so the gate tracks tempo automatically.
+	float gateLength = 0.5f;
+	int   stepIntervalSamples = 0;     // measured time between step advances
+	int   samplesSinceAdvance = 0;
+	int   gateRemaining = 0;           // samples of gate left to hold
+	bool  haveInterval = false;
+	bool  noteSounding = false;        // a real note is currently held (for ties)
+	float sampleRate_ = 48000.f;
 
 	// Bar/clock coincidence handling (mirrors Beat)
 	int pendingClockSamples = -1;
@@ -206,6 +220,7 @@ struct Note : Module {
 		advanceOnBarOnly = true;
 		pendingClockSamples = -1;
 		barSuppressionSamples = 0;
+		noteSounding = false;
 		params[ROOT_PARAM].setValue(0.f);
 		params[SCALE_PARAM].setValue(0.f);
 		params[OCT_PARAM].setValue(0.f);
@@ -240,16 +255,46 @@ struct Note : Module {
 	}
 
 	void fireStepIfActive() {
+		// Measure the interval between step advances (this runs on every
+		// advance, rest or not) so the gate length can track tempo.
+		stepIntervalSamples = samplesSinceAdvance;
+		samplesSinceAdvance = 0;
+		if (stepIntervalSamples > 0) haveInterval = true;
+
 		const Pattern& p = patterns[playPattern];
 		if (playStep < 0 || playStep >= p.length) return;
+
+		int ivl = haveInterval ? stepIntervalSamples : (int)(sampleRate_ * 0.125f);
+		int len = p.length < 1 ? 1 : p.length;
+		bool nextTie = p.legato[(playStep + 1) % len];      // does the next step tie?
+		// Gate fraction: hold the whole step (100%) when the next step ties in,
+		// so the held note is continuous; otherwise the normal duty so it ends
+		// with a gap before the next note.
+		auto holdGate = [&]() {
+			float frac = nextTie ? 1.0f : gateLength;
+			if (frac <= 0.f) { gatePulse.trigger(0.001f); return; }   // trigger mode
+			gateRemaining = std::max(1, (int)(frac * ivl));
+		};
+
+		// --- Tie: extend the currently-held note. No pitch change, no accent,
+		//     no probability roll, no retrigger. ---
+		if (p.legato[playStep]) {
+			if (noteSounding) holdGate();      // nothing held → behaves like a rest
+			return;
+		}
+
 		int pitch = p.pitches[playStep];
-		if (pitch < 0) return;                              // rest
-		if (pitch >= currentRowCount()) return;             // out of scale (incl. octave row)
-		if (random::uniform() >= p.probabilities[playStep]) return;
-		gatePulse.trigger(0.001f);
+		if (pitch < 0 || pitch >= currentRowCount()
+		    || random::uniform() >= p.probabilities[playStep]) {
+			noteSounding = false;                           // rest / skipped
+			return;
+		}
+
 		currentVelocity = clamp(p.velocities[playStep], 0.f, 1.f);
 		currentVoct = voctForRow(pitch);
+		noteSounding = true;
 		if (p.accents[playStep]) accentPulse.trigger(0.001f);
+		holdGate();
 	}
 
 	void doReset() {
@@ -261,9 +306,18 @@ struct Note : Module {
 		firstClockPending = true;
 		pendingClockSamples = -1;
 		barSuppressionSamples = 0;
+		gateRemaining = 0;
+		samplesSinceAdvance = 0;
+		haveInterval = false;
+		noteSounding = false;
 	}
 
 	void process(const ProcessArgs& args) override {
+		sampleRate_ = args.sampleRate;
+		// Time since the last step advance, used to size the gate. Cap so an
+		// idle (unclocked) module doesn't overflow the counter.
+		if (samplesSinceAdvance < (int)(args.sampleRate * 10.f)) samplesSinceAdvance++;
+
 		// ROOT, SCALE, OCT come from trimpots, optionally summed with CV.
 		int rootK = (int)std::round(params[ROOT_PARAM].getValue());
 		int scaleK = (int)std::round(params[SCALE_PARAM].getValue());
@@ -353,7 +407,13 @@ struct Note : Module {
 		}
 		if (barSuppressionSamples > 0) barSuppressionSamples--;
 
-		bool gateHi = gatePulse.process(args.sampleTime);
+		bool gateHi;
+		if (gateLength <= 0.f) {
+			gateHi = gatePulse.process(args.sampleTime);     // legacy 1ms trigger
+		} else {
+			gateHi = gateRemaining > 0;
+			if (gateRemaining > 0) gateRemaining--;
+		}
 		bool accHi  = accentPulse.process(args.sampleTime);
 
 		outputs[GATE_OUTPUT].setVoltage(gateHi ? 10.f : 0.f);
@@ -377,6 +437,7 @@ struct Note : Module {
 		json_object_set_new(root, "scaleIndex", json_integer(scaleIndex));
 		json_object_set_new(root, "octaveShift", json_integer(octaveShift));
 		json_object_set_new(root, "advanceOnBarOnly", json_boolean(advanceOnBarOnly));
+		json_object_set_new(root, "gateLength", json_real(gateLength));
 
 		json_t* patArray = json_array();
 		for (int p = 0; p < N_PATTERNS; p++) {
@@ -388,16 +449,19 @@ struct Note : Module {
 			json_t* velArr = json_array();
 			json_t* accArr = json_array();
 			json_t* probArr = json_array();
+			json_t* legArr = json_array();
 			for (int s = 0; s < N_STEPS; s++) {
 				json_array_append_new(pitchArr, json_integer(patterns[p].pitches[s]));
 				json_array_append_new(velArr,  json_real(patterns[p].velocities[s]));
 				json_array_append_new(accArr,  json_boolean(patterns[p].accents[s]));
 				json_array_append_new(probArr, json_real(patterns[p].probabilities[s]));
+				json_array_append_new(legArr,  json_boolean(patterns[p].legato[s]));
 			}
 			json_object_set_new(po, "pitches", pitchArr);
 			json_object_set_new(po, "velocities", velArr);
 			json_object_set_new(po, "accents", accArr);
 			json_object_set_new(po, "probabilities", probArr);
+			json_object_set_new(po, "legato", legArr);
 			json_array_append_new(patArray, po);
 		}
 		json_object_set_new(root, "patterns", patArray);
@@ -423,6 +487,8 @@ struct Note : Module {
 			octaveShift = clamp((int)json_integer_value(j), -4, 4);
 		if (json_t* j = json_object_get(root, "advanceOnBarOnly"))
 			advanceOnBarOnly = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "gateLength"))
+			gateLength = (float)json_real_value(j);
 
 		json_t* patArray = json_object_get(root, "patterns");
 		if (patArray && json_is_array(patArray)) {
@@ -457,6 +523,12 @@ struct Note : Module {
 					for (int s = 0; s < N_STEPS; s++) {
 						if (json_t* v = json_array_get(arr, s))
 							patterns[p].probabilities[s] = clamp((float)json_real_value(v), 0.f, 1.f);
+					}
+				}
+				if (json_t* arr = json_object_get(po, "legato")) {
+					for (int s = 0; s < N_STEPS; s++) {
+						if (json_t* v = json_array_get(arr, s))
+							patterns[p].legato[s] = json_boolean_value(v);
 					}
 				}
 			}
@@ -537,7 +609,10 @@ rack::math::Rect NoteDisplay::cellRectFor(int col, int row) {
 int NoteDisplay::hitTestMatrixCol(rack::math::Vec p) {
 	if (!matrixRect.contains(p)) return -1;
 	float relX = p.x - matrixRect.pos.x;
-	int col = (int)(relX / (matrixRect.size.x / (float)N_STEPS));
+	// Cells are on a 20-unit pitch within the 158-unit matrix (not 158/8), so
+	// match that or clicks drift onto the neighbouring column near cell edges.
+	float colPitch = matrixRect.size.x * (20.f / 158.f);
+	int col = (int)(relX / colPitch);
 	return clamp(col, 0, N_STEPS - 1);
 }
 
@@ -670,6 +745,13 @@ void NoteDisplay::onButton(const ButtonEvent& e) {
 	int row = hitTestMatrixRow(p);
 	if (col >= 0) {
 		Note::Pattern& pat = module->patterns[module->editPattern];
+		// Shift-click: toggle legato (tie) — extend the previous note into this
+		// column. The tied column holds the held note; its own pitch is ignored.
+		if (e.mods & GLFW_MOD_SHIFT) {
+			pat.legato[col] = !pat.legato[col];
+			e.consume(this);
+			return;
+		}
 		bool needsRow = (module->editMode == Note::MODE_STEPS
 		              || module->editMode == Note::MODE_ACC);
 		// STEPS / ACC require an in-scale row; VEL / PROB act per column
@@ -679,7 +761,13 @@ void NoteDisplay::onButton(const ButtonEvent& e) {
 		}
 		switch (module->editMode) {
 			case Note::MODE_STEPS: {
-				if (pat.pitches[col] == row) {
+				if (pat.legato[col]) {
+					// Tied step: a plain click breaks the tie and places a real
+					// note here, so tied steps stay editable.
+					pat.legato[col] = false;
+					pat.pitches[col] = row;
+					dragRow = row;
+				} else if (pat.pitches[col] == row) {
 					pat.pitches[col] = -1;
 					dragRow = -1;
 				} else {
@@ -761,6 +849,7 @@ void NoteDisplay::onDragMove(const DragMoveEvent& e) {
 			int col = hitTestMatrixCol(dragPos);
 			if (col >= 0 && col < module->patterns[module->editPattern].length) {
 				module->patterns[module->editPattern].pitches[col] = dragRow;
+				module->patterns[module->editPattern].legato[col] = false;
 			}
 			break;
 		}
@@ -921,10 +1010,22 @@ void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
 	bool valueMode  = (module->editMode == Note::MODE_VEL
 	                || module->editMode == Note::MODE_PROB);
 
+	// Effective sounding row per column, following ties (a legato column inherits
+	// the held note's row).
+	int effRow[N_STEPS];
+	{
+		int held = -1;
+		for (int c = 0; c < N_STEPS; c++) {
+			if (editPat.legato[c]) effRow[c] = held;
+			else { held = editPat.pitches[c]; effRow[c] = held; }
+		}
+	}
+
 	for (int col = 0; col < N_STEPS; col++) {
 		bool inLen = (col < editPat.length);
 		bool isCurrentCol = isPlayingPattern && (col == module->playStep);
-		int litRow = editPat.pitches[col];
+		bool tie = editPat.legato[col];
+		int litRow = effRow[col];
 
 		float colX = (7.f + col * 20.f) * s;
 		float colW = 18.f * s;
@@ -990,6 +1091,20 @@ void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
 				nvgRoundedRect(args.vg, cr.pos.x + 0.5f, cr.pos.y + 0.5f,
 					cr.size.x - 1.f, cr.size.y - 1.f, 1.f * s);
 				nvgFillColor(args.vg, cellBg);
+				nvgFill(args.vg);
+			}
+			// Tie connector: a bar bridging from the previous column at the held
+			// row, so a sustained note reads as one long note.
+			if (inLen && tie && litRow >= 0 && col > 0) {
+				rack::math::Rect cr = cellRectFor(col, litRow);
+				rack::math::Rect pr = cellRectFor(col - 1, litRow);
+				float x0 = pr.pos.x + pr.size.x;        // prev cell right edge
+				float x1 = cr.pos.x;                    // cur cell left edge (gap only)
+				float yc = cr.pos.y + cr.size.y * 0.5f;
+				float hh = cr.size.y * 0.6f;
+				nvgBeginPath(args.vg);
+				nvgRect(args.vg, x0, yc - hh * 0.5f, x1 - x0, hh);
+				nvgFillColor(args.vg, isCurrentCol ? COL_ORANGE : COL_BLUE);
 				nvgFill(args.vg);
 			}
 		}
@@ -1373,6 +1488,20 @@ struct NoteWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Advance only on bar trigger", "",
 			&module->advanceOnBarOnly));
+
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Gate length"));
+		struct GateOpt { const char* name; float val; };
+		static const GateOpt gateOpts[] = {
+			{"Trigger (1ms)", 0.f}, {"25%", 0.25f}, {"50%", 0.5f},
+			{"75%", 0.75f}, {"90%", 0.9f}, {"100% (legato)", 1.f},
+		};
+		for (const GateOpt& o : gateOpts) {
+			float v = o.val;
+			menu->addChild(createCheckMenuItem(o.name, "",
+				[=]() { return std::fabs(module->gateLength - v) < 1e-4f; },
+				[=]() { module->gateLength = v; }));
+		}
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Patterns"));

@@ -279,6 +279,13 @@ struct Muse : Module {
 	dsp::SchmittTrigger randButtonTrigger;
 	dsp::PulseGenerator gatePulse;
 
+	// 50%-duty gate: the gate stays high for half the measured clock interval,
+	// so it actually sustains a synth voice (instead of a 1ms trigger).
+	int  samplesSinceTick = 0;
+	int  tickInterval = 0;
+	bool haveTickInterval = false;
+	int  gateRemaining = 0;
+
 	bool running = true;
 	bool gateOnChangeOnly = false;
 	int  lastPitchAddr = -1;
@@ -507,6 +514,9 @@ struct Muse : Module {
 		if (resetEdge) {
 			if (!followingThisFrame) core.clearState();
 			lastPitchAddr = -1;
+			gateRemaining = 0;
+			samplesSinceTick = 0;
+			haveTickInterval = false;
 		}
 
 		// --- Random (button or CV) ---
@@ -524,6 +534,8 @@ struct Muse : Module {
 		syncSlidersToCore();
 
 		// --- Advance machine ---
+		// Time since the last clock tick, used to size the 50%-duty gate.
+		samplesSinceTick = std::min(samplesSinceTick + 1, (int)(args.sampleRate * 10.f));
 		bool didTickThisFrame = false;
 		uint8_t myFbBit = 0;
 
@@ -547,7 +559,10 @@ struct Muse : Module {
 
 				bool emitGate = !gateOnChangeOnly || (addr != lastPitchAddr);
 				lastPitchAddr = addr;
-				if (emitGate) gatePulse.trigger(0.001f);
+				if (emitGate) {
+					int ivl = haveTickInterval ? samplesSinceTick : (int)(args.sampleRate * 0.05f);
+					gateRemaining = std::max(1, ivl / 2);
+				}
 			}
 		} else {
 			// Standalone / master path: drive from our own CLOCK input
@@ -571,9 +586,19 @@ struct Muse : Module {
 
 					bool emitGate = !gateOnChangeOnly || (addr != lastPitchAddr);
 					lastPitchAddr = addr;
-					if (emitGate) gatePulse.trigger(0.001f);
+					if (emitGate) {
+						int ivl = haveTickInterval ? samplesSinceTick : (int)(args.sampleRate * 0.05f);
+						gateRemaining = std::max(1, ivl / 2);
+					}
 				}
 			}
+		}
+
+		// Capture the clock interval and reset the counter on each tick.
+		if (didTickThisFrame) {
+			tickInterval = samplesSinceTick;
+			samplesSinceTick = 0;
+			haveTickInterval = true;
 		}
 
 		// --- Forward state to right-neighbor Muse via expander ---
@@ -622,7 +647,9 @@ struct Muse : Module {
 			cvOut = (pitchSemis / scaleMaxSemis) * targetV;
 		}
 		outputs[VOCT_OUTPUT].setVoltage(cvOut);
-		outputs[GATE_OUTPUT].setVoltage(gatePulse.process(args.sampleTime) ? 10.f : 0.f);
+		bool gateHi = gateRemaining > 0;
+		if (gateRemaining > 0) gateRemaining--;
+		outputs[GATE_OUTPUT].setVoltage(gateHi ? 10.f : 0.f);
 	}
 
 	json_t* dataToJson() override {

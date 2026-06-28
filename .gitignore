@@ -11,6 +11,7 @@
 /dep
 /dist
 dist-win/
+plugin-build-win/
 *.ai
 Panels.ai
 SFS.ai

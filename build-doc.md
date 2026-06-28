@@ -73,7 +73,45 @@ is self-contained; the script runs `objdump` afterward to confirm it pulls in no
 MinGW runtime DLLs. Restart VCV Rack after a dev build to load the plugin.
 
 > The same `./build.sh ... win` invocation **cross-compiles** when run on macOS
-> instead (requires `brew install mingw-w64 coreutils zstd`).
+> instead (requires `brew install mingw-w64 coreutils zstd`). That cross-build is
+> validated to be ABI-clean against the SDK, but for *guaranteed* parity with the
+> exact toolchain the VCV Library uses, prefer the Docker method below.
+
+### Windows Build (Docker — official toolchain, guaranteed parity)
+
+`./build-win-docker.sh` builds the Windows `.vcvplugin` inside VCV's official
+[`rack-plugin-toolchain`](https://github.com/VCVRack/rack-plugin-toolchain), the
+same toolchain the Library compiles with. Use this when you want byte-for-byte
+toolchain parity rather than the Homebrew MinGW cross-compile.
+
+To avoid the non-redistributable macOS SDK that the stock all-platforms image
+requires, we use a **Windows-only** image (`Dockerfile.win`, kept in this repo's
+tooling and copied into the toolchain clone).
+
+**One-time setup:**
+
+1. Install Docker Desktop and start it.
+2. Clone the toolchain and add the Windows-only Dockerfile:
+   ```bash
+   git clone -b v2 https://github.com/VCVRack/rack-plugin-toolchain ~/code/rack-plugin-toolchain
+   cp Dockerfile.win ~/code/rack-plugin-toolchain/      # from this repo
+   ```
+
+**Build:**
+
+```bash
+./build-win-docker.sh
+```
+
+The first run builds the toolchain image (MinGW-w64; on Apple Silicon it runs
+under `linux/amd64` emulation and can take tens of minutes). Later runs reuse the
+image and only compile the plugin. Output: `plugin-build-win/*.vcvplugin`, also
+copied into `dist/`.
+
+> The plugin build bind-mounts this repo and runs `make clean/dep/dist`, so it
+> wipes `build/` and `dist/` here; the Windows artifact is copied back into
+> `dist/` at the end. Run `./build.sh` again afterward for a Mac build.
+> Override the toolchain location with `TOOLCHAIN_DIR=...`.
 
 ### Manual Make (without build script)
 

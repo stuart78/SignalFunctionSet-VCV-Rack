@@ -26,6 +26,8 @@ void init(Plugin* p) {
 	p->addModel(modelGravity);
 	p->addModel(modelBand);
 	p->addModel(modelCycle);
+	p->addModel(modelBell);
+	p->addModel(modelOpEnv);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

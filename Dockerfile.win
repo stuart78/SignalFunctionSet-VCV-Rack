@@ -1,0 +1,78 @@
+# Windows-only variant of the VCV rack-plugin-toolchain image.
+#
+# The stock Dockerfile builds mac + win + lin toolchains and REQUIRES the
+# non-redistributable macOS SDK tarball (MacOSX<ver>.sdk.tar.xz) in the repo
+# root. We only need guaranteed-parity Windows builds, so this variant builds
+# just the win-x64 MinGW toolchain + the win-x64 Rack SDK — no macOS SDK needed.
+#
+# Build (from this directory):
+#   docker build --platform linux/amd64 --build-arg JOBS=$(sysctl -n hw.ncpu) \
+#       -f Dockerfile.win -t rack-plugin-toolchain:win .
+#
+# The matching plugin build is driven by SignalFunctionSet/build-win-docker.sh.
+FROM ubuntu:24.04
+ENV LANG=C.UTF-8
+
+ARG JOBS
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        make \
+        sudo \
+        ca-certificates \
+        git \
+        build-essential \
+        autoconf \
+        automake \
+        bison \
+        flex \
+        gawk \
+        libtool-bin \
+        libncurses5-dev \
+        unzip \
+        zip \
+        jq \
+        libgl-dev \
+        libglu-dev \
+        wget \
+        curl \
+        cmake \
+        nasm \
+        xz-utils \
+        file \
+        python3 \
+        libxml2-dev \
+        libssl-dev \
+        texinfo \
+        help2man \
+        libz-dev \
+        rsync \
+        xxd \
+        perl \
+        coreutils \
+        zstd \
+        markdown \
+        libarchive-tools \
+        gettext \
+        libgmp-dev \
+        libmpfr-dev
+RUN echo "%sudo ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Unprivileged build user (uid 1000 maps cleanly to the host user under Docker
+# Desktop on macOS).
+RUN useradd --non-unique --create-home --uid 1000 --gid 1000 --shell /bin/bash build
+RUN usermod -aG sudo build
+USER build
+
+RUN mkdir -p /home/build/rack-plugin-toolchain
+WORKDIR /home/build/rack-plugin-toolchain
+COPY Makefile /home/build/rack-plugin-toolchain/
+
+USER root
+RUN rm -rf /var/lib/apt/lists/*
+USER build
+
+# Windows toolchain (MinGW-w64) + the matching win-x64 Rack SDK, baked into the
+# image so the plugin build needs no host-side SDK mount.
+RUN JOBS=$JOBS make toolchain-win
+RUN JOBS=$JOBS make rack-sdk-win-x64

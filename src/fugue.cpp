@@ -199,6 +199,7 @@ struct Fugue : Module {
 		float currentVoltage = 0.f;
 		float targetVoltage = 0.f;
 		float slewRate = 0.f;
+		dsp::PulseGenerator gatePulse;   // used in Trigger gate-length mode
 	};
 
 	VoiceState voices[NUM_VOICES];
@@ -206,6 +207,10 @@ struct Fugue : Module {
 	dsp::SchmittTrigger resetButtonTrigger;
 	float faderRangeVolts = 1.f;
 	bool harmonicLock = true;
+	// Gate length as a fraction of the step period (0 = 1ms trigger). Previously
+	// the gate just mirrored the clock's high time, so a trigger clock produced
+	// trigger-width "gates"; this makes a proper musical gate.
+	float gateLength = 0.5f;
 
 	// ─── Constructor ─────────────────────────────────────────────────────────
 
@@ -284,6 +289,7 @@ struct Fugue : Module {
 		json_t* rootJ = json_object();
 		json_object_set_new(rootJ, "faderRange", json_real(faderRangeVolts));
 		json_object_set_new(rootJ, "harmonicLock", json_boolean(harmonicLock));
+		json_object_set_new(rootJ, "gateLength", json_real(gateLength));
 		return rootJ;
 	}
 
@@ -292,6 +298,8 @@ struct Fugue : Module {
 		if (j) faderRangeVolts = json_number_value(j);
 		json_t* hlJ = json_object_get(rootJ, "harmonicLock");
 		if (hlJ) harmonicLock = json_boolean_value(hlJ);
+		json_t* glJ = json_object_get(rootJ, "gateLength");
+		if (glJ) gateLength = json_number_value(glJ);
 	}
 
 	// ─── Scale Quantization ──────────────────────────────────────────────────
@@ -617,6 +625,11 @@ struct Fugue : Module {
 			}
 		}
 
+		// Gate mode: passthrough (-1) mirrors the clock high time; trigger (0)
+		// emits a 1ms pulse; >0 is a duty-cycle fraction of the step period.
+		bool gatePassthrough = gateLength < -0.5f;
+		bool gateTriggerMode = !gatePassthrough && gateLength <= 0.f;
+
 		// ── Per-voice clock processing ──
 		for (int v = 0; v < NUM_VOICES; v++) {
 			VoiceState& voice = voices[v];
@@ -638,6 +651,13 @@ struct Fugue : Module {
 				}
 
 				onVoiceStepAdvance(v);
+
+				// Trigger gate-length mode: fire a 1ms pulse on the new step.
+				if (gateTriggerMode) {
+					int ti = v * NUM_STEPS + voice.currentStep;
+					if (params[GATE_TOGGLE_PARAM_0 + ti].getValue() > 0.5f)
+						voice.gatePulse.trigger(0.001f);
+				}
 			}
 
 			// ── Slew ──
@@ -647,9 +667,19 @@ struct Fugue : Module {
 			outputs[CV_OUTS[v]].setVoltage(voice.currentVoltage);
 
 			// ── Gate output ──
+			// Duty-cycle gate sized to the step period (independent of the clock
+			// pulse width), so a trigger clock still yields a real gate. Trigger
+			// mode (gateLength<=0) emits a fixed 1ms pulse per step instead.
 			int toggleIdx = v * NUM_STEPS + voice.currentStep;
 			bool toggleOn = params[GATE_TOGGLE_PARAM_0 + toggleIdx].getValue() > 0.5f;
-			outputs[GATE_OUTS[v]].setVoltage((voice.clockHigh && toggleOn) ? 10.f : 0.f);
+			bool gateHi;
+			if (gatePassthrough)
+				gateHi = toggleOn && voice.clockHigh;          // old clock-follow behavior
+			else if (gateTriggerMode)
+				gateHi = voice.gatePulse.process(args.sampleTime);
+			else
+				gateHi = toggleOn && (voice.clockTimer < gateLength * voice.clockPeriod);
+			outputs[GATE_OUTS[v]].setVoltage(gateHi ? 10.f : 0.f);
 		}
 
 		// ── Update lights ──
@@ -876,6 +906,21 @@ struct FugueWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Harmonic Lock", "",
 			&module->harmonicLock));
+
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Gate length"));
+		struct GateOpt { const char* name; float val; };
+		static const GateOpt gateOpts[] = {
+			{"Clock passthrough", -1.f},
+			{"Trigger (1ms)", 0.f}, {"25%", 0.25f}, {"50%", 0.5f},
+			{"75%", 0.75f}, {"90%", 0.9f}, {"100% (legato)", 1.f},
+		};
+		for (const GateOpt& o : gateOpts) {
+			float gv = o.val;
+			menu->addChild(createCheckMenuItem(o.name, "",
+				[=]() { return std::fabs(module->gateLength - gv) < 1e-4f; },
+				[=]() { module->gateLength = gv; }));
+		}
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Randomize Sequence", "",

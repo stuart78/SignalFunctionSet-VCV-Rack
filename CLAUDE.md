@@ -24,6 +24,8 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
 17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards / Hungry Man Pac-Man maze / LOGO Turtle / Pattern spirograph-rose generator) with X/Y, radius, angle, sector CVs and ray-crossing gates
 18. **Band** — Harmonic bandpass bank: 4 bands each lock to an integer harmonic of a shared (auto-detected or 1V/oct) fundamental; per-band level/harmonic/enable + CV, spectrum display
+19. **Operator** (slug `Bell`) — DX7-style 6-operator FM voice on the msfa engine; loads .syx cartridges, polyphonic, AUDIO/VCO/ENV-follower outs, tabbed operators/envelope display
+20. **OP ENV** (slug `OpEnv`) — standalone DX7 operator envelope generator; loads a voice's carrier EG, offsets all 8 rate/level attributes via trimpot/CV, V/oct rate scaling, LFO tremolo, "Release to 0V" option
 
 ## Build Commands
 
