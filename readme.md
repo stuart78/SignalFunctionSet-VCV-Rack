@@ -4,70 +4,73 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 
 ## Contents
 
-- [Drift](#drift) — 4-channel chaotic LFO with phase spread
+Modules grouped by function:
+
+**Sound Sources**
+- [Operator](#operator) — DX7-style 6-operator FM voice (.syx cartridges)
 - [GSX](#gsx) — Granular synthesis VCO (Truax 1985–86 lineage)
-- [Fugue](#fugue) — 8-step harmonic deviation sequencer (3 voices)
-  - [Fugue X (Expander)](#fugue-x-expander)
-  - [MetaFugue](#metafugue)
-- [Phase](#phase) — Dual sample looper with sleep/rotate phase drift
 - [Overtone](#overtone) — Additive VCO with 8 togglable harmonics
 - [Intone](#intone) — CHANT/FOF formant synthesis voice
+- [Phase](#phase) — Dual sample looper with sleep/rotate phase drift
+
+**Filters & Resonators**
+- [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
 - [Tine](#tine) — Tunable pingable resonator (Gamelan Resonator circuit)
+
+**Clocks & Sequencers**
 - [Meter](#meter) — Time-signature-aware musical clock with swing
 - [Beat](#beat) — Per-voice pattern sequencer (8 patterns × 16 steps)
 - [Note](#note) — Pitched CV/gate sequencer with 19 scales
-- [Swell](#swell) — Ping-driven additive A/D envelope
-- [Shift](#shift) — 4-output CV shift register with cascade chain
+- [Fugue](#fugue) — 8-step harmonic deviation sequencer (3 voices)
+  - [Fugue X (Expander)](#fugue-x-expander)
+  - [MetaFugue](#metafugue)
 - [Muse](#muse) — Faithful Triadex Muse recreation (Fredkin/Minsky, 1972)
-- [Gravity](#gravity) — Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
-- [Vac](#vac) — Semi-stable A/R envelope with vactrol-like timing drift
-- [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
+
+**LFOs & Modulation**
+- [Drift](#drift) — 4-channel chaotic LFO with phase spread
 - [Cycle](#cycle) — Bar-synced quad LFO with morphing shapes
-- [Operator](#operator) — DX7-style 6-operator FM voice (.syx cartridges)
+- [Gravity](#gravity) — Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
+
+**Envelopes**
+- [Swell](#swell) — Ping-driven additive A/D envelope
+- [Vac](#vac) — Semi-stable A/R envelope with vactrol-like timing drift
 - [OP ENV](#op-env) — Standalone DX7 operator envelope generator
+
+**Utilities**
+- [Shift](#shift) — 4-output CV shift register with cascade chain
+
 - [Other Platforms](#other-platforms)
 - [Building](#building)
 - [License](#license)
 
 ## Modules
 
-### Drift
+Modules are grouped by function below.
 
-<img src="screenshots/Drift.png" alt="Drift panel" height="320"> 
+### Sound Sources
 
-**[Drift on signalfunctionset.com →](https://signalfunctionset.com/projects/drift)**
+#### Operator
 
-A 4-channel LFO with chaos capabilities and advanced phase and scaling control.
+<img src="screenshots/Bell.png" alt="Operator panel" height="320"> 
+
+**[Operator on signalfunctionset.com →](https://signalfunctionset.com/projects/operator)**
+
+A 6-operator FM synth voice in the Yamaha DX7 lineage. Operator loads DX7 `.syx` cartridges (or your own banks exported from [Dexed](https://asb2m10.github.io/dexed/)), lets you pick a voice, and plays it polyphonically on Google's msfa DX7 core — so patches sound faithful to the hardware, with all six operators, every algorithm, feedback, key scaling, and the DX7 envelopes. It ships with four classic Brian Eno DX7 patches so it makes sound the moment you patch a gate.
 
 **Features:**
-- **4 Phase-Shifted Outputs** (A, B, C, D) — Each output can be independently phase-shifted using the Phase control
-- **Morphing Waveforms** — Shape control smoothly transitions between sine, triangle, sawtooth, square, and chaos
-- **Clock Sync** — Can sync to external clock input or run freely at set frequency
-- **Flexible Scaling** — Center and Y Spread controls for precise voltage range adjustment
-- **Stability Control** — Modulates chaos behavior and waveform characteristics
+- **Faithful DX7 voicing** — reads packed VMEM exactly as the hardware stores it; cartridges and Dexed banks play as intended.
+- **Three outputs** — AUDIO (the voice with its internal DX7 envelope), VCO (the raw tone, no envelope, for shaping with an external EG/VCA), and ENV (a 0–10V envelope follower of the audio).
+- **One-knob timbre** — BRIGHTNESS tilts the whole sound darker/brighter; FEEDBACK offsets the patch's feedback buzz; TUNE is ±12 semitones.
+- **Tabbed display** — an OPERATORS view that shows the algorithm and lets you click operators to mute/un-mute them, and an ENVELOPE view with the carrier EG shape plus a live trace.
+- **Polyphonic** (up to 16 voices), with velocity input and sample-rate-corrected envelopes.
 
-**Controls:**
-- **Shape**: Morphs between waveform types (sine/triangle/sawtooth/square/chaos)
-- **Stability**: Adds uncertainty to the waveforms. Higher values are more stable. Stability is calculated independently per output for subtle variation.
-- **Center** (bipolar): DC offset for all outputs.
-- **Spread**: Controls the amplitude of the outputs. Bipolar, so 5V means ±5V.
-- **Frequency**: Sets LFO frequency in Hz. Slow to the left, fast to the right.
-- **Phase**: Sets the phase offset relative to A. At 1, A is 0°, B is 90°, C is 180° and D is 270°.
+**Controls:** Voice, Bank, ◀/▶ voice (on screen), Tune, Brightness, Feedback.
+**Inputs:** V/Oct (poly), Gate (poly), Vel (poly), Voice CV, Bank CV, Tune CV, Brightness CV, Feedback CV.
+**Outputs:** Audio (poly), VCO (poly), Env (poly).
 
-**Inputs:**
-- **Shape**: CV control for waveform morphing
-- **Stability**: CV control for stability parameter
-- **Clock**: External clock input for sync (overrides frequency control)
-- **Phase**: CV control for phase spreading
-- **Center**: CV control for DC offset
-- **Spread**: CV control for amplitude
+See [docs/operator-manual.md](docs/operator-manual.md) for the full manual.
 
-**Outputs:**
-- **A, B, C, D**: Four phase-shifted LFO outputs
-- **Min**: Minimum value across all 4 channels
-- **Max**: Maximum value across all 4 channels
-
-### GSX
+#### GSX
 
 <img src="screenshots/gsx.png" alt="GSX panel" height="320"> 
 
@@ -100,84 +103,78 @@ A real-time granular synthesis module inspired by Barry Truax's groundbreaking G
 **Outputs:**
 - **Left / Right**: Stereo output pair
 
-### Fugue
+#### Overtone
 
-<img src="screenshots/Fugue.png" alt="Fugue panel" height="320"> 
+<img src="screenshots/Overtone.png" alt="Overtone panel" height="320"> 
 
-**[Fugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+**[Overtone on signalfunctionset.com →](https://signalfunctionset.com/projects/overtone)**
 
-An 8-step harmonic deviation sequencer with three independent CV/gate voices (A, B, C). Each voice reads the same pitch sequence but wanders harmonically according to its own controls — producing shifting counterpoint from a shared origin.
+An additive synthesis VCO that builds waveforms from the harmonic series. The fundamental is always present; 8 toggle switches enable/disable overtones (harmonics 2–9) with natural 1/n amplitude falloff. All overtones on produces a saw-like wave; all off gives a pure sine.
 
 **Features:**
-- **Three Independent Voices** — Each with its own clock, gate pattern, and wander control
-- **Harmonic Deviation** — Wander control selects notes from musically-informed tiers: chord tones, extensions, chromatic neighbors
-- **Harmonic Lock** — Voices bias toward consonance with each other, creating soft harmonic gravity (enabled by default)
-- **Clock Normalling** — Clock B normalled to A, Clock C normalled to B. Patch separate clocks for polyrhythmic effects.
-- **19 Scales** — Drawn from a shared canonical scale list used across Fugue, Note, and Muse, so SCALE CV is interchangeable between them (sequence scale changes for the whole rig at once): Chromatic, Major, Minor, Pentatonic Major/Minor, Blues, Whole Tone, Harmonic Series, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Melodic Minor, Hijaz, Hirajoshi, Pelog, Slendro
-- **Adaptive Slew** — Portamento that always resolves before the next note arrives
-- **Per-Voice Gate Patterns** — 24 toggle buttons (8 steps × 3 voices) for independent rhythmic patterns
+- **8 Harmonic Toggles** — Individual on/off for harmonics 2 through 9
+- **Natural Amplitude Falloff** — Each harmonic scaled by 1/n (H2=0.5, H3=0.33, etc.)
+- **Even/Odd Filter** — 3-position switch: All, Odd only (square-like), Even only
+- **Binary Mask CV** — 0–10V mapped to 8-bit pattern for voltage-controlled timbre
+- **Sweep Mask Mode** — Alternative CV mode: 0–10V enables 0–8 harmonics from bottom up
+- **Zero-Crossing Gating** — Click-free transitions when toggling harmonics
+- **Waveform Display** — Shows composite wave with faint individual harmonic traces and fundamental
+- **LED Indicators** — Show actual active state after filter/CV processing
 
 **Controls:**
-- **Root** (C–B): Root note for scale quantization. CV: 1V = 1 semitone.
-- **Scale** (19 modes): Scale selection. CV: 1V = 1 scale index.
-- **Steps** (1–8): Active sequence length.
-- **Slew** (0–100%): Adaptive portamento.
-- **Pitch Faders** (8): Base pitch per step, quantized to the selected scale.
-- **Gate Toggles** (3 rows × 8): Per-voice gate on/off per step.
-- **Wander A/B/C** (0–100%): Horizontal sliders controlling harmonic deviation per voice.
-- **Reset**: Jack + momentary button, returns all voices to step 1.
+- **Harmonic 2–9 Toggles**: Enable/disable individual overtones (default: all on)
+- **Even/Odd/All Switch**: 3-position filter for harmonic selection
+- **Freq** (-4 to +4 octaves, default C4): Coarse frequency control, log2 scaled
 
 **Inputs:**
-- **Clock A, B, C** — Trigger inputs (B normalled to A, C normalled to B)
-- **Reset** — Trigger input
-- **Root CV, Scale CV, Steps CV, Slew CV** — Parameter modulation
-- **Wander A/B/C CV** — Per-voice wander modulation (±5V)
+- **V/Oct** — 1V/octave pitch tracking
+- **Mask** (0–10V) — Binary (8-bit) or sweep (0–8 harmonics) mode, selected via context menu
+- **Filter** (0–5V) — Even/odd filter CV (0–1.67V=All, 1.67–3.33V=Odd, 3.33–5V=Even)
 
 **Outputs:**
-- **CV A, B, C** — 1V/octave pitch
-- **Gate A, B, C** — +10V gate
+- **Out** — Monophonic audio output (±5V normalized)
 
 **Context Menu:**
-- Fader Range: 1V (1 octave), 2V (2 octaves), or 5V (5 octaves)
-- Harmonic Lock: Toggle consonance-biased deviation (default: on)
-- Randomize Sequence: Set all faders to random positions
+- Mask CV Mode: Binary (8-bit pattern) or Sweep (bottom-up harmonics)
 
-#### Fugue X (Expander)
+#### Intone
 
-<img src="screenshots/FugueX.png" alt="Fugue X panel" height="320"> 
+<img src="screenshots/Intone.png" alt="Intone panel" height="320"> 
 
-**[Fugue X on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+**[Intone on signalfunctionset.com →](https://signalfunctionset.com/projects/intone)**
 
-An expander module for Fugue that adds per-voice controls for steps, range, sleep, and probability, plus sorted CV outputs and per-step trigger outputs. Place to the right of Fugue to connect automatically.
+A CHANT/FOF formant synthesis voice inspired by the IRCAM CHANT project (Rodet, Potard, Barriere, 1984). Generates vocal-character sound using 5 parallel formant cells, each producing overlapping FOF (Formant Wave Function) grains — damped sinusoids at formant frequencies.
 
-**Per-Voice Controls (A, B, C):**
-- **Steps** (1–8): Independent step count per voice (overrides Fugue's global steps)
-- **Range** (1V/2V/5V): Independent fader range per voice (overrides Fugue's global range)
-- **Sleep** (0–64 steps): Number of clock ticks to skip between active steps — creates rests and rhythmic variation
-- **Probability** (0–100%): Chance that each step actually fires its gate. At 100% every step plays; lower values introduce random silences.
+**Features:**
+- **5 Parallel Formant Cells** — Each generating overlapping FOF grains at independently controllable center frequencies
+- **Vowel Morph Slider** — Smoothly interpolates through /a/, /e/, /i/, /o/, /u/ formant presets
+- **Per-Formant Controls** — Frequency offset, bandwidth, and amplitude knobs with CV inputs
+- **Skirt Width** — Controls the spectral slope of each formant peak (FOF attack rate)
+- **Spectrum Display** — 5 formant bell curves + composite envelope on a logarithmic frequency axis
+- **Three Excitation Modes:**
+  - **Default** (nothing patched): FOF vocal VCO, V/Oct controls pitch
+  - **Audio mode** (audio + switch up): Parallel resonant bandpass filter bank — input audio is formant-filtered through the 5 vowel resonances, V/Oct transposes the formant pattern
+  - **Trigger mode** (clock + switch down): External trigger fires FOF grains for rhythmic vowel hits, V/Oct transposes formants
 
-**Additional Features:**
-- **Sample & Hold Mode** — Toggle: when enabled, held notes sustain through rests instead of returning to silence
-- **Randomize Sequence** — Button + trigger input to randomize the parent Fugue's pitch faders
-- **LED Matrix** — 8×3 grid showing the current step position for each voice, plus sleep indicator LEDs
-- **Per-Step Trigger Outputs** — 24 individual trigger outputs (8 steps × 3 voices) for driving external modules from specific sequence positions
+**Controls:**
+- **Formant 1–5 Frequency** (±1 octave offset): Adjusts each formant relative to the vowel morph preset
+- **Formant 1–5 Bandwidth** (30–500 Hz): Width of each formant resonance
+- **Formant 1–5 Amplitude** (0–1): Level of each formant
+- **Vowel Morph** (slider): Sweeps through /a/ → /e/ → /i/ → /o/ → /u/
+- **Skirt**: Spectral slope control (soft to hard formant edges)
+- **Mode Switch** (Audio/Trigger): Selects excitation mode when EXC is patched
 
-**Sorted CV Outputs:**
-- **Max** — Highest of the three voice CV values
-- **Mid** — Middle value
-- **Min** — Lowest value
+**Inputs:**
+- **V/Oct** — Pitch (default mode) or formant transposition (audio/trigger modes)
+- **EXC** — Excitation source (audio or trigger, behavior depends on mode switch)
+- **Formant 1–5 Freq CV, Formant 1–5 BW CV** (±5V) — Per-formant modulation
+- **Vowel CV** (0–10V) — Vowel morph position
+- **Skirt CV** (±5V) — Skirt width modulation
 
-**All per-voice parameters have CV inputs** (±5V).
+**Outputs:**
+- **Out** — Monophonic audio output
 
-#### MetaFugue
-
-<img src="screenshots/MetaFugue.png" alt="MetaFugue panel" height="320"> 
-
-**[MetaFugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
-
-A single-module merge of Fugue + Fugue X — all of Fugue's controls plus the per-voice steps/range/sleep/probability, S&H mode, sorted min/mid/max CV outputs, and per-step trigger outputs, in one wider panel. Ideal for hosts that don't support expanders (e.g. MetaModule) or for anyone who prefers everything in one place.
-
-### Phase
+#### Phase
 
 <img src="screenshots/Phase.png" alt="Phase panel" height="320"> 
 
@@ -228,78 +225,31 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 - VCA Mode toggle (anti-click envelope)
 - Recording mode (Replace / Append) and "Save recordings with patch"
 
-### Overtone
+### Filters & Resonators
 
-<img src="screenshots/Overtone.png" alt="Overtone panel" height="320"> 
+#### Band
 
-**[Overtone on signalfunctionset.com →](https://signalfunctionset.com/projects/overtone)**
+<img src="screenshots/Band.png" alt="Band panel" height="320"> 
 
-An additive synthesis VCO that builds waveforms from the harmonic series. The fundamental is always present; 8 toggle switches enable/disable overtones (harmonics 2–9) with natural 1/n amplitude falloff. All overtones on produces a saw-like wave; all off gives a pure sine.
+**[Band on signalfunctionset.com →](https://signalfunctionset.com/projects/band)**
 
-**Features:**
-- **8 Harmonic Toggles** — Individual on/off for harmonics 2 through 9
-- **Natural Amplitude Falloff** — Each harmonic scaled by 1/n (H2=0.5, H3=0.33, etc.)
-- **Even/Odd Filter** — 3-position switch: All, Odd only (square-like), Even only
-- **Binary Mask CV** — 0–10V mapped to 8-bit pattern for voltage-controlled timbre
-- **Sweep Mask Mode** — Alternative CV mode: 0–10V enables 0–8 harmonics from bottom up
-- **Zero-Crossing Gating** — Click-free transitions when toggling harmonics
-- **Waveform Display** — Shows composite wave with faint individual harmonic traces and fundamental
-- **LED Indicators** — Show actual active state after filter/CV processing
-
-**Controls:**
-- **Harmonic 2–9 Toggles**: Enable/disable individual overtones (default: all on)
-- **Even/Odd/All Switch**: 3-position filter for harmonic selection
-- **Freq** (-4 to +4 octaves, default C4): Coarse frequency control, log2 scaled
-
-**Inputs:**
-- **V/Oct** — 1V/octave pitch tracking
-- **Mask** (0–10V) — Binary (8-bit) or sweep (0–8 harmonics) mode, selected via context menu
-- **Filter** (0–5V) — Even/odd filter CV (0–1.67V=All, 1.67–3.33V=Odd, 3.33–5V=Even)
-
-**Outputs:**
-- **Out** — Monophonic audio output (±5V normalized)
-
-**Context Menu:**
-- Mask CV Mode: Binary (8-bit pattern) or Sweep (bottom-up harmonics)
-
-### Intone
-
-<img src="screenshots/Intone.png" alt="Intone panel" height="320"> 
-
-**[Intone on signalfunctionset.com →](https://signalfunctionset.com/projects/intone)**
-
-A CHANT/FOF formant synthesis voice inspired by the IRCAM CHANT project (Rodet, Potard, Barriere, 1984). Generates vocal-character sound using 5 parallel formant cells, each producing overlapping FOF (Formant Wave Function) grains — damped sinusoids at formant frequencies.
+A harmonic bandpass bank for isolating individual harmonics of a sound — inspired by Suzanne Ciani's technique of taking a low, rich wave and filtering out all but one harmonic at a time. Because harmonics are *linearly* spaced (f0, 2·f0, 3·f0…), a normal filter makes them fiddly to find; Band instead locks each of its four bands to an **integer harmonic** of a shared fundamental, so every band lands dead-on a partial.
 
 **Features:**
-- **5 Parallel Formant Cells** — Each generating overlapping FOF grains at independently controllable center frequencies
-- **Vowel Morph Slider** — Smoothly interpolates through /a/, /e/, /i/, /o/, /u/ formant presets
-- **Per-Formant Controls** — Frequency offset, bandwidth, and amplitude knobs with CV inputs
-- **Skirt Width** — Controls the spectral slope of each formant peak (FOF attack rate)
-- **Spectrum Display** — 5 formant bell curves + composite envelope on a logarithmic frequency axis
-- **Three Excitation Modes:**
-  - **Default** (nothing patched): FOF vocal VCO, V/Oct controls pitch
-  - **Audio mode** (audio + switch up): Parallel resonant bandpass filter bank — input audio is formant-filtered through the 5 vowel resonances, V/Oct transposes the formant pattern
-  - **Trigger mode** (clock + switch down): External trigger fires FOF grains for rhythmic vowel hits, V/Oct transposes formants
+- **Four bands (A/B/C/D)** — each isolates an integer harmonic, with its own level, harmonic selector, and enable (anti-click). Each has a colour carried into the display so you always know which control owns which harmonic.
+- **Auto-follow pitch** — detects the source's fundamental from the audio (FFT autocorrelation) and locks the harmonic grid to it, so the bands track whatever you play with no tuning. Manual 1V/oct (standard 0V = C4) tuning is also available.
+- **Width as a fraction of f0** — constant absolute bandwidth, so every harmonic isolates equally cleanly. Narrow = pure single harmonic; wider = neighbours bleed in.
+- **Global SHIFT** — continuously slides all bands between harmonics for scanning/impurity.
+- **Spectrum display** — FFT of the source on a harmonic axis, with each band's coloured bell sitting on its partial (labelled e.g. `A5`).
+- Full CV over every parameter; **MIX** and per-band **POLY** outputs.
 
-**Controls:**
-- **Formant 1–5 Frequency** (±1 octave offset): Adjusts each formant relative to the vowel morph preset
-- **Formant 1–5 Bandwidth** (30–500 Hz): Width of each formant resonance
-- **Formant 1–5 Amplitude** (0–1): Level of each formant
-- **Vowel Morph** (slider): Sweeps through /a/ → /e/ → /i/ → /o/ → /u/
-- **Skirt**: Spectral slope control (soft to hard formant edges)
-- **Mode Switch** (Audio/Trigger): Selects excitation mode when EXC is patched
+**Controls:** per band — Level, Harmonic, Enable; global — Tune, Width.
+**Inputs:** In, V/Oct, Shift, W-CV, and per band — Level CV, Harmonic CV, Enable gate.
+**Outputs:** Mix, Poly (one channel per band).
 
-**Inputs:**
-- **V/Oct** — Pitch (default mode) or formant transposition (audio/trigger modes)
-- **EXC** — Excitation source (audio or trigger, behavior depends on mode switch)
-- **Formant 1–5 Freq CV, Formant 1–5 BW CV** (±5V) — Per-formant modulation
-- **Vowel CV** (0–10V) — Vowel morph position
-- **Skirt CV** (±5V) — Skirt width modulation
+See [docs/band-manual.md](docs/band-manual.md) for the full manual.
 
-**Outputs:**
-- **Out** — Monophonic audio output
-
-### Tine
+#### Tine
 
 <img src="screenshots/Tine.png" alt="Tine panel" height="320"> 
 
@@ -331,7 +281,9 @@ A tunable 3rd-order pingable resonator based on the Gamelan Resonator circuit fr
 **Context Menu:**
 - VCA Mode (anti-click): Toggle crossfade envelope on retrigger (default: on)
 
-### Meter
+### Clocks & Sequencers
+
+#### Meter
 
 <img src="screenshots/Meter.png" alt="Meter panel" height="320"> 
 
@@ -372,7 +324,7 @@ A time-signature-aware musical clock. Most VCV clocks output evenly-spaced pulse
 - Apply time signature changes immediately (default: queue for next bar)
 - Reset on play (default: resume from current position)
 
-### Beat
+#### Beat
 
 <img src="screenshots/Beat.png" alt="Beat panel" height="320"> 
 
@@ -403,7 +355,7 @@ A single-voice pattern sequencer designed to pair with Meter (or any clock + bar
 - "Advance only on bar trigger" (default ON)
 - Patterns: Randomize current pattern / Clear current / Clear all
 
-### Note
+#### Note
 
 <img src="screenshots/Note.png" alt="Note panel" height="320"> 
 
@@ -432,75 +384,84 @@ A monophonic CV/gate pattern sequencer — Beat's pitched cousin. Eight patterns
 - "Advance only on bar trigger" (default ON)
 - Patterns: Randomize / Clear
 
-### Swell
+#### Fugue
 
-<img src="screenshots/Swell.png" alt="Swell panel" height="320"> 
+<img src="screenshots/Fugue.png" alt="Fugue panel" height="320"> 
 
-**[Swell on signalfunctionset.com →](https://signalfunctionset.com/projects/swell)**
+**[Fugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
 
-A ping-driven envelope generator. Each rising edge on the PING input adds a configurable voltage rise to the current envelope value, then the envelope decays back toward zero. Multiple pings stack — you can build up a slow swell from a stream of triggers, or get a single sharp attack from a single ping.
-
-Where a typical AD/AR envelope produces one fixed-shape ramp per gate, Swell *accumulates* contributions from every trigger and bleeds them off continuously. The output is a single 0–10V CV that smoothly soft-saturates near the ceiling and is paused from decaying while a rise is still in flight.
+An 8-step harmonic deviation sequencer with three independent CV/gate voices (A, B, C). Each voice reads the same pitch sequence but wanders harmonically according to its own controls — producing shifting counterpoint from a shared origin.
 
 **Features:**
-- **Additive Stacking** — Multiple in-flight rises sum together, giving naturally swelling envelopes from rapid trigger streams
-- **Soft Saturation** — Output asymptotes smoothly at 10V (no hard clipping)
-- **Curve Morph** — Linear → exponential blend on both rise and decay
-- **Scope Display** — 1.2-second view: past trace on the left, current voltage at center, projected future trace simulated forward from the current state
-- **Decay Pause During Rise** — Rises always reach their full delta (decay is held off until in-flight rises complete)
+- **Three Independent Voices** — Each with its own clock, gate pattern, and wander control
+- **Harmonic Deviation** — Wander control selects notes from musically-informed tiers: chord tones, extensions, chromatic neighbors
+- **Harmonic Lock** — Voices bias toward consonance with each other, creating soft harmonic gravity (enabled by default)
+- **Clock Normalling** — Clock B normalled to A, Clock C normalled to B. Patch separate clocks for polyrhythmic effects.
+- **19 Scales** — Drawn from a shared canonical scale list used across Fugue, Note, and Muse, so SCALE CV is interchangeable between them (sequence scale changes for the whole rig at once): Chromatic, Major, Minor, Pentatonic Major/Minor, Blues, Whole Tone, Harmonic Series, Dorian, Phrygian, Lydian, Mixolydian, Locrian, Harmonic Minor, Melodic Minor, Hijaz, Hirajoshi, Pelog, Slendro
+- **Adaptive Slew** — Portamento that always resolves before the next note arrives
+- **Per-Voice Gate Patterns** — 24 toggle buttons (8 steps × 3 voices) for independent rhythmic patterns
 
 **Controls:**
-- **Δ** (Delta, 0–10V): Voltage added per ping
-- **Rise** (1ms–2s): Time for each ping's contribution to climb to its full value
-- **Fall** (10ms–10s): Decay time constant when no pings are active
-- **Curve** (Linear ↔ Exponential): Blends both rise and decay shapes
+- **Root** (C–B): Root note for scale quantization. CV: 1V = 1 semitone.
+- **Scale** (19 modes): Scale selection. CV: 1V = 1 scale index.
+- **Steps** (1–8): Active sequence length.
+- **Slew** (0–100%): Adaptive portamento.
+- **Pitch Faders** (8): Base pitch per step, quantized to the selected scale.
+- **Gate Toggles** (3 rows × 8): Per-voice gate on/off per step.
+- **Wander A/B/C** (0–100%): Horizontal sliders controlling harmonic deviation per voice.
+- **Reset**: Jack + momentary button, returns all voices to step 1.
 
 **Inputs:**
-- **Ping** — Rising edge adds Δ
-- **Reset** — Zeros the envelope and clears all in-flight rises
-- **Δ CV / Rise CV / Fall CV / Curve CV** (±5V → ±50%)
+- **Clock A, B, C** — Trigger inputs (B normalled to A, C normalled to B)
+- **Reset** — Trigger input
+- **Root CV, Scale CV, Steps CV, Slew CV** — Parameter modulation
+- **Wander A/B/C CV** — Per-voice wander modulation (±5V)
 
 **Outputs:**
-- **CV out** — 0–10V soft-saturated envelope
-
-### Shift
-
-<img src="screenshots/Shift.png" alt="Shift panel" height="320"> 
-
-**[Shift on signalfunctionset.com →](https://signalfunctionset.com/projects/shift)**
-
-A 4-output CV shift register with per-lane controls. Sample input CV at the clock rate; route it through a chain of buffered delay/cascade stages with independent step counts, clock dividers, and step-CV modulation. Designed for generative-sequencer and CV-shaping work where you want a small forest of related-but-distinct CV streams from a single input.
-
-**Features:**
-- **Per-Lane Controls (×4)** — Independent N pot, Step CV input, Mode switch (parallel/cascade), Clock divider knob, CV output, Gate output, and LED
-- **Parallel Mode (per lane)** — N-step delay line on the input. Output = input from N lane-clocks ago. Updates every lane-clock.
-- **Cascade Mode (per lane)** — Tape-loop FIFO of length N, fed by the previous lane's value on each parent tick. CV cycles through the buffer continuously at clock rate; new content drips in at parent's rate. Cascade-on-A falls back to parallel.
-- **Clock Divider Per Lane** — ÷1 / ÷2 / ÷3 / ÷4 / ÷8 (slows that lane's reads + writes; combines multiplicatively with N)
-- **Disconnect Playback** — When the CV input cable is unpatched, lane reads cycle through a 16-slot full-depth history ring at clock rate so even cascade-N=1 lanes keep playing accumulated content
-- **Jumble Output Pair** — CV (random pick across A/B/C/D held values, re-rolled every input clock) + accompanying CLK trigger + LED
-- **Reset Button** — Paired with RESET trigger input; clears all buffers + held values
-
-**Controls:**
-- **Per Lane (×4):** N (1–16, snap), Step CV input (±5V → ±N), Mode switch (cascade left / parallel right), DIV knob (÷1 / ÷2 / ÷3 / ÷4 / ÷8, snap)
-- **Reset button** + **RESET** trigger input
-- **N CV** input (global, sums into every lane's N)
-
-**Inputs:**
-- **CV** — Data signal (sampled by all lanes)
-- **CLOCK** — Lane-step trigger source for every lane
-- **N CV** — Global N modulator
-- **RESET** — Trigger to clear all lane state
-- **Step CV A/B/C/D** — Per-lane N modulation
-
-**Outputs:**
-- **A / B / C / D CV** — Lane CV outputs
-- **A / B / C / D GATE** — 1ms pulse on each lane tick
-- **JUMBLE CV** + **JUMBLE CLK** — Random-pick S&H + accompanying clock
+- **CV A, B, C** — 1V/octave pitch
+- **Gate A, B, C** — +10V gate
 
 **Context Menu:**
-- "Clear all" — Wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
+- Fader Range: 1V (1 octave), 2V (2 octaves), or 5V (5 octaves)
+- Harmonic Lock: Toggle consonance-biased deviation (default: on)
+- Randomize Sequence: Set all faders to random positions
 
-### Muse
+##### Fugue X (Expander)
+
+<img src="screenshots/FugueX.png" alt="Fugue X panel" height="320"> 
+
+**[Fugue X on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+
+An expander module for Fugue that adds per-voice controls for steps, range, sleep, and probability, plus sorted CV outputs and per-step trigger outputs. Place to the right of Fugue to connect automatically.
+
+**Per-Voice Controls (A, B, C):**
+- **Steps** (1–8): Independent step count per voice (overrides Fugue's global steps)
+- **Range** (1V/2V/5V): Independent fader range per voice (overrides Fugue's global range)
+- **Sleep** (0–64 steps): Number of clock ticks to skip between active steps — creates rests and rhythmic variation
+- **Probability** (0–100%): Chance that each step actually fires its gate. At 100% every step plays; lower values introduce random silences.
+
+**Additional Features:**
+- **Sample & Hold Mode** — Toggle: when enabled, held notes sustain through rests instead of returning to silence
+- **Randomize Sequence** — Button + trigger input to randomize the parent Fugue's pitch faders
+- **LED Matrix** — 8×3 grid showing the current step position for each voice, plus sleep indicator LEDs
+- **Per-Step Trigger Outputs** — 24 individual trigger outputs (8 steps × 3 voices) for driving external modules from specific sequence positions
+
+**Sorted CV Outputs:**
+- **Max** — Highest of the three voice CV values
+- **Mid** — Middle value
+- **Min** — Lowest value
+
+**All per-voice parameters have CV inputs** (±5V).
+
+##### MetaFugue
+
+<img src="screenshots/MetaFugue.png" alt="MetaFugue panel" height="320"> 
+
+**[MetaFugue on signalfunctionset.com →](https://signalfunctionset.com/projects/fugue)**
+
+A single-module merge of Fugue + Fugue X — all of Fugue's controls plus the per-voice steps/range/sleep/probability, S&H mode, sorted min/mid/max CV outputs, and per-step trigger outputs, in one wider panel. Ideal for hosts that don't support expanders (e.g. MetaModule) or for anyone who prefers everything in one place.
+
+#### Muse
 
 <img src="screenshots/Muse.png" alt="Muse panel" height="320"> 
 
@@ -538,7 +499,67 @@ A faithful recreation of the **Triadex Muse**, the legendary algorithmic sequenc
 
 See [docs/muse-manual.md](docs/muse-manual.md) for the full manual.
 
-### Gravity
+### LFOs & Modulation
+
+#### Drift
+
+<img src="screenshots/Drift.png" alt="Drift panel" height="320"> 
+
+**[Drift on signalfunctionset.com →](https://signalfunctionset.com/projects/drift)**
+
+A 4-channel LFO with chaos capabilities and advanced phase and scaling control.
+
+**Features:**
+- **4 Phase-Shifted Outputs** (A, B, C, D) — Each output can be independently phase-shifted using the Phase control
+- **Morphing Waveforms** — Shape control smoothly transitions between sine, triangle, sawtooth, square, and chaos
+- **Clock Sync** — Can sync to external clock input or run freely at set frequency
+- **Flexible Scaling** — Center and Y Spread controls for precise voltage range adjustment
+- **Stability Control** — Modulates chaos behavior and waveform characteristics
+
+**Controls:**
+- **Shape**: Morphs between waveform types (sine/triangle/sawtooth/square/chaos)
+- **Stability**: Adds uncertainty to the waveforms. Higher values are more stable. Stability is calculated independently per output for subtle variation.
+- **Center** (bipolar): DC offset for all outputs.
+- **Spread**: Controls the amplitude of the outputs. Bipolar, so 5V means ±5V.
+- **Frequency**: Sets LFO frequency in Hz. Slow to the left, fast to the right.
+- **Phase**: Sets the phase offset relative to A. At 1, A is 0°, B is 90°, C is 180° and D is 270°.
+
+**Inputs:**
+- **Shape**: CV control for waveform morphing
+- **Stability**: CV control for stability parameter
+- **Clock**: External clock input for sync (overrides frequency control)
+- **Phase**: CV control for phase spreading
+- **Center**: CV control for DC offset
+- **Spread**: CV control for amplitude
+
+**Outputs:**
+- **A, B, C, D**: Four phase-shifted LFO outputs
+- **Min**: Minimum value across all 4 channels
+- **Max**: Maximum value across all 4 channels
+
+#### Cycle
+
+<img src="screenshots/Cycle.png" alt="Cycle panel" height="320"> 
+
+**[Cycle on signalfunctionset.com →](https://signalfunctionset.com/projects/cycle)**
+
+A four-channel LFO that thinks in bars, not Hertz. All four outputs (A/B/C/D) run the same cycle but can be spread, scaled, and shaped independently, and the whole bank locks to a musical bar via clock + bar inputs — patch it into Meter and every modulation lands on the grid. Unpatched, it free-runs in Hz like an ordinary LFO. It's the tempo-synced companion to Drift.
+
+**Features:**
+- **Bar-locked timing** — BAR is the timing authority: Cycle hard-aligns its cycle to every downbeat, so it can't drift out of phase. FREQUENCY becomes a musical divider/multiplier (64 bars … ⅛ bar) when locked, or 0.02–20 Hz when free.
+- **Shape ring** — each channel morphs through sine → triangle → saw → square → staircase → stepped-random → back to sine. The loop is closed, so shape CV and link offsets wrap continuously instead of clamping.
+- **Clock-quantized steps** — patch CLOCK and the staircase / stepped-random shapes advance one step per pulse, so they land on real beats. Stepped-random generates a fresh set of voltages each cycle, shared by all four channels.
+- **Per-channel depth** — bipolar SCALE per channel (negative inverts), plus global PHASE spread to fan the channels across the cycle and Drift-style STABILITY for amplitude wander.
+- **Linking with offsets** — shape/scale link buttons gang adjacent channels (on by default); a linked channel's knob becomes a wrapping (shape) or bounded (scale) offset from the group leader.
+- **Display** — all four waveforms with a playhead, bar gridlines, a bar-position readout, and bipolar/unipolar voltage scales on the edges.
+
+**Controls:** per channel — Shape, Scale; global — Frequency, Phase, Stability, Reset, plus shape/scale link buttons.
+**Inputs:** Bar, Clock, Reset, Frequency CV, Phase CV, Stability CV, and per channel — Shape CV, Scale CV.
+**Outputs:** per channel — Uni (0–5V) and Bi (±5V); End-of-cycle trigger.
+
+See [docs/cycle-manual.md](docs/cycle-manual.md) for the full manual.
+
+#### Gravity
 
 <img src="screenshots/Gravity.png" alt="Gravity panel" height="320"> 
 
@@ -575,7 +596,40 @@ A multi-mode chaos and motion engine. A single moving point — driven by one of
 
 See [docs/gravity-manual.md](docs/gravity-manual.md) for the full manual.
 
-### Vac
+### Envelopes
+
+#### Swell
+
+<img src="screenshots/Swell.png" alt="Swell panel" height="320"> 
+
+**[Swell on signalfunctionset.com →](https://signalfunctionset.com/projects/swell)**
+
+A ping-driven envelope generator. Each rising edge on the PING input adds a configurable voltage rise to the current envelope value, then the envelope decays back toward zero. Multiple pings stack — you can build up a slow swell from a stream of triggers, or get a single sharp attack from a single ping.
+
+Where a typical AD/AR envelope produces one fixed-shape ramp per gate, Swell *accumulates* contributions from every trigger and bleeds them off continuously. The output is a single 0–10V CV that smoothly soft-saturates near the ceiling and is paused from decaying while a rise is still in flight.
+
+**Features:**
+- **Additive Stacking** — Multiple in-flight rises sum together, giving naturally swelling envelopes from rapid trigger streams
+- **Soft Saturation** — Output asymptotes smoothly at 10V (no hard clipping)
+- **Curve Morph** — Linear → exponential blend on both rise and decay
+- **Scope Display** — 1.2-second view: past trace on the left, current voltage at center, projected future trace simulated forward from the current state
+- **Decay Pause During Rise** — Rises always reach their full delta (decay is held off until in-flight rises complete)
+
+**Controls:**
+- **Δ** (Delta, 0–10V): Voltage added per ping
+- **Rise** (1ms–2s): Time for each ping's contribution to climb to its full value
+- **Fall** (10ms–10s): Decay time constant when no pings are active
+- **Curve** (Linear ↔ Exponential): Blends both rise and decay shapes
+
+**Inputs:**
+- **Ping** — Rising edge adds Δ
+- **Reset** — Zeros the envelope and clears all in-flight rises
+- **Δ CV / Rise CV / Fall CV / Curve CV** (±5V → ±50%)
+
+**Outputs:**
+- **CV out** — 0–10V soft-saturated envelope
+
+#### Vac
 
 <img src="screenshots/Vac.png" alt="Vac panel" height="320"> 
 
@@ -596,72 +650,7 @@ A semi-stable attack/release envelope generator. It has the classic A/R shape, b
 
 See [docs/vac-manual.md](docs/vac-manual.md) for the full manual.
 
-### Band
-
-<img src="screenshots/Band.png" alt="Band panel" height="320"> 
-
-**[Band on signalfunctionset.com →](https://signalfunctionset.com/projects/band)**
-
-A harmonic bandpass bank for isolating individual harmonics of a sound — inspired by Suzanne Ciani's technique of taking a low, rich wave and filtering out all but one harmonic at a time. Because harmonics are *linearly* spaced (f0, 2·f0, 3·f0…), a normal filter makes them fiddly to find; Band instead locks each of its four bands to an **integer harmonic** of a shared fundamental, so every band lands dead-on a partial.
-
-**Features:**
-- **Four bands (A/B/C/D)** — each isolates an integer harmonic, with its own level, harmonic selector, and enable (anti-click). Each has a colour carried into the display so you always know which control owns which harmonic.
-- **Auto-follow pitch** — detects the source's fundamental from the audio (FFT autocorrelation) and locks the harmonic grid to it, so the bands track whatever you play with no tuning. Manual 1V/oct (standard 0V = C4) tuning is also available.
-- **Width as a fraction of f0** — constant absolute bandwidth, so every harmonic isolates equally cleanly. Narrow = pure single harmonic; wider = neighbours bleed in.
-- **Global SHIFT** — continuously slides all bands between harmonics for scanning/impurity.
-- **Spectrum display** — FFT of the source on a harmonic axis, with each band's coloured bell sitting on its partial (labelled e.g. `A5`).
-- Full CV over every parameter; **MIX** and per-band **POLY** outputs.
-
-**Controls:** per band — Level, Harmonic, Enable; global — Tune, Width.
-**Inputs:** In, V/Oct, Shift, W-CV, and per band — Level CV, Harmonic CV, Enable gate.
-**Outputs:** Mix, Poly (one channel per band).
-
-See [docs/band-manual.md](docs/band-manual.md) for the full manual.
-
-### Cycle
-
-<img src="screenshots/Cycle.png" alt="Cycle panel" height="320"> 
-
-**[Cycle on signalfunctionset.com →](https://signalfunctionset.com/projects/cycle)**
-
-A four-channel LFO that thinks in bars, not Hertz. All four outputs (A/B/C/D) run the same cycle but can be spread, scaled, and shaped independently, and the whole bank locks to a musical bar via clock + bar inputs — patch it into Meter and every modulation lands on the grid. Unpatched, it free-runs in Hz like an ordinary LFO. It's the tempo-synced companion to Drift.
-
-**Features:**
-- **Bar-locked timing** — BAR is the timing authority: Cycle hard-aligns its cycle to every downbeat, so it can't drift out of phase. FREQUENCY becomes a musical divider/multiplier (64 bars … ⅛ bar) when locked, or 0.02–20 Hz when free.
-- **Shape ring** — each channel morphs through sine → triangle → saw → square → staircase → stepped-random → back to sine. The loop is closed, so shape CV and link offsets wrap continuously instead of clamping.
-- **Clock-quantized steps** — patch CLOCK and the staircase / stepped-random shapes advance one step per pulse, so they land on real beats. Stepped-random generates a fresh set of voltages each cycle, shared by all four channels.
-- **Per-channel depth** — bipolar SCALE per channel (negative inverts), plus global PHASE spread to fan the channels across the cycle and Drift-style STABILITY for amplitude wander.
-- **Linking with offsets** — shape/scale link buttons gang adjacent channels (on by default); a linked channel's knob becomes a wrapping (shape) or bounded (scale) offset from the group leader.
-- **Display** — all four waveforms with a playhead, bar gridlines, a bar-position readout, and bipolar/unipolar voltage scales on the edges.
-
-**Controls:** per channel — Shape, Scale; global — Frequency, Phase, Stability, Reset, plus shape/scale link buttons.
-**Inputs:** Bar, Clock, Reset, Frequency CV, Phase CV, Stability CV, and per channel — Shape CV, Scale CV.
-**Outputs:** per channel — Uni (0–5V) and Bi (±5V); End-of-cycle trigger.
-
-See [docs/cycle-manual.md](docs/cycle-manual.md) for the full manual.
-
-### Operator
-
-<img src="screenshots/Bell.png" alt="Operator panel" height="320"> 
-
-**[Operator on signalfunctionset.com →](https://signalfunctionset.com/projects/operator)**
-
-A 6-operator FM synth voice in the Yamaha DX7 lineage. Operator loads DX7 `.syx` cartridges (or your own banks exported from [Dexed](https://asb2m10.github.io/dexed/)), lets you pick a voice, and plays it polyphonically on Google's msfa DX7 core — so patches sound faithful to the hardware, with all six operators, every algorithm, feedback, key scaling, and the DX7 envelopes. It ships with four classic Brian Eno DX7 patches so it makes sound the moment you patch a gate.
-
-**Features:**
-- **Faithful DX7 voicing** — reads packed VMEM exactly as the hardware stores it; cartridges and Dexed banks play as intended.
-- **Three outputs** — AUDIO (the voice with its internal DX7 envelope), VCO (the raw tone, no envelope, for shaping with an external EG/VCA), and ENV (a 0–10V envelope follower of the audio).
-- **One-knob timbre** — BRIGHTNESS tilts the whole sound darker/brighter; FEEDBACK offsets the patch's feedback buzz; TUNE is ±12 semitones.
-- **Tabbed display** — an OPERATORS view that shows the algorithm and lets you click operators to mute/un-mute them, and an ENVELOPE view with the carrier EG shape plus a live trace.
-- **Polyphonic** (up to 16 voices), with velocity input and sample-rate-corrected envelopes.
-
-**Controls:** Voice, Bank, ◀/▶ voice (on screen), Tune, Brightness, Feedback.
-**Inputs:** V/Oct (poly), Gate (poly), Vel (poly), Voice CV, Bank CV, Tune CV, Brightness CV, Feedback CV.
-**Outputs:** Audio (poly), VCO (poly), Env (poly).
-
-See [docs/operator-manual.md](docs/operator-manual.md) for the full manual.
-
-### OP ENV
+#### OP ENV
 
 <img src="screenshots/OpEnv.png" alt="OP ENV panel" height="320"> 
 
@@ -681,6 +670,45 @@ The DX7 operator envelope, freed from the oscillator. OP ENV loads a voice from 
 **Outputs:** Env (0–10V).
 
 See [docs/op-env-manual.md](docs/op-env-manual.md) for the full manual.
+
+### Utilities
+
+#### Shift
+
+<img src="screenshots/Shift.png" alt="Shift panel" height="320"> 
+
+**[Shift on signalfunctionset.com →](https://signalfunctionset.com/projects/shift)**
+
+A 4-output CV shift register with per-lane controls. Sample input CV at the clock rate; route it through a chain of buffered delay/cascade stages with independent step counts, clock dividers, and step-CV modulation. Designed for generative-sequencer and CV-shaping work where you want a small forest of related-but-distinct CV streams from a single input.
+
+**Features:**
+- **Per-Lane Controls (×4)** — Independent N pot, Step CV input, Mode switch (parallel/cascade), Clock divider knob, CV output, Gate output, and LED
+- **Parallel Mode (per lane)** — N-step delay line on the input. Output = input from N lane-clocks ago. Updates every lane-clock.
+- **Cascade Mode (per lane)** — Tape-loop FIFO of length N, fed by the previous lane's value on each parent tick. CV cycles through the buffer continuously at clock rate; new content drips in at parent's rate. Cascade-on-A falls back to parallel.
+- **Clock Divider Per Lane** — ÷1 / ÷2 / ÷3 / ÷4 / ÷8 (slows that lane's reads + writes; combines multiplicatively with N)
+- **Disconnect Playback** — When the CV input cable is unpatched, lane reads cycle through a 16-slot full-depth history ring at clock rate so even cascade-N=1 lanes keep playing accumulated content
+- **Jumble Output Pair** — CV (random pick across A/B/C/D held values, re-rolled every input clock) + accompanying CLK trigger + LED
+- **Reset Button** — Paired with RESET trigger input; clears all buffers + held values
+
+**Controls:**
+- **Per Lane (×4):** N (1–16, snap), Step CV input (±5V → ±N), Mode switch (cascade left / parallel right), DIV knob (÷1 / ÷2 / ÷3 / ÷4 / ÷8, snap)
+- **Reset button** + **RESET** trigger input
+- **N CV** input (global, sums into every lane's N)
+
+**Inputs:**
+- **CV** — Data signal (sampled by all lanes)
+- **CLOCK** — Lane-step trigger source for every lane
+- **N CV** — Global N modulator
+- **RESET** — Trigger to clear all lane state
+- **Step CV A/B/C/D** — Per-lane N modulation
+
+**Outputs:**
+- **A / B / C / D CV** — Lane CV outputs
+- **A / B / C / D GATE** — 1ms pulse on each lane tick
+- **JUMBLE CV** + **JUMBLE CLK** — Random-pick S&H + accompanying clock
+
+**Context Menu:**
+- "Clear all" — Wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
 
 ## Other Platforms
 
