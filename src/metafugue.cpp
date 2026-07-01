@@ -1327,6 +1327,11 @@ struct MetaFugueWidget : ModuleWidget {
 	}
 };
 
+// (MetaFugue is in an anonymous namespace → internal linkage, so g++ emits its
+// static constexpr arrays from the in-class initializers; no out-of-line
+// definitions are needed here. Fugue needs them only because it has external
+// linkage — see fugue.cpp.)
+
 } // namespace
 
 Model* modelMetaFugue = createModel<MetaFugue, MetaFugueWidget>("MetaFugue");

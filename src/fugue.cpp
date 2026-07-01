@@ -933,4 +933,12 @@ struct FugueWidget : ModuleWidget {
 	}
 };
 
+// Out-of-line definitions for the ODR-used static constexpr arrays. Strict
+// C++11 (mingw g++) needs them; clang/libc++ already treats the in-class
+// initializer as the definition, so emitting them there is a redefinition.
+#ifndef __clang__
+constexpr int Fugue::CV_OUTS[];
+constexpr int Fugue::GATE_OUTS[];
+#endif
+
 Model* modelFugue = createModel<Fugue, FugueWidget>("Fugue");

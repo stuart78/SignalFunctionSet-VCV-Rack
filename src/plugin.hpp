@@ -28,5 +28,6 @@ extern Model* modelMuse;
 extern Model* modelGravity;
 extern Model* modelBand;
 extern Model* modelCycle;
-extern Model* modelBell;
+extern Model* modelOperator;
 extern Model* modelOpEnv;
+extern Model* modelChance;

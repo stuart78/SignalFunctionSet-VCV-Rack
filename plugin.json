@@ -239,7 +239,7 @@
       "hidden": true
     },
     {
-      "slug": "Bell",
+      "slug": "Operator",
       "name": "Operator",
       "description": "DX7-style 6-operator FM voice. Loads Yamaha DX7 .syx cartridges (or your own banks exported from Dexed), selects a voice, and plays it polyphonically. Built on the msfa FM engine.",
       "manualUrl": "https://signalfunctionset.com/projects/operator/",
@@ -258,6 +258,17 @@
         "Envelope generator",
         "Function generator"
       ]
+    },
+    {
+      "slug": "Chance",
+      "name": "Chance",
+      "description": "5-stage probabilistic step sequencer. Per-stage voltage slider plus repeat, probability, and harmonic-drift amounts; selectable direction, active length, and gate length; internal or external clock; CV/Gate/EOC outs and a randomize trigger.",
+      "tags": [
+        "Sequencer",
+        "Random",
+        "Quantizer"
+      ],
+      "hidden": true
     }
   ]
 }

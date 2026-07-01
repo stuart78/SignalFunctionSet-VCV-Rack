@@ -240,6 +240,15 @@ struct Drift : Module {
 				lorenz[i].x += dx * lorenzDt;
 				lorenz[i].y += dy * lorenzDt;
 				lorenz[i].z += dz * lorenzDt;
+
+				// Safety: if the Euler step ever diverges (huge dt / denormals),
+				// reset this attractor to its seed instead of spewing NaNs.
+				if (!std::isfinite(lorenz[i].x) || !std::isfinite(lorenz[i].y) ||
+				    !std::isfinite(lorenz[i].z) ||
+				    std::abs(lorenz[i].x) > 1e4f || std::abs(lorenz[i].y) > 1e4f ||
+				    std::abs(lorenz[i].z) > 1e4f) {
+					lorenz[i] = LorenzState();
+				}
 			}
 		}
 
@@ -252,42 +261,43 @@ struct Drift : Module {
 			if (adjustedPhase >= 1.f)
 				adjustedPhase -= 1.f;
 
-			// Generate base wave
-			float wave = generateWave(adjustedPhase, shape, i, args.sampleTime);
-			
-			// Apply Lorenz attractor-based stability modulation
+			// Work out the (optionally Lorenz-modulated) phase FIRST, then render
+			// the wave exactly once. generateWave() advances the Brownian/chaos
+			// state, so it must be called a single time per sample per output
+			// against one consistent phase — calling it twice (as before) made the
+			// chaos waveform re-roll almost every sample under instability.
+			float finalPhase = adjustedPhase;
+			float ampMod = 1.f;
+			float harmonicContent = 0.f;
 			if (stability < 1.f) {
 				float instabilityAmount = 1.f - stability;
-				
+
 				// Normalize Lorenz coordinates to usable ranges
 				// X and Y typically range ±20, Z ranges 0-50
 				float lorenzX = clamp(lorenz[i].x / 20.f, -1.f, 1.f);   // Phase modulation
-				float lorenzY = clamp(lorenz[i].y / 20.f, -1.f, 1.f);   // Amplitude modulation  
+				float lorenzY = clamp(lorenz[i].y / 20.f, -1.f, 1.f);   // Amplitude modulation
 				float lorenzZ = clamp((lorenz[i].z - 25.f) / 25.f, -1.f, 1.f); // Frequency modulation
-				
+
 				// Phase modulation - creates "drift" in timing
 				float phaseOffset = lorenzX * instabilityAmount * 0.1f;
 				float driftedPhase = adjustedPhase + phaseOffset;
 				while (driftedPhase < 0.f) driftedPhase += 1.f;
 				while (driftedPhase >= 1.f) driftedPhase -= 1.f;
-				
+
 				// Amplitude modulation - creates "breathing" effect
-				float ampMod = 1.f + (lorenzY * instabilityAmount * 0.3f);
-				ampMod = clamp(ampMod, 0.3f, 1.7f); // Reasonable range
-				
+				ampMod = clamp(1.f + (lorenzY * instabilityAmount * 0.3f), 0.3f, 1.7f);
+
 				// Frequency modulation - creates subtle tempo variations
 				float freqMod = 1.f + (lorenzZ * instabilityAmount * 0.05f);
-				float freqModulatedPhase = driftedPhase * freqMod;
-				while (freqModulatedPhase < 0.f) freqModulatedPhase += 1.f;
-				while (freqModulatedPhase >= 1.f) freqModulatedPhase -= 1.f;
-				
-				// Generate the wave with all modulations
-				wave = generateWave(freqModulatedPhase, shape, i, args.sampleTime) * ampMod;
-				
-				// Add subtle harmonic content based on Lorenz Z
-				float harmonicContent = std::sin(freqModulatedPhase * 3.f * M_PI) * lorenzZ * instabilityAmount * 0.1f;
-				wave += harmonicContent;
+				finalPhase = driftedPhase * freqMod;
+				while (finalPhase < 0.f) finalPhase += 1.f;
+				while (finalPhase >= 1.f) finalPhase -= 1.f;
+
+				// Subtle harmonic content based on Lorenz Z
+				harmonicContent = std::sin(finalPhase * 3.f * M_PI) * lorenzZ * instabilityAmount * 0.1f;
 			}
+
+			float wave = generateWave(finalPhase, shape, i, args.sampleTime) * ampMod + harmonicContent;
 
 			// Scale and offset
 			outputs[i] = center + wave * ySpread;
@@ -311,7 +321,7 @@ struct Drift : Module {
 struct DriftWidget : ModuleWidget {
 	DriftWidget(Drift* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/quadlfo.svg")));
+		setPanel(createPanel(asset::plugin(pluginInstance, "res/drift.svg")));
 
 
 		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 15.0)), module, Drift::PARAMSTABILITY_PARAM));

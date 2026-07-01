@@ -800,4 +800,4 @@ struct BellWidget : ModuleWidget {
 	}
 };
 
-Model* modelBell = createModel<Bell, BellWidget>("Bell");
+Model* modelOperator = createModel<Bell, BellWidget>("Operator");
