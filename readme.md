@@ -51,7 +51,7 @@ Modules are grouped by function below.
 
 #### Operator
 
-<img src="screenshots/Bell.png" alt="Operator panel" height="320"> 
+<img src="screenshots/Operator.png" alt="Operator panel" height="320"> 
 
 **[Operator on signalfunctionset.com →](https://signalfunctionset.com/projects/operator)**
 
