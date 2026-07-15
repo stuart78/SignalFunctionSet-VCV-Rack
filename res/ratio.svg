@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="101.6mm" height="128.5mm" viewBox="0 0 288.00 364.25">
+  <rect x="0" y="0" width="288.00" height="364.25" fill="#f0f0f0"/>
+  <rect x="14.17" y="34.02" width="259.65" height="79.37" rx="2.83" fill="#1a1a2e" stroke="#404060" stroke-width="0.85"/>
+  <text x="14.17" y="30.05" font-family="sans-serif" font-size="10.20" font-weight="bold" fill="#231f20">RATIO</text>
+  <circle cx="31.18" cy="136.06" r="11.15" fill="#d0595a"/>
+  <text x="31.18" y="154.02" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">IN</text>
+  <circle cx="68.03" cy="136.06" r="11.15" fill="#d0595a"/>
+  <text x="68.03" y="154.02" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">CV</text>
+  <circle cx="34.02" cy="175.75" r="13.33" fill="#9a9aa6"/>
+  <text x="34.02" y="195.88" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">R1</text>
+  <circle cx="70.87" cy="175.75" r="11.15" fill="#d0595a"/>
+  <text x="70.87" y="193.70" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">rcv</text>
+  <circle cx="104.88" cy="175.75" r="8.40" fill="#2b7fd8"/>
+  <text x="104.88" y="190.95" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">slew</text>
+  <circle cx="136.06" cy="175.75" r="8.47" fill="#7a5fd0"/>
+  <text x="136.06" y="191.02" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mute</text>
+  <circle cx="167.24" cy="175.75" r="11.15" fill="#d0595a"/>
+  <text x="167.24" y="193.70" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mcv</text>
+  <circle cx="252.28" cy="175.75" r="11.15" fill="#e0803f"/>
+  <text x="252.28" y="193.70" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">OUT1</text>
+  <circle cx="34.02" cy="221.10" r="13.33" fill="#9a9aa6"/>
+  <text x="34.02" y="241.24" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">R2</text>
+  <circle cx="70.87" cy="221.10" r="11.15" fill="#d0595a"/>
+  <text x="70.87" y="239.06" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">rcv</text>
+  <circle cx="104.88" cy="221.10" r="8.40" fill="#2b7fd8"/>
+  <text x="104.88" y="236.31" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">slew</text>
+  <circle cx="136.06" cy="221.10" r="8.47" fill="#7a5fd0"/>
+  <text x="136.06" y="236.38" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mute</text>
+  <circle cx="167.24" cy="221.10" r="11.15" fill="#d0595a"/>
+  <text x="167.24" y="239.06" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mcv</text>
+  <circle cx="252.28" cy="221.10" r="11.15" fill="#e0803f"/>
+  <text x="252.28" y="239.06" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">OUT2</text>
+  <circle cx="34.02" cy="266.46" r="13.33" fill="#9a9aa6"/>
+  <text x="34.02" y="286.59" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">R3</text>
+  <circle cx="70.87" cy="266.46" r="11.15" fill="#d0595a"/>
+  <text x="70.87" y="284.41" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">rcv</text>
+  <circle cx="104.88" cy="266.46" r="8.40" fill="#2b7fd8"/>
+  <text x="104.88" y="281.66" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">slew</text>
+  <circle cx="136.06" cy="266.46" r="8.47" fill="#7a5fd0"/>
+  <text x="136.06" y="281.73" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mute</text>
+  <circle cx="167.24" cy="266.46" r="11.15" fill="#d0595a"/>
+  <text x="167.24" y="284.41" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mcv</text>
+  <circle cx="252.28" cy="266.46" r="11.15" fill="#e0803f"/>
+  <text x="252.28" y="284.41" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">OUT3</text>
+  <circle cx="34.02" cy="311.81" r="13.33" fill="#9a9aa6"/>
+  <text x="34.02" y="331.94" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">R4</text>
+  <circle cx="70.87" cy="311.81" r="11.15" fill="#d0595a"/>
+  <text x="70.87" y="329.76" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">rcv</text>
+  <circle cx="104.88" cy="311.81" r="8.40" fill="#2b7fd8"/>
+  <text x="104.88" y="327.01" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">slew</text>
+  <circle cx="136.06" cy="311.81" r="8.47" fill="#7a5fd0"/>
+  <text x="136.06" y="327.08" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mute</text>
+  <circle cx="167.24" cy="311.81" r="11.15" fill="#d0595a"/>
+  <text x="167.24" y="329.76" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">mcv</text>
+  <circle cx="252.28" cy="311.81" r="11.15" fill="#e0803f"/>
+  <text x="252.28" y="329.76" font-family="sans-serif" font-size="4.82" fill="#231f20" text-anchor="middle">OUT4</text>
+</svg>

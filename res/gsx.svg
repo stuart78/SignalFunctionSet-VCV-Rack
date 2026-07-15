@@ -2,7 +2,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="60.96mm" height="128.5mm" viewBox="0 0 172.8 364.25">
   <g id="Background">
     <rect id="rect49" x="0" width="172.8" height="364.25" fill="#f0f0f0"/>
-    <rect id="rect48" x="106.4" y="311.73" width="57.6" height="43.2" rx="5.67" ry="5.67"/>
   </g>
   <g id="UI">
     <g>
@@ -27,7 +26,31 @@
       <path d="M26.08,25.95l2.29-3.24-2.24-3.06h1.73l1.32,1.9,1.31-1.9h1.73l-2.23,3.06,2.29,3.24h-1.75l-1.35-2.04-1.36,2.04h-1.75Z" fill="#231f20"/>
     </g>
   </g>
+  <g id="Templates">
+    <circle cx="28.8" cy="81.6" r="13.33" fill="#9a9aa6"/>
+    <circle cx="86.4" cy="81.6" r="13.33" fill="#9a9aa6"/>
+    <circle cx="144" cy="81.6" r="13.33" fill="#9a9aa6"/>
+    <circle cx="28.8" cy="168" r="13.33" fill="#9a9aa6"/>
+    <circle cx="86.4" cy="168" r="13.33" fill="#9a9aa6"/>
+    <circle cx="144" cy="168" r="13.33" fill="#9a9aa6"/>
+    <circle cx="28.8" cy="254.41" r="13.33" fill="#9a9aa6"/>
+    <circle cx="86.4" cy="254.41" r="13.33" fill="#9a9aa6"/>
+    <circle cx="144" cy="254.41" r="13.33" fill="#9a9aa6"/>
+    <circle cx="28.8" cy="117.6" r="11.15" fill="#d0595a"/>
+    <circle cx="86.4" cy="117.6" r="11.15" fill="#d0595a"/>
+    <circle cx="144" cy="117.6" r="11.15" fill="#d0595a"/>
+    <circle cx="28.8" cy="204" r="11.15" fill="#d0595a"/>
+    <circle cx="86.4" cy="204" r="11.15" fill="#d0595a"/>
+    <circle cx="144" cy="204" r="11.15" fill="#d0595a"/>
+    <circle cx="28.8" cy="290.41" r="11.15" fill="#d0595a"/>
+    <circle cx="86.4" cy="290.41" r="11.15" fill="#d0595a"/>
+    <circle cx="144" cy="290.41" r="11.15" fill="#d0595a"/>
+    <circle cx="28.8" cy="340.8" r="11.15" fill="#d0595a"/>
+  </g>
   <g id="Layer_10" data-name="Layer 10">
+    <rect id="rect48" x="96" y="316.8" width="67.2" height="43.2" rx="5.67" ry="5.67"/>
+    <circle cx="115.2" cy="340.8" r="11.15" fill="#e0803f"/>
+    <circle cx="144" cy="340.8" r="11.15" fill="#e0803f"/>
     <g isolation="isolate">
       <path d="M114.15,326.4v-4.9h.6v4.27h1.98v.63h-2.58Z" fill="#fff"/>
     </g>
@@ -154,14 +177,14 @@
     <path id="path25" d="M156.92,95.85v-1.29h1.64v2.58h1.64v-1.29" fill="none" stroke="#b2b2b2" stroke-miterlimit="10" stroke-width=".5"/>
     <path id="path26" d="M130.66,95.85v-.47c0-.45.37-.82.82-.82h0c.45,0,.82.37.82.82h0v.94c0,.45.37.82.82.82h0c.45,0,.82-.37.82-.82h0v-.47" fill="none" stroke="#b2b2b2" stroke-miterlimit="10" stroke-width=".5"/>
     <path id="path10" d="M127.73,66.93l.93-1.37,1.87,2.74.93-1.37" fill="none" stroke="#b2b2b2" stroke-miterlimit="10" stroke-width=".5"/>
-    <path id="path1" d="M28.8,95.73v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path2" d="M86.4,95.73v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path3" d="M144,95.73v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path4" d="M28.8,182.13v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path5" d="M86.4,182.13v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path6" d="M144,182.13v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path7" d="M28.8,268.53v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path8" d="M86.4,268.53v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
-    <path id="path9" d="M144,268.53v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path1" d="M28.8,93.6v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path2" d="M86.4,93.6v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path3" d="M144,93.6v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path4" d="M28.8,180v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path5" d="M86.4,180v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path6" d="M144,180v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path7" d="M28.8,266.4v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path8" d="M86.4,266.4v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
+    <path id="path9" d="M144,266.4v14.4" fill="none" stroke="#b2b2b2" stroke-miterlimit="11.34" stroke-width=".5"/>
   </g>
 </svg>

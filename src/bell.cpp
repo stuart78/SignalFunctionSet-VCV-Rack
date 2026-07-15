@@ -117,6 +117,10 @@ struct Bell : Module {
 	int  dispVoice = 0, dispBank = 0, dispAlgo = 0, dispCarrier = 0;
 	char dispName[11] = {0};
 	int  screenTab = 0;   // 0 = Operators, 1 = Envelope
+	float outLevelDb = 0.f;   // user output level trim (context menu), -12..+12 dB
+	// Bank / Voice CV scaling (context menu). 0 = 0-10V across the range,
+	// 1 = 0.1V per step, 2 = notes (1V/oct, one semitone per step, C4/0V = index 0).
+	int bankCvMode = 0, voiceCvMode = 0;
 
 	// Envelope display: static carrier-EG shape (recomputed on voice change) +
 	// a live amplitude follower of the audio output.
@@ -155,8 +159,8 @@ struct Bell : Module {
 		configInput(VOCT_INPUT, "V/oct (poly)");
 		configInput(GATE_INPUT, "Gate (poly)");
 		configInput(VEL_INPUT, "Velocity (poly)");
-		configInput(VOICE_CV_INPUT, "Voice select CV (0-10V across 32 voices)");
-		configInput(BANK_CV_INPUT, "Bank select CV (1V/bank)");
+		configInput(VOICE_CV_INPUT, "Voice/patch select CV (scale set in right-click menu)");
+		configInput(BANK_CV_INPUT, "Bank select CV (scale set in right-click menu)");
 		configInput(TUNE_CV_INPUT, "Tune CV (1V/oct)");
 		configInput(BRIGHTNESS_CV_INPUT, "Brightness CV (±5V)");
 		configInput(FEEDBACK_CV_INPUT, "Feedback CV (±5V)");
@@ -179,10 +183,16 @@ struct Bell : Module {
 		engine.getVoiceName(dispName);
 	}
 
+	// CV → index offset. mode 0 = 0-10V across `span`, 1 = 0.1V/step, 2 = 1V/oct notes.
+	static int cvIndex(float v, int mode, int span) {
+		if (mode == 1) return (int) std::round(v * 10.f);   // 0.1V per step
+		if (mode == 2) return (int) std::round(v * 12.f);   // one semitone per step (0V/C4 = 0)
+		return (int) std::round(v / 10.f * (float) std::max(1, span - 1));
+	}
 	int selectedBank() {
 		int b = (int) std::round(params[BANK_PARAM].getValue());
 		if (inputs[BANK_CV_INPUT].isConnected())
-			b += (int) std::round(inputs[BANK_CV_INPUT].getVoltage());   // 1V/bank
+			b += cvIndex(inputs[BANK_CV_INPUT].getVoltage(), bankCvMode, (int) banks.size());
 		return clamp(b, 0, (int) banks.size() - 1);
 	}
 	int currentVoiceCount() const {
@@ -193,7 +203,7 @@ struct Bell : Module {
 	int selectedVoice() {
 		int v = (int) std::round(params[VOICE_PARAM].getValue());
 		if (inputs[VOICE_CV_INPUT].isConnected())
-			v += (int) std::round(inputs[VOICE_CV_INPUT].getVoltage() / 10.f * 31.f);
+			v += cvIndex(inputs[VOICE_CV_INPUT].getVoltage(), voiceCvMode, 32);
 		return clamp(v, 0, currentVoiceCount() - 1);
 	}
 	void bumpVoice(int d) {
@@ -334,14 +344,19 @@ struct Bell : Module {
 
 		bool envOn = outputs[ENV_OUTPUT].isConnected();
 		outputs[ENV_OUTPUT].setChannels(envOn ? chans : 0);
-		// Gain the follower up toward a useful 0-10V range (the raw voice peaks
-		// well under 10V), so the ENV CV and the on-screen trace show real detail.
-		const float ENV_GAIN = 6.f;
+		// Follower gain toward a useful 0-10V range. The audio path now carries the
+		// bulk of the makeup gain (below), so this is modest.
+		const float ENV_GAIN = 2.f;
+		const float outGain = std::pow(10.f, outLevelDb / 20.f);   // user OUTPUT LEVEL trim
 		float blkEnv = 0.f;
 		for (int ch = 0; ch < chans; ch++) {
 			float n = engine.sample(ch, blockPos);
 			if (!std::isfinite(n)) n = 0.f;   // never emit NaN/Inf
-			float v = clamp(n * 5.f, -10.f, 10.f);
+			// Makeup gain: DX7 patches peak well below the engine's clip point, so at
+			// unity they were far quieter than a ±5V VCV oscillator. Drive into a tanh
+			// so a typical patch reaches ~±5V and hot multi-carrier patches saturate
+			// gracefully toward ±10V (no hard clip). OUTPUT LEVEL trims the drive.
+			float v = 10.f * std::tanh(n * (1.7f * outGain));
 			outputs[AUDIO_OUTPUT].setVoltage(v, ch);
 			// Envelope follower (computed always so the display works unpatched).
 			float rect = std::fabs(v) * ENV_GAIN;
@@ -362,7 +377,7 @@ struct Bell : Module {
 			for (int ch = 0; ch < chans; ch++) {
 				float s = engine.vcoSample(ch, blockPos);
 				if (!std::isfinite(s)) s = 0.f;
-				outputs[VCO_OUTPUT].setVoltage(clamp(s * 5.f, -10.f, 10.f), ch);
+				outputs[VCO_OUTPUT].setVoltage(clamp(s * 16.f * outGain, -10.f, 10.f), ch);   // match audio makeup
 			}
 		}
 		blockPos = (blockPos + 1) % BellEngine::BLOCK;
@@ -419,6 +434,9 @@ struct Bell : Module {
 		for (int i = 0; i < 6; i++) json_array_append_new(ops, json_boolean(opEnabled[i]));
 		json_object_set_new(root, "opEnabled", ops);
 		json_object_set_new(root, "screenTab", json_integer(screenTab));
+		json_object_set_new(root, "outLevelDb", json_real(outLevelDb));
+		json_object_set_new(root, "bankCvMode", json_integer(bankCvMode));
+		json_object_set_new(root, "voiceCvMode", json_integer(voiceCvMode));
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
@@ -459,6 +477,10 @@ struct Bell : Module {
 			for (int i = 0; i < 6; i++) opEnabled[i] = json_boolean_value(json_array_get(ops, i));
 		if (json_t* st = json_object_get(root, "screenTab"))
 			screenTab = clamp((int) json_integer_value(st), 0, 1);
+		if (json_t* ol = json_object_get(root, "outLevelDb"))
+			outLevelDb = clamp((float) json_number_value(ol), -24.f, 12.f);
+		if (json_t* j = json_object_get(root, "bankCvMode"))  bankCvMode  = clamp((int) json_integer_value(j), 0, 2);
+		if (json_t* j = json_object_get(root, "voiceCvMode")) voiceCvMode = clamp((int) json_integer_value(j), 0, 2);
 		engine.getVoiceName(dispName);
 	}
 };
@@ -797,6 +819,25 @@ struct BellWidget : ModuleWidget {
 			menu->addChild(createMenuItem("Remove current bank", "",
 				[m]() { m->removeBank(m->curBank); }));
 		}
+
+		menu->addChild(new MenuSeparator);
+		static const float LVL[] = {-24.f, -18.f, -12.f, -9.f, -6.f, -3.f, 0.f, 3.f, 6.f, 9.f, 12.f};
+		static const int NLVL = (int)(sizeof(LVL) / sizeof(LVL[0]));
+		std::vector<std::string> lvlLabels;
+		for (int i = 0; i < NLVL; i++) lvlLabels.push_back(string::f("%+g dB", LVL[i]));
+		menu->addChild(createIndexSubmenuItem("Output level", lvlLabels,
+			[m]() { int c = 6; for (int i = 0; i < NLVL; i++) if (std::fabs(LVL[i] - m->outLevelDb) < 0.01f) c = i; return c; },
+			[m](int i) { m->outLevelDb = LVL[i]; }));
+
+		// CV input scaling — lets a sequencer address banks/voices by low voltage or by
+		// note. e.g. Notes mode: C4 = first, C#4 = second… (play drum kits with one Operator).
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createIndexSubmenuItem("Bank CV",
+			{"0–10V (full range)", "0–1.6V (0.1V / bank)", "Notes (1V/oct, C4 = 1st)"},
+			[m]() { return m->bankCvMode; }, [m](int i) { m->bankCvMode = i; }));
+		menu->addChild(createIndexSubmenuItem("Voice CV",
+			{"0–10V (full range)", "0–3.2V (0.1V / voice)", "Notes (1V/oct, C4 = 1st)"},
+			[m]() { return m->voiceCvMode; }, [m](int i) { m->voiceCvMode = i; }));
 	}
 };
 

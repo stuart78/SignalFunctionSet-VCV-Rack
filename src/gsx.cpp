@@ -358,29 +358,29 @@ struct GsxWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/gsx.svg")));
 
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 28.69)), module, Gsx::PARAMFREQUENCY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 28.69)), module, Gsx::PARAMSTREAMS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 28.69)), module, Gsx::PARAMSHAPE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 59.17)), module, Gsx::PARAMRANGE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 59.17)), module, Gsx::PARAMDURATION_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 59.17)), module, Gsx::PARAMDELAY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 89.65)), module, Gsx::PARAMDENSITY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 89.65)), module, Gsx::PARAMVARIATION_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 89.65)), module, Gsx::PARAMSPREAD_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 28.79)), module, Gsx::PARAMFREQUENCY_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 28.79)), module, Gsx::PARAMSTREAMS_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 28.79)), module, Gsx::PARAMSHAPE_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 59.27)), module, Gsx::PARAMRANGE_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 59.27)), module, Gsx::PARAMDURATION_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 59.27)), module, Gsx::PARAMDELAY_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 89.75)), module, Gsx::PARAMDENSITY_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 89.75)), module, Gsx::PARAMVARIATION_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 89.75)), module, Gsx::PARAMSPREAD_PARAM));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 41.39)), module, Gsx::INFREQUENCY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 41.39)), module, Gsx::INSTREAMS_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 41.39)), module, Gsx::INSHAPE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 71.87)), module, Gsx::INRANGE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 71.87)), module, Gsx::INDURATION_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 71.87)), module, Gsx::INDELAY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 102.35)), module, Gsx::INDENSITY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 102.35)), module, Gsx::INVARIATION_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 102.35)), module, Gsx::INSPREAD_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 120.13)), module, Gsx::INVCA_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 41.49)), module, Gsx::INFREQUENCY_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 41.49)), module, Gsx::INSTREAMS_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 41.49)), module, Gsx::INSHAPE_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 71.97)), module, Gsx::INRANGE_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 71.97)), module, Gsx::INDURATION_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 71.97)), module, Gsx::INDELAY_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 102.45)), module, Gsx::INDENSITY_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 102.45)), module, Gsx::INVARIATION_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 102.45)), module, Gsx::INSPREAD_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 120.23)), module, Gsx::INVCA_INPUT));
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.64, 120.13)), module, Gsx::OUTLEFT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(50.8, 120.13)), module, Gsx::OUTRIGHT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.64, 120.23)), module, Gsx::OUTLEFT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(50.8, 120.23)), module, Gsx::OUTRIGHT_OUTPUT));
 	}
 };
 

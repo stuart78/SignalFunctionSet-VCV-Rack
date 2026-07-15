@@ -538,8 +538,10 @@ struct Note : Module {
 
 
 // Pattern clipboard (shared across all Note instances in this process).
-static Note::Pattern g_noteClipboard;
+static Note::Pattern g_noteClipboard;               // single pattern
 static bool g_noteClipboardValid = false;
+static Note::Pattern g_noteClipboardAll[N_PATTERNS];     // whole bank
+static bool g_noteClipboardAllValid = false;
 
 
 // --- NoteDisplay implementation ---
@@ -1488,6 +1490,25 @@ struct NoteWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Advance only on bar trigger", "",
 			&module->advanceOnBarOnly));
+
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Copy / paste"));
+		menu->addChild(createMenuItem("Copy current pattern", "", [=]() {
+			g_noteClipboard = module->patterns[module->editPattern];
+			g_noteClipboardValid = true;
+		}));
+		menu->addChild(createMenuItem("Copy all patterns", "", [=]() {
+			for (int p = 0; p < N_PATTERNS; p++) g_noteClipboardAll[p] = module->patterns[p];
+			g_noteClipboardAllValid = true;
+		}));
+		menu->addChild(createMenuItem("Paste to current pattern", "", [=]() {
+			bool wasActive = module->patterns[module->editPattern].active;
+			module->patterns[module->editPattern] = g_noteClipboard;
+			module->patterns[module->editPattern].active = wasActive;   // keep slot on/off
+		}, !g_noteClipboardValid));
+		menu->addChild(createMenuItem("Paste all patterns", "", [=]() {
+			for (int p = 0; p < N_PATTERNS; p++) module->patterns[p] = g_noteClipboardAll[p];
+		}, !g_noteClipboardAllValid));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Gate length"));

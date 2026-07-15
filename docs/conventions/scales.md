@@ -3,7 +3,8 @@
 All modules that expose a SCALE control share **one** scale list, defined in
 `src/scales.hpp` (namespace `sfs`). This guarantees that a SCALE CV value
 (1V per scale step) selects the *same* scale on every module — you can patch
-one SCALE sequence to Note, Fugue, and Muse at once and they stay in agreement.
+one SCALE sequence to Note, Fugue, MetaFugue, Muse, Chance, and Arrange at once and
+they stay in agreement.
 
 ## The rule
 

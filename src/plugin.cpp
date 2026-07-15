@@ -14,6 +14,7 @@ void init(Plugin* p) {
 	p->addModel(modelIntone);
 	p->addModel(modelTine);
 	p->addModel(modelMeter);
+	p->addModel(modelMeterExpander);
 	p->addModel(modelFugueX);
 	p->addModel(modelMetaFugue);
 	p->addModel(modelBeat);
@@ -29,6 +30,10 @@ void init(Plugin* p) {
 	p->addModel(modelOperator);
 	p->addModel(modelOpEnv);
 	p->addModel(modelChance);
+	p->addModel(modelRecord);
+	p->addModel(modelPlay);
+	p->addModel(modelRatio);
+	p->addModel(modelArrange);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

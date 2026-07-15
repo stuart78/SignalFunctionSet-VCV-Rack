@@ -1,43 +1,25 @@
 #include "plugin.hpp"
+#include "scales.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
+// Scales come from the shared canonical list (src/scales.hpp) so SCALE CV values
+// are interchangeable across Note, Chance, Muse, Phrase, and MetaFugue. `ScaleInfo`
+// is kept as an alias to the shared struct so the existing DSP (scale.intervals /
+// scale.size) compiles unchanged. Canonical intervals are float (some scales are
+// non-12-TET), so the quantizer/deviation math below works in floats.
+using ScaleInfo = sfs::Scale;
+static const sfs::Scale* const SCALES = sfs::SCALES;
+static const int NUM_SCALES = sfs::NUM_SCALES;
 
-struct ScaleInfo {
-	const int* intervals;
-	int size;
-};
-
-static const int SCALE_MAJOR[]        = {0, 2, 4, 5, 7, 9, 11};
-static const int SCALE_NAT_MINOR[]    = {0, 2, 3, 5, 7, 8, 10};
-static const int SCALE_HARM_MINOR[]   = {0, 2, 3, 5, 7, 8, 11};
-static const int SCALE_MELO_MINOR[]   = {0, 2, 3, 5, 7, 9, 11};
-static const int SCALE_DORIAN[]       = {0, 2, 3, 5, 7, 9, 10};
-static const int SCALE_PHRYGIAN[]     = {0, 1, 3, 5, 7, 8, 10};
-static const int SCALE_LYDIAN[]       = {0, 2, 4, 6, 7, 9, 11};
-static const int SCALE_MIXOLYDIAN[]   = {0, 2, 4, 5, 7, 9, 10};
-static const int SCALE_LOCRIAN[]      = {0, 1, 3, 5, 6, 8, 10};
-static const int SCALE_PENTA_MAJ[]    = {0, 2, 4, 7, 9};
-static const int SCALE_PENTA_MIN[]    = {0, 3, 5, 7, 10};
-static const int SCALE_CHROMATIC[]    = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-
-static const ScaleInfo SCALES[] = {
-	{SCALE_MAJOR,      7},
-	{SCALE_NAT_MINOR,  7},
-	{SCALE_HARM_MINOR, 7},
-	{SCALE_MELO_MINOR, 7},
-	{SCALE_DORIAN,     7},
-	{SCALE_PHRYGIAN,   7},
-	{SCALE_LYDIAN,     7},
-	{SCALE_MIXOLYDIAN, 7},
-	{SCALE_LOCRIAN,    7},
-	{SCALE_PENTA_MAJ,  5},
-	{SCALE_PENTA_MIN,  5},
-	{SCALE_CHROMATIC, 12},
-};
+// Fugue historically shipped a private 12-scale table in a DIFFERENT order.
+// Old saved patches store SCALE_PARAM as an index into that old order; this maps
+// old index → canonical index so dataFromJson() can migrate them (see below).
+//   old: Major,NatMin,HarmMin,MeloMin,Dorian,Phrygian,Lydian,Mixolydian,Locrian,Penta+,Penta-,Chromatic
+static const int LEGACY_SCALE_REMAP[12] = {1, 2, 12, 17, 8, 9, 10, 11, 18, 3, 4, 0};
 
 static const int NUM_STEPS = 8;
 static const int NUM_VOICES = 3;
-static const int CHROMATIC_SCALE_INDEX = 11;
+static const int CHROMATIC_SCALE_INDEX = 0;   // canonical Chromatic is index 0
 
 // ─── Harmonic Deviation Tier Tables ──────────────────────────────────────────
 
@@ -227,11 +209,13 @@ struct Fugue : Module {
 		configSwitch(ROOT_PARAM, 0.f, 11.f, 0.f, "Root Note",
 			{"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"});
 
-		// Scale (snapped)
-		configSwitch(SCALE_PARAM, 0.f, 11.f, 0.f, "Scale",
-			{"Major", "Natural Minor", "Harmonic Minor", "Melodic Minor",
-			 "Dorian", "Phrygian", "Lydian", "Mixolydian", "Locrian",
-			 "Penta Major", "Penta Minor", "Chromatic"});
+		// Scale (snapped) — canonical shared list; order matches Note/Chance/Muse/Phrase
+		// so SCALE CV is interchangeable. Default index 1 = Major (Fugue's historical default).
+		{
+			std::vector<std::string> scaleNames;
+			for (int i = 0; i < NUM_SCALES; i++) scaleNames.push_back(sfs::SCALES[i].longName);
+			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES - 1), 1.f, "Scale", scaleNames);
+		}
 
 		// Steps (snapped)
 		configSwitch(STEPS_PARAM, 1.f, 8.f, 8.f, "Steps",
@@ -290,6 +274,10 @@ struct Fugue : Module {
 		json_object_set_new(rootJ, "faderRange", json_real(faderRangeVolts));
 		json_object_set_new(rootJ, "harmonicLock", json_boolean(harmonicLock));
 		json_object_set_new(rootJ, "gateLength", json_real(gateLength));
+		// Marks this patch as using the canonical shared scale order. Its ABSENCE on
+		// load means the patch predates the migration and its SCALE_PARAM index must
+		// be remapped from Fugue's old private order (see dataFromJson).
+		json_object_set_new(rootJ, "scaleCanonical", json_boolean(true));
 		return rootJ;
 	}
 
@@ -300,6 +288,15 @@ struct Fugue : Module {
 		if (hlJ) harmonicLock = json_boolean_value(hlJ);
 		json_t* glJ = json_object_get(rootJ, "gateLength");
 		if (glJ) gateLength = json_number_value(glJ);
+
+		// Patch migration: params are already loaded by the base class before this
+		// runs, so params[SCALE_PARAM] holds the saved index. A pre-canonical patch
+		// (no "scaleCanonical" flag) stored it in Fugue's old 12-scale order — remap
+		// it to the canonical index so the patch keeps its intended scale.
+		if (!json_object_get(rootJ, "scaleCanonical")) {
+			int oldIdx = clamp((int)std::round(params[SCALE_PARAM].getValue()), 0, 11);
+			params[SCALE_PARAM].setValue((float)LEGACY_SCALE_REMAP[oldIdx]);
+		}
 	}
 
 	// ─── Scale Quantization ──────────────────────────────────────────────────
@@ -316,8 +313,8 @@ struct Fugue : Module {
 
 		for (int oct = 0; oct <= maxOctaves; oct++) {
 			for (int d = 0; d < scale.size; d++) {
-				int semitone = oct * 12 + scale.intervals[d];
-				float noteVoltage = (float)semitone / 12.f;
+				float semitone = (float)(oct * 12) + scale.intervals[d];
+				float noteVoltage = semitone / 12.f;
 
 				if (noteVoltage > faderRange + 0.05f) break;
 				if (noteVoltage < -0.05f) continue;
@@ -409,12 +406,13 @@ struct Fugue : Module {
 				if (baseSemiNorm < 0) baseSemiNorm += 12;
 				int baseOctave = (int)std::floor(baseSemiFromRoot / 12.f);
 
+				// Find scale degree closest to baseSemiNorm. Floats are used so
+				// non-12-TET scales (Pelog, Slendro, Harmonic) work too.
 				int baseDegree = 0;
+				float bestDiff = 999.f;
 				for (int d = 0; d < scale.size; d++) {
-					if (scale.intervals[d] == baseSemiNorm) {
-						baseDegree = d;
-						break;
-					}
+					float diff = std::fabs(scale.intervals[d] - (float)baseSemiNorm);
+					if (diff < bestDiff) { bestDiff = diff; baseDegree = d; }
 				}
 
 				// Calculate target degree (up or down)
@@ -548,7 +546,7 @@ struct Fugue : Module {
 		if (inputs[SCALE_CV_INPUT].isConnected()) {
 			scaleIndex += (int)std::round(inputs[SCALE_CV_INPUT].getVoltage());
 		}
-		scaleIndex = clamp(scaleIndex, 0, 11);
+		scaleIndex = clamp(scaleIndex, 0, NUM_SCALES - 1);
 
 		int numSteps = (int)std::round(params[STEPS_PARAM].getValue());
 

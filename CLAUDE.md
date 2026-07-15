@@ -15,17 +15,23 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 7. **Intone** — CHANT/FOF formant synthesis voice with vowel morphing
 8. **Tine** — Tunable 3rd-order pingable resonator (Gamelan Resonator circuit)
 9. **Meter** — Time-signature-aware musical clock with subdivision outputs and per-output swing
-10. **Beat** — Per-voice pattern sequencer (8×16) with on-screen step/velocity/accent/probability editing
-11. **Note** — Monophonic CV/gate pattern sequencer with 12-note pitch matrix and scale/root selection
-12. **Swell** — Ping-driven additive A/D envelope with stacked rises
-13. **Shift** — 4-output CV shift register with per-lane delay/cascade modes
-14. **Wave** — Polaroid wavetable voice: live parametric shape + 8 FIFO snapshots + WANDER macro
-15. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
-16. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
-17. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards / Hungry Man Pac-Man maze / LOGO Turtle / Pattern spirograph-rose generator) with X/Y, radius, angle, sector CVs and ray-crossing gates
-18. **Band** — Harmonic bandpass bank: 4 bands each lock to an integer harmonic of a shared (auto-detected or 1V/oct) fundamental; per-band level/harmonic/enable + CV, spectrum display
-19. **Operator** (slug `Bell`) — DX7-style 6-operator FM voice on the msfa engine; loads .syx cartridges, polyphonic, AUDIO/VCO/ENV-follower outs, tabbed operators/envelope display
-20. **OP ENV** (slug `OpEnv`) — standalone DX7 operator envelope generator; loads a voice's carrier EG, offsets all 8 rate/level attributes via trimpot/CV, V/oct rate scaling, LFO tremolo, "Release to 0V" option
+10. **Meter X** (slug `MeterX`) — Expander for Meter: 24 PPQN clock, Run gate, and Bar / 2 / 4 / 8 / 16 / 32 / 64 / 128-bar trigger outputs, each with an activity LED. Reads Meter's clock over the expander bus (`src/meter-messages.hpp`)
+11. **Beat** — Per-voice pattern sequencer (8×16) with on-screen step/velocity/accent/probability editing
+12. **Note** — Monophonic CV/gate pattern sequencer with 12-note pitch matrix and scale/root selection
+13. **Swell** — Ping-driven additive A/D envelope with stacked rises
+14. **Shift** — 4-output CV shift register with per-lane delay/cascade modes
+15. **Wave** — Polaroid wavetable voice *(WIP, hidden — not ready)*: live parametric shape + 8 FIFO snapshots + WANDER macro
+16. **Vac** — Semi-stable A/R envelope with vactrol-like timing drift (log-symmetric STAB)
+17. **Muse** — Faithful Triadex Muse recreation (Fredkin/Minsky 1972) — 4 theme + 4 interval sliders
+18. **Gravity** — Multi-mode chaos engine (pendulum / gravity well / billiards / Hungry Man Pac-Man maze / LOGO Turtle / Pattern spirograph-rose generator) with X/Y, radius, angle, sector CVs and ray-crossing gates
+19. **Band** — Harmonic bandpass bank: 4 bands each lock to an integer harmonic of a shared (auto-detected or 1V/oct) fundamental; per-band level/harmonic/enable + CV, spectrum display
+20. **Cycle** (slug `Cycle`) — Bar-synced quad LFO: four channels (A-D) with morphable shape + depth, locked to a musical bar via clock + bar inputs (free-run Hz unpatched); global phase spread + stability; per-pair SHAPE/SCALE **link buttons** (a linked channel follows its group's leftmost leader, its own pot becomes an offset from the leader — circular values wrap, bounded ones clamp); per-channel uni/bipolar outs
+21. **Operator** (slug `Bell`) — DX7-style 6-operator FM voice on the msfa engine; loads .syx cartridges, polyphonic, AUDIO/VCO/ENV-follower outs, tabbed operators/envelope display
+22. **OP ENV** (slug `OpEnv`) — standalone DX7 operator envelope generator; loads a voice's carrier EG, offsets all 8 rate/level attributes via trimpot/CV, V/oct rate scaling, LFO tremolo, "Release to 0V" option
+23. **Arrange** (slug `Arrange`, formerly Phrase) — song-form / arrangement sequencer: a single horizontal chain of 8 phrases (bar-length sections) advancing linearly (next active, wraps). Each phrase carries a bar length (4×4 grid, 1-16), enable, root + scale + BPM (trimpots; **LED link dots between columns cascade BPM/root/scale independently per row, default linked** — a linked phrase inherits its group's leftmost leader's value exactly; break the link for independence), a **GATE out that stays high while that phrase plays** (row under the trimpots), and **4 channel enables** (colored bars on screen: blue/green/orange-red/purple). The 4 channels are per-instrument clock buses in a dark inset — each column has a clock-division trimpot (÷1..÷16, bar-aligned) above its divided CLOCK out, then BAR, RESET (fires on master reset + channel re-enable), and EOC (arrangement wrap) outs, all muted on phrases where the channel is off (instruments drop in/out per phrase); the master outs (BPM 0.01V/BPM → Meter's "BPM CV absolute", Root + Scale CV in Note convention, Phrase index 1V/phrase) sit at the inset's bottom. BAR in (advances the arrangement — Meter's BAR out) + CLOCK in (divided per channel) + RESET in/btn bottom-left. No master Bar/Clock outs — Meter is the source; instruments take the channel outs. 34HP. The arrangement brain above Beat/Note/Chance.
+24. **Chance** (slug `Chance`) — Generative melodic walk sequencer (26HP, external clock): a seeded deterministic core melody + a BRANCH probability of straying to a neighbour (non-cascading, so the core always shows through); Markov note choice (`src/chance-markov.hpp`); GRAV/DRIFT = direction + move size; Rest/Hold/Leap/Ratchet shaping each with CV; 8 seeded patterns (micro-waveform, per-step 3-state gates off/gate/tie, repeat count, normal-vs-reseed mode) rotating at cycle level; Harmony 2nd voice (fixed interval or Varied); on-screen editing (click a pattern to load it into the walk; gate edits apply immediately mid-cycle)
+25. **Record** (slug `Record`) — Auto-sampler (16HP): drives any voice with V/OCT+GATE+VEL, records the stereo return across a note × velocity sweep, and writes WAVs + an `.sfz`. Audition mode, round-robins, loop-point detection, latency calibration, wait-for-silence, mono/stereo + 16/24/32-bit. **WAVs are written on the GUI thread** (`RecordWidget::step()`), never from `process()`
+26. **Play** (slug `Play`) — Polyphonic multisample player (16HP): loads `.sfz` or DecentSampler `.dspreset` (both parsed inline in play.cpp) into a shared 16-voice engine; velocity layers, round-robins, loops-while-held, per-note tune; note-off releases by default (menu "One-shot (play through)" for drums); multi-instrument via INSTR knob/CV; poly V/OCT+GATE read with `getPolyVoltage`
 
 ## Build Commands
 
@@ -52,6 +58,7 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/intone.cpp` — Intone
 - `src/tine.cpp` — Tine
 - `src/meter.cpp` — Meter
+- `src/meterx.cpp` — Meter X (expander; `src/meter-messages.hpp` = Meter ↔ Meter X bus)
 - `src/beat.cpp` — Beat
 - `src/note.cpp` — Note
 - `src/swell.cpp` — Swell
@@ -61,6 +68,11 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/muse.cpp` — Muse
 - `src/gravity.cpp` — Gravity
 - `src/band.cpp` — Band
+- `src/cycle.cpp` — Cycle
+- `src/chance.cpp` — Chance (`src/chance-markov.hpp` = note-choice tables)
+- `src/record.cpp` — Record
+- `src/play.cpp` — Play (`src/pushgrid.hpp` = shared pad grid, also used by Record)
+- `src/arrange.cpp` — Arrange
 - `src/dr_wav.h` — Header-only WAV loader (Phase)
 - `src/fugue-messages.hpp` — Fugue ↔ Fugue X expander messages
 - `docs/conventions/` — Cross-module conventions and required patterns
@@ -85,7 +97,7 @@ to every module in the plugin.
 See **`docs/conventions/browser-preview-pattern.md`** for the full pattern, examples from every shipped module, and testing instructions. Treat this as a required part of the display widget contract from day one of any new module.
 
 ### Scale Conventions
-**Any module exposing a SCALE control MUST use the shared canonical list in `src/scales.hpp`** (namespace `sfs`) — never define its own scale table. The list is append-only; reordering breaks cross-module SCALE CV compatibility and saved patches. Note, Fugue, and Muse all alias `sfs::Scale` / `sfs::SCALES[]`.
+**Any module exposing a SCALE control MUST use the shared canonical list in `src/scales.hpp`** (namespace `sfs`) — never define its own scale table. The list is append-only; reordering breaks cross-module SCALE CV compatibility and saved patches. Note, Fugue, Fugue's MetaFugue variant, Muse, Chance, and Arrange all alias `sfs::Scale` / `sfs::SCALES[]`, so a SCALE CV (1V/scale) and ROOT CV (1V/oct, semitone-quantized) are interchangeable across all of them. (Fugue was migrated onto the canonical list in 2026-07; a `scaleCanonical` JSON flag + `LEGACY_SCALE_REMAP` translate pre-migration patches.)
 
 See **`docs/conventions/scales.md`** for the 19-scale list, struct fields (longName/shortName/museName, intervals/size, museSemis[8]), and how to add a scale.
 

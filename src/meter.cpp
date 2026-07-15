@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "meter-messages.hpp"
 #include <cmath>
 
 
@@ -69,6 +70,7 @@ struct Meter : Module {
 		SWING_CV_3,
 		SWING_CV_4,
 		SWING_CV_5,
+		RESET_INPUT,        // appended — keeps existing patch cable indices valid
 		INPUTS_LEN
 	};
 	enum OutputId {
@@ -126,6 +128,7 @@ struct Meter : Module {
 	// --- Triggers ---
 	dsp::PulseGenerator resetOutPulse;
 	dsp::SchmittTrigger resetButtonTrigger;
+	dsp::SchmittTrigger resetInputTrigger;
 	dsp::SchmittTrigger extClockTrigger;
 
 	// --- Run state ---
@@ -144,6 +147,31 @@ struct Meter : Module {
 	bool extClockConnected = false;
 	int barsSinceReset = 0;       // Increments on each bar wrap; cleared on Reset
 	float syncFlash = 0.f;        // Brightness of the sync indicator (decays)
+
+	// --- Meter X expander bus ---
+	bool  msgBar = false;         // a BAR pulse fired this sample (for the expander)
+	bool  msgPpqn = false;        // a 24-PPQN pulse fired this sample
+	float samplesSince24 = 0.f;   // 24-PPQN accumulator (straight, un-swung)
+	void writeExpander(bool running) {
+		if (!(rightExpander.module && rightExpander.module->model == modelMeterExpander)) return;
+		auto* m = (MeterExpanderMessage*)rightExpander.producerMessage;
+		if (!m) return;
+		m->running = running;
+		m->ppqn24 = msgPpqn;
+		static const int NB[8] = {1, 2, 4, 8, 16, 32, 64, 128};
+		for (int k = 0; k < 8; k++) m->bar[k] = msgBar && (barsSinceReset % NB[k] == 0);
+		// Continuous bar position: whole bars since reset + fraction through the
+		// current bar (sixteenth count + sub-sixteenth). Drives the expander's
+		// per-output cycle pie charts. Frozen while stopped (accumulators idle).
+		float frac = 0.f;
+		if (sixteenthsPerBar > 0) {
+			float sixteenthLen = lastSamplesPerQuarter / 4.f;
+			float sub = (sixteenthLen > 0.f) ? clamp(samplesSinceSixteenth / sixteenthLen, 0.f, 1.f) : 0.f;
+			frac = ((float)sixteenthCount + sub) / (float)sixteenthsPerBar;
+		}
+		m->barPos = (float)barsSinceReset + frac;
+		rightExpander.requestMessageFlip();
+	}
 
 	// --- Grid (un-swung) phase trackers ---
 	// 5 entries for the swingable subdivisions: Q, E, S, QT, ET (no BAR
@@ -182,9 +210,17 @@ struct Meter : Module {
 	// --- Context menu options ---
 	bool applyTimeSigImmediately = false;
 	bool resetOnPlay = false;
+	bool bpmCvAbsolute = false;   // BPM CV as absolute 0.01V/BPM (e.g. from Arrange) vs additive offset
+
+	~Meter() {
+		delete (MeterExpanderMessage*)rightExpander.producerMessage;
+		delete (MeterExpanderMessage*)rightExpander.consumerMessage;
+	}
 
 	Meter() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+		rightExpander.producerMessage = new MeterExpanderMessage();
+		rightExpander.consumerMessage = new MeterExpanderMessage();
 
 		configParam(BPM_PARAM, 30.f, 300.f, 120.f, "BPM", " bpm");
 		configParam(NUMERATOR_PARAM, 1.f, 16.f, 4.f, "Numerator");
@@ -201,11 +237,12 @@ struct Meter : Module {
 				string::f("%s swing", SUB_LABELS[i]), "%", 0.f, 100.f);
 		}
 
-		configInput(BPM_INPUT, "BPM CV");
+		configInput(BPM_INPUT, "BPM CV (additive ~27 BPM/V, or absolute 0.01V/BPM via menu)");
 		configInput(NUMERATOR_INPUT, "Numerator CV");
 		configInput(DENOMINATOR_INPUT, "Denominator CV");
 		configInput(RUN_INPUT, "Run gate");
 		configInput(EXT_CLOCK_INPUT, "External clock");
+		configInput(RESET_INPUT, "Reset (resets bar/position, forwards to Reset OUT)");
 
 		for (int i = 0; i < NUM_OUTPUTS; i++) {
 			configInput(SWING_CV_0 + i, string::f("%s swing CV", SUB_LABELS[i]));
@@ -217,7 +254,7 @@ struct Meter : Module {
 		configOutput(SIXTEENTH_OUTPUT,                 "Sixteenth note (swung)");
 		configOutput(QUARTER_TRIPLET_OUTPUT,           "Quarter triplet (swung)");
 		configOutput(EIGHTH_TRIPLET_OUTPUT,            "Eighth triplet (swung)");
-		configOutput(RESET_OUTPUT,                     "Reset (fires when Reset button pressed)");
+		configOutput(RESET_OUTPUT,                     "Reset (fires on Reset button or Reset IN)");
 		configOutput(QUARTER_GRID_OUTPUT,          "Quarter note (grid, no swing)");
 		configOutput(EIGHTH_GRID_OUTPUT,           "Eighth note (grid, no swing)");
 		configOutput(SIXTEENTH_GRID_OUTPUT,        "Sixteenth note (grid, no swing)");
@@ -292,6 +329,8 @@ struct Meter : Module {
 		}
 		displayedSixteenth = 0;
 		barsSinceReset = 0;
+		msgBar = true;             // reset is a bar downbeat for the expander
+		samplesSince24 = 0.f;      // re-lock the 24-PPQN clock
 	}
 
 	// Returns swing-adjusted target sample count for the next pulse.
@@ -319,6 +358,7 @@ struct Meter : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
+		msgBar = false; msgPpqn = false;   // per-sample expander flags
 		// --- Run button latch + gate override ---
 		if (params[RUN_PARAM].getValue() > 0.f) {
 			params[RUN_PARAM].setValue(0.f);
@@ -331,18 +371,22 @@ struct Meter : Module {
 		}
 		lights[RUN_LIGHT].setBrightness(effectiveRunning ? 1.f : 0.f);
 
-		// --- Reset (button only — Meter is the master clock; Reset OUT
-		//     forwards to downstream modules like Beat) ---
+		// --- Reset (button or Reset IN; Reset OUT forwards to downstream
+		//     modules like Beat) ---
 		bool resetBtn = resetButtonTrigger.process(params[RESET_PARAM].getValue());
-		if (resetBtn) {
+		bool resetIn = inputs[RESET_INPUT].isConnected()
+			&& resetInputTrigger.process(inputs[RESET_INPUT].getVoltage());
+		if (resetBtn || resetIn) {
 			doReset();
 			resetOutPulse.trigger(0.001f);
 		}
 
 		// --- Read CV-modulated parameters ---
 		float bpmKnob = params[BPM_PARAM].getValue();
-		if (inputs[BPM_INPUT].isConnected())
-			bpmKnob += inputs[BPM_INPUT].getVoltage() * 27.f;
+		if (inputs[BPM_INPUT].isConnected()) {
+			if (bpmCvAbsolute) bpmKnob = inputs[BPM_INPUT].getVoltage() * 100.f;   // 0.01V/BPM absolute (Arrange)
+			else               bpmKnob += inputs[BPM_INPUT].getVoltage() * 27.f;   // additive offset
+		}
 		bpmKnob = clamp(bpmKnob, 30.f, 300.f);
 
 		int numKnob = (int)std::round(params[NUMERATOR_PARAM].getValue());
@@ -437,11 +481,20 @@ struct Meter : Module {
 			for (int i = 0; i < NUM_OUTPUTS; i++) {
 				outputs[BAR_OUTPUT + i].setVoltage(0.f);
 			}
+			writeExpander(false);   // RUN gate low, no clock (msgBar may still be set by a Reset)
 			return;
 		}
 
 		// --- Compute per-subdivision base periods (samples per pulse, no swing) ---
 		float samplesPerQuarter = 60.f * args.sampleRate / effectiveBpm;
+
+		// --- 24 PPQN clock (straight, un-swung) for the expander ---
+		float period24 = samplesPerQuarter / 24.f;
+		samplesSince24 += 1.f;
+		if (period24 > 0.f && samplesSince24 >= period24) {
+			samplesSince24 -= period24;
+			msgPpqn = true;
+		}
 
 		// --- BPM-change rescaling ---
 		// When samplesPerQuarter changes (BPM knob, BPM CV, ext clock LPF
@@ -511,6 +564,7 @@ struct Meter : Module {
 		// Helper to fire a pulse and update its flash state
 		auto firePulse = [&](int outIdx) {
 			pulses[outIdx].trigger(0.001f);
+			if (outIdx == SUB_BAR) msgBar = true;   // notify the expander
 			pulseFlashIdx[outIdx] = pulseInBar[outIdx];
 			pulseInBar[outIdx]++;
 			pulseFlash[outIdx] = 1.f;
@@ -620,6 +674,8 @@ struct Meter : Module {
 			bool hi = pulses_grid[i].process(args.sampleTime);
 			outputs[gridOutIds[i]].setVoltage(hi ? 10.f : 0.f);
 		}
+
+		writeExpander(true);
 	}
 
 	json_t* dataToJson() override {
@@ -628,6 +684,7 @@ struct Meter : Module {
 		json_object_set_new(rootJ, "extClockPpqnIndex", json_integer(extClockPpqnIndex));
 		json_object_set_new(rootJ, "applyTimeSigImmediately", json_boolean(applyTimeSigImmediately));
 		json_object_set_new(rootJ, "resetOnPlay", json_boolean(resetOnPlay));
+		json_object_set_new(rootJ, "bpmCvAbsolute", json_boolean(bpmCvAbsolute));
 		json_object_set_new(rootJ, "barsSinceReset", json_integer(barsSinceReset));
 		return rootJ;
 	}
@@ -641,6 +698,8 @@ struct Meter : Module {
 		if (immJ) applyTimeSigImmediately = json_boolean_value(immJ);
 		json_t* ropJ = json_object_get(rootJ, "resetOnPlay");
 		if (ropJ) resetOnPlay = json_boolean_value(ropJ);
+		json_t* bcaJ = json_object_get(rootJ, "bpmCvAbsolute");
+		if (bcaJ) bpmCvAbsolute = json_boolean_value(bcaJ);
 		json_t* bsrJ = json_object_get(rootJ, "barsSinceReset");
 		if (bsrJ) barsSinceReset = (int)json_integer_value(bsrJ);
 	}
@@ -1004,6 +1063,8 @@ struct MeterWidget : ModuleWidget {
 			mm2px(Vec(20.32f, 121.92f)), module, Meter::RUN_INPUT));
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(50.79f, 121.92f)), module, Meter::RESET_PARAM));
+		addInput(createInputCentered<PJ301MPort>(
+			mm2px(Vec(60.95f, 121.92f)), module, Meter::RESET_INPUT));
 		addOutput(createOutputCentered<PJ301MPort>(
 			mm2px(Vec(81.27f, 121.92f)), module, Meter::RESET_OUTPUT));
 
@@ -1069,6 +1130,9 @@ struct MeterWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Reset on play", "",
 			&module->resetOnPlay));
+		menu->addChild(createBoolPtrMenuItem(
+			"BPM CV absolute (0.01V/BPM — for Arrange)", "",
+			&module->bpmCvAbsolute));
 
 		if (module->extClockConnected && module->extClockHasMeasurement) {
 			menu->addChild(new MenuSeparator);

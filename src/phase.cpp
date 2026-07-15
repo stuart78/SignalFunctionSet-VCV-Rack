@@ -2,10 +2,32 @@
 #include <osdialog.h>
 #include <thread>
 #include <atomic>
-#include <mutex>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+
+#ifdef METAMODULE
+#include "filesystem/async_filebrowser.hh"
+#include "filesystem/helpers.hh"
+#include "patch/patch_file.hh"
+// MetaModule's newlib doesn't provide <mutex>. The Phase module uses
+// std::mutex / std::unique_lock to coordinate cue-edit access between
+// the GUI thread and the audio thread. On MetaModule, the audio engine
+// pauses during patch load and GUI callbacks, so no-op stubs are safe.
+namespace std {
+struct mutex { void lock() {} void unlock() {} bool try_lock() { return true; } };
+template<typename T> struct lock_guard { lock_guard(T&) {} };
+struct try_to_lock_t {};
+inline constexpr try_to_lock_t try_to_lock{};
+template<typename T> struct unique_lock {
+	unique_lock(T&) {}
+	unique_lock(T&, try_to_lock_t) {}
+	bool owns_lock() const { return true; }
+};
+}
+#else
+#include <mutex>
+#endif
 
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
@@ -17,12 +39,28 @@ static const int WAVEFORM_POINTS = 512;
 // WAV file filter for open dialog
 static const char PHASE_WAV_FILTERS[] = "WAV file (.wav):wav;All files (*.*):*";
 
-// Max sample length: 10 minutes at 48kHz
-static const size_t MAX_SAMPLE_LENGTH = 48000 * 60 * 10;
-
-// Max live-recording length: 60 seconds at 48kHz
-// (Pre-allocates one buffer per loop. 60s = ~11.5MB each.)
-static const size_t MAX_REC_LENGTH = 48000 * 60;
+#ifdef METAMODULE
+// On MetaModule we halve sample-buffer memory by storing samples as int16
+// instead of float. 16-bit at 48kHz is still transparent quality for looper
+// work; the memory saving matters because MetaModule shares ~300MB across all
+// plugins. We also cap max sample/record length harder than desktop.
+using PhaseSampleT = int16_t;
+static const size_t MAX_SAMPLE_LENGTH = 48000 * 60 * 3;  //  3 min per loop
+static const size_t MAX_REC_LENGTH    = 48000 * 30;      // 30 s per record
+static inline float sampleToFloat(int16_t s) { return (float)s * (1.f / 32768.f); }
+static inline int16_t floatToSample(float f) {
+	if (f >=  1.f) return  32767;
+	if (f <= -1.f) return -32768;
+	return (int16_t)(f * 32768.f);
+}
+#else
+// VCV (desktop): float storage, generous limits.
+using PhaseSampleT = float;
+static const size_t MAX_SAMPLE_LENGTH = 48000 * 60 * 10; // 10 min per loop
+static const size_t MAX_REC_LENGTH    = 48000 * 60;      // 60 s per record
+static inline float sampleToFloat(float s) { return s; }
+static inline float floatToSample(float f) { return f; }
+#endif
 
 
 // --- Base64 helpers (used to embed audio buffers in patch JSON) ---
@@ -73,7 +111,7 @@ static std::vector<uint8_t> base64Decode(const std::string& s) {
 
 
 struct SampleData {
-	std::vector<float> samples;
+	std::vector<PhaseSampleT> samples;   // int16 on MM, float on VCV
 	size_t length = 0;
 	std::string filePath;
 	std::string fileName;
@@ -120,7 +158,7 @@ struct RecState {
 	bool armed = false;             // panel-button latch state
 	std::atomic<size_t> writePos{0}; // current write index into recBuffer (atomic for GUI reads)
 	float envelope = 0.f;           // anti-click fade envelope
-	std::vector<float> recBuffer;   // pre-allocated, MAX_REC_LENGTH
+	std::vector<PhaseSampleT> recBuffer;   // pre-allocated, MAX_REC_LENGTH
 	std::atomic<bool> pendingFinalize{false};
 	size_t recordedLength = 0;      // captured at FINISHING completion
 };
@@ -475,7 +513,7 @@ struct Phase : Module {
 			if (end > sd.length) end = sd.length;
 			float peak = 0.f;
 			for (size_t j = start; j < end; j++) {
-				float v = std::fabs(sd.samples[j]);
+				float v = std::fabs(sampleToFloat(sd.samples[j]));
 				if (v > peak) peak = v;
 			}
 			sd.waveformMini[i] = peak;
@@ -508,11 +546,11 @@ struct Phase : Module {
 			float sum = 0.f;
 			float hfSum = 0.f;
 			for (int j = 0; j < windowSize && offset + j < sd.length; j++) {
-				float v = sd.samples[offset + j];
+				float v = sampleToFloat(sd.samples[offset + j]);
 				sum += v * v;
 				// High-frequency energy via sample differencing
 				if (j > 0) {
-					float diff = v - sd.samples[offset + j - 1];
+					float diff = v - sampleToFloat(sd.samples[offset + j - 1]);
 					hfSum += diff * diff;
 				}
 			}
@@ -571,7 +609,9 @@ struct Phase : Module {
 		// while we mutate it. Wait one audio buffer's worth (~5ms) for the
 		// audio thread to see the flag before we reallocate.
 		sd.loaded.store(false);
+#ifndef METAMODULE
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
 		sd.samples.clear();
 		sd.length = 0;
 		sd.filePath.clear();
@@ -669,9 +709,17 @@ struct Phase : Module {
 		// Mark as unloaded so the audio thread skips reads of sd.samples,
 		// then wait one audio buffer's worth (~5ms) before reallocating.
 		sd.loaded.store(false);
+#ifndef METAMODULE
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
 
+#ifdef METAMODULE
+		// Convert decoded float samples to int16 storage.
+		sd.samples.resize(mono.size());
+		for (size_t i = 0; i < mono.size(); i++) sd.samples[i] = floatToSample(mono[i]);
+#else
 		sd.samples = std::move(mono);
+#endif
 		sd.length = sd.samples.size();
 		sd.filePath = path;
 		sd.fileName = system::getFilename(path);
@@ -699,6 +747,42 @@ struct Phase : Module {
 		sd.loaded.store(true);
 	}
 
+	void loadSampleFromPath(const std::string& path, bool isB) {
+		if (isB) {
+			loadSample(sampleB, path);
+			sampleBExplicitlyLoaded = true;
+		} else {
+			loadSample(sampleA, path);
+			if (!sampleBExplicitlyLoaded) {
+				loadSample(sampleB, path);
+			}
+		}
+	}
+
+#ifdef METAMODULE
+	void loadSampleDialog(bool isB) {
+		std::string dir = "";
+		if (isB && sampleB.loaded) {
+			dir = system::getDirectory(sampleB.filePath);
+		} else if (!isB && sampleA.loaded) {
+			dir = system::getDirectory(sampleA.filePath);
+		}
+		osdialog_filters* filters = osdialog_filters_parse(PHASE_WAV_FILTERS);
+		async_osdialog_file(OSDIALOG_OPEN,
+			dir.empty() ? NULL : dir.c_str(),
+			NULL,
+			filters,
+			[this, isB, filters](char* pathC) {
+				if (pathC) {
+					std::string path = pathC;
+					std::free(pathC);
+					loadSampleFromPath(path, isB);
+				}
+				osdialog_filters_free(filters);
+			}
+		);
+	}
+#else
 	void loadSampleDialog(bool isB) {
 		osdialog_filters* filters = osdialog_filters_parse(PHASE_WAV_FILTERS);
 		DEFER({ osdialog_filters_free(filters); });
@@ -716,17 +800,9 @@ struct Phase : Module {
 		std::string path = pathC;
 		std::free(pathC);
 
-		if (isB) {
-			loadSample(sampleB, path);
-			sampleBExplicitlyLoaded = true;
-		} else {
-			loadSample(sampleA, path);
-			// Cascade to B if B not explicitly loaded
-			if (!sampleBExplicitlyLoaded) {
-				loadSample(sampleB, path);
-			}
-		}
+		loadSampleFromPath(path, isB);
 	}
+#endif
 
 	// --- Live recording ---
 
@@ -774,10 +850,10 @@ struct Phase : Module {
 		// Convert from ±5V audio scale to ±1.0 sample value, apply fade envelope
 		float sampleValue = (audioInput / 5.f) * rec.envelope;
 
-		// Write to record buffer
+		// Write to record buffer (float → PhaseSampleT, which is int16 on MM)
 		size_t pos = rec.writePos.load();
 		if (pos < rec.recBuffer.size()) {
-			rec.recBuffer[pos] = sampleValue;
+			rec.recBuffer[pos] = floatToSample(sampleValue);
 			rec.writePos.store(pos + 1);
 		} else {
 			// Buffer full, force end. Skip to FINISHING.
@@ -818,7 +894,9 @@ struct Phase : Module {
 		// Mark as unloaded so the audio thread skips reads of sd.samples,
 		// then wait one audio buffer's worth (~5ms) before reallocating.
 		sd.loaded.store(false);
+#ifndef METAMODULE
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
 
 		sd.samples.assign(rec.recBuffer.begin(),
 		                  rec.recBuffer.begin() + rec.recordedLength);
@@ -842,9 +920,18 @@ struct Phase : Module {
 	// recorded buffers from the patch JSON. Runs on the GUI thread.
 	void adoptSampleBuffer(SampleData& sd, std::vector<float>&& buf, bool fromRecording) {
 		sd.loaded.store(false);
+#ifndef METAMODULE
 		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+#endif
+#ifdef METAMODULE
+		// Convert incoming float buffer to int16 storage.
+		size_t n = std::min(buf.size(), MAX_SAMPLE_LENGTH);
+		sd.samples.resize(n);
+		for (size_t i = 0; i < n; i++) sd.samples[i] = floatToSample(buf[i]);
+#else
 		sd.samples = std::move(buf);
 		if (sd.samples.size() > MAX_SAMPLE_LENGTH) sd.samples.resize(MAX_SAMPLE_LENGTH);
+#endif
 		sd.length = sd.samples.size();
 		sd.loopStart = 0.f;
 		sd.loopEnd = 1.f;
@@ -882,8 +969,8 @@ struct Phase : Module {
 			size_t n = std::min(CHUNK, length - i);
 			for (size_t j = 0; j < n; j++) {
 				size_t idx = i + j;
-				interleaved[j * 2]     = (idx < sampleA.length) ? sampleA.samples[idx] : 0.f;
-				interleaved[j * 2 + 1] = (idx < sampleB.length) ? sampleB.samples[idx] : 0.f;
+				interleaved[j * 2]     = (idx < sampleA.length) ? sampleToFloat(sampleA.samples[idx]) : 0.f;
+				interleaved[j * 2 + 1] = (idx < sampleB.length) ? sampleToFloat(sampleB.samples[idx]) : 0.f;
 			}
 			drwav_write_pcm_frames(&wav, n, interleaved.data());
 		}
@@ -891,21 +978,40 @@ struct Phase : Module {
 		return true;
 	}
 
-	void saveStereoWavDialog() {
-		osdialog_filters* filters = osdialog_filters_parse(PHASE_WAV_FILTERS);
-		DEFER({ osdialog_filters_free(filters); });
-		char* pathC = osdialog_file(OSDIALOG_SAVE, NULL, "phase-buffers.wav", filters);
-		if (!pathC) return;
-		std::string path = pathC;
-		std::free(pathC);
-		// Auto-append .wav if missing
+	static std::string ensureWavExt(std::string path) {
 		if (path.size() < 4 ||
 		    !(path[path.size()-4]=='.' && path[path.size()-3]=='w' &&
 		      path[path.size()-2]=='a' && path[path.size()-1]=='v')) {
 			path += ".wav";
 		}
+		return path;
+	}
+
+#ifdef METAMODULE
+	void saveStereoWavDialog() {
+		osdialog_filters* filters = osdialog_filters_parse(PHASE_WAV_FILTERS);
+		async_osdialog_file(OSDIALOG_SAVE, NULL, "phase-buffers.wav", filters,
+			[this, filters](char* pathC) {
+				if (pathC) {
+					std::string path = ensureWavExt(pathC);
+					std::free(pathC);
+					saveStereoWav(path);
+				}
+				osdialog_filters_free(filters);
+			}
+		);
+	}
+#else
+	void saveStereoWavDialog() {
+		osdialog_filters* filters = osdialog_filters_parse(PHASE_WAV_FILTERS);
+		DEFER({ osdialog_filters_free(filters); });
+		char* pathC = osdialog_file(OSDIALOG_SAVE, NULL, "phase-buffers.wav", filters);
+		if (!pathC) return;
+		std::string path = ensureWavExt(pathC);
+		std::free(pathC);
 		saveStereoWav(path);
 	}
+#endif
 
 	void redetectTransients() {
 		if (sampleA.loaded) {
@@ -933,8 +1039,18 @@ struct Phase : Module {
 			if (!sd.filePath.empty()) {
 				json_object_set_new(rootJ, pathKey, json_string(sd.filePath.c_str()));
 			} else if (persistRecordedBuffers) {
+#ifdef METAMODULE
+				// Convert int16 → float bytes so the patch JSON format stays
+				// cross-compatible with VCV Rack. Otherwise a patch recorded
+				// on MetaModule wouldn't load in VCV and vice-versa.
+				std::vector<float> tmp(sd.length);
+				for (size_t i = 0; i < sd.length; i++) tmp[i] = sampleToFloat(sd.samples[i]);
+				size_t numBytes = tmp.size() * sizeof(float);
+				std::string b64 = base64Encode((const uint8_t*)tmp.data(), numBytes);
+#else
 				size_t numBytes = sd.length * sizeof(float);
 				std::string b64 = base64Encode((const uint8_t*)sd.samples.data(), numBytes);
+#endif
 				json_object_set_new(rootJ, dataKey, json_string(b64.c_str()));
 			}
 		};
@@ -1020,12 +1136,18 @@ struct Phase : Module {
 
 		if (!aRestored && pathAJ) {
 			std::string path = json_string_value(pathAJ);
+#ifdef METAMODULE
+			path = MetaModule::Filesystem::translate_path_to_local(path, MetaModule::Patch::get_dir());
+#endif
 			loadSample(sampleA, path);
 		}
 
 		if (!bRestored) {
 			if (pathBJ) {
 				std::string path = json_string_value(pathBJ);
+#ifdef METAMODULE
+				path = MetaModule::Filesystem::translate_path_to_local(path, MetaModule::Patch::get_dir());
+#endif
 				loadSample(sampleB, path);
 			} else if (sampleA.loaded && !sampleBExplicitlyLoaded && !sampleA.filePath.empty()) {
 				loadSample(sampleB, sampleA.filePath);
@@ -1149,10 +1271,10 @@ struct Phase : Module {
 			size_t idx = (size_t)readPos;
 			float frac = (float)(readPos - (double)idx);
 			if (idx < sd.length) {
-				float s0 = sd.samples[idx];
+				float s0 = sampleToFloat(sd.samples[idx]);
 				size_t idx1 = idx + 1;
 				if (idx1 >= regionEnd) idx1 = regionStart;
-				float s1 = (idx1 < sd.length) ? sd.samples[idx1] : s0;
+				float s1 = (idx1 < sd.length) ? sampleToFloat(sd.samples[idx1]) : s0;
 				sample = s0 + (s1 - s0) * frac;
 			}
 
@@ -1203,8 +1325,8 @@ struct Phase : Module {
 				float frac = (float)(loop.playhead - (double)idx);
 
 				if (idx < sd.length) {
-					float s0 = sd.samples[idx];
-					float s1 = (idx + 1 < sd.length) ? sd.samples[idx + 1] : sd.samples[idx];
+					float s0 = sampleToFloat(sd.samples[idx]);
+					float s1 = (idx + 1 < sd.length) ? sampleToFloat(sd.samples[idx + 1]) : s0;
 					sample = s0 + (s1 - s0) * frac;
 				}
 
@@ -1683,7 +1805,7 @@ void PhaseWaveformDisplay::onDragEnd(const DragEndEvent& e) {
 // Build a peak-amplitude mini waveform from the live record buffer.
 // Used to render the in-progress recording on the display. Stride-samples
 // within each bin so it stays cheap to compute every frame.
-static std::vector<float> buildLiveRecMini(const std::vector<float>& buf, size_t writePos) {
+static std::vector<float> buildLiveRecMini(const std::vector<PhaseSampleT>& buf, size_t writePos) {
 	std::vector<float> mini(WAVEFORM_POINTS, 0.f);
 	if (writePos == 0) return mini;
 	for (int i = 0; i < WAVEFORM_POINTS; i++) {
@@ -1694,7 +1816,7 @@ static std::vector<float> buildLiveRecMini(const std::vector<float>& buf, size_t
 		size_t step = std::max((size_t)1, (binEnd - binStart) / 16);
 		float peak = 0.f;
 		for (size_t j = binStart; j < binEnd; j += step) {
-			float v = std::fabs(buf[j]);
+			float v = std::fabs(sampleToFloat(buf[j]));
 			if (v > peak) peak = v;
 		}
 		mini[i] = peak;

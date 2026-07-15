@@ -324,12 +324,12 @@ struct DriftWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/drift.svg")));
 
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 15.0)), module, Drift::PARAMSTABILITY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 15.0)), module, Drift::PARAMSHAPE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 62.5)), module, Drift::PARAMXSPREAD_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 37.5)), module, Drift::PARAMCENTER_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 62.5)), module, Drift::PARAMFREQUENCY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 37.5)), module, Drift::PARAMYSPREAD_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 20.32)), module, Drift::PARAMSTABILITY_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 20.32)), module, Drift::PARAMSHAPE_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 60.96)), module, Drift::PARAMXSPREAD_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 40.64)), module, Drift::PARAMCENTER_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.7, 60.96)), module, Drift::PARAMFREQUENCY_PARAM));
+		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(38.1, 40.64)), module, Drift::PARAMYSPREAD_PARAM));
 
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(6.306, 85.365)), module, Drift::INSHAPE_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(18.955, 85.365)), module, Drift::INSTABILITY_INPUT));

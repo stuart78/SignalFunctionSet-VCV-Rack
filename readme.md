@@ -12,15 +12,19 @@ Modules grouped by function:
 - [Overtone](#overtone) — Additive VCO with 8 togglable harmonics
 - [Intone](#intone) — CHANT/FOF formant synthesis voice
 - [Phase](#phase) — Dual sample looper with sleep/rotate phase drift
+- [Play](#play) — Polyphonic multisample player (SFZ / DecentSampler)
 
 **Filters & Resonators**
 - [Band](#band) — Harmonic bandpass bank (isolate individual harmonics)
 - [Tine](#tine) — Tunable pingable resonator (Gamelan Resonator circuit)
 
 **Clocks & Sequencers**
+- [Arrange](#arrange) — Song-form sequencer: 8 phrases, 4 per-instrument clock buses
 - [Meter](#meter) — Time-signature-aware musical clock with swing
+  - [Meter X (Expander)](#meter-x-expander) — 24 PPQN, run gate, 1–128 bar triggers
 - [Beat](#beat) — Per-voice pattern sequencer (8 patterns × 16 steps)
 - [Note](#note) — Pitched CV/gate sequencer with 19 scales
+- [Chance](#chance) — Generative melodic walk sequencer (8 seeded patterns)
 - [Fugue](#fugue) — 8-step harmonic deviation sequencer (3 voices)
   - [Fugue X (Expander)](#fugue-x-expander)
   - [MetaFugue](#metafugue)
@@ -38,6 +42,7 @@ Modules grouped by function:
 
 **Utilities**
 - [Shift](#shift) — 4-output CV shift register with cascade chain
+- [Record](#record) — Auto-sampler: capture any voice to a multisampled SFZ instrument
 
 - [Other Platforms](#other-platforms)
 - [Building](#building)
@@ -225,6 +230,28 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 - VCA Mode toggle (anti-click envelope)
 - Recording mode (Replace / Append) and "Save recordings with patch"
 
+#### Play
+
+<img src="screenshots/Play.png" alt="Play panel" height="320"> 
+
+**[Play on signalfunctionset.com →](https://signalfunctionset.com/projects/play)**
+
+A polyphonic multisample player. Loads an `.sfz` or DecentSampler `.dspreset` instrument and plays it back with up to 16 voices — velocity layers, round-robins, loops, and per-note tuning. It's the other half of [Record](#record): load what you captured and play it. It isn't limited to that, though — it reads a practical SFZ subset, so simple third-party libraries work too. Play is 16HP.
+
+**Features:**
+- **16-voice polyphony** — one voice per V/OCT + GATE cable channel. A mono cable broadcasts to all voices, so a single velocity cable applies to the whole chord.
+- **SFZ subset** — `sample`, `lokey`/`hikey`/`key`, `pitch_keycenter`, `lovel`/`hivel`, `tune`, `volume`, `loop_mode`/`loop_start`/`loop_end`, `default_path`, `seq_length`/`seq_position`; note-name or numeric keys, cascading global → group → region.
+- **DecentSampler** — `.dspreset` parsing with the convention-correct accumulating tuning/volume, loops, and round-robins mapped onto the same engine.
+- **Gate-controlled duration** — note-off releases the voice by default; a "One-shot (play through)" option lets drums run to their natural end. Looped regions loop while held.
+- **Multiple instruments** — keep several loaded and select with the INSTR knob or CV.
+- **Playable display** — 88-key map (mapped = blue, playing = cyan) or a 12×8 Push-style pad grid with three layouts; tap a pad to audition the instrument with nothing patched.
+
+**Controls:** Instr, Level.
+**Inputs:** V/Oct (poly), Gate (poly), Vel, Instr CV, Level CV.
+**Outputs:** L / R.
+
+See [docs/play-manual.md](docs/play-manual.md) for the full manual.
+
 ### Filters & Resonators
 
 #### Band
@@ -283,6 +310,28 @@ A tunable 3rd-order pingable resonator based on the Gamelan Resonator circuit fr
 
 ### Clocks & Sequencers
 
+#### Arrange
+
+<img src="screenshots/Arrange.png" alt="Arrange panel" height="320"> 
+
+**[Arrange on signalfunctionset.com →](https://signalfunctionset.com/projects/arrange)**
+
+The song-form brain that sits above the rest of the rig. Where Beat, Note, and Chance each play a part, Arrange decides *what section you're in* — how many bars it lasts, what key and tempo it's in, and which instruments are playing during it. A single chain of 8 phrases (intro, verse, chorus, break) that advances on Meter's bars and wraps. Arrange is 34HP.
+
+**Features:**
+- **8 phrases** — each with a bar length (1–16 via a 4×4 grid), an enable, and its own root, scale, and BPM.
+- **4 per-instrument clock buses** — each channel has its own clock division (÷1…÷16) plus CLOCK / BAR / RESET / EOC outputs. Toggle a channel off for a phrase and that instrument simply stops; toggle it back on and its RESET fires so it re-enters in sync. Division counters keep running while off, so returning instruments stay phase-locked.
+- **Per-phrase GATE outs** — a gate that stays high for the whole time its phrase is playing, for section-length envelopes and fades.
+- **Linked key and tempo** — LED dots between the trimpot columns cascade BPM, root, and scale independently down the chain (on by default). A linked phrase inherits its group leader's value exactly; break one dot for a key change.
+- **Drives the whole patch's key** — ROOT and SCALE outs use the shared 19-scale convention, interchangeable with Note, Chance, Fugue, Muse, and MetaFugue.
+- **Feeds Meter's tempo** — BPM out (0.01V/BPM) into Meter's BPM CV with "BPM CV absolute" enabled.
+
+**Controls:** per phrase — Scale, Root, BPM trimpots + scale/root/BPM link dots; per channel — clock division; Reset.
+**Inputs:** Bar (from Meter), Clock, Reset.
+**Outputs:** per phrase — Gate; per channel — Clock, Bar, Reset, EOC; master — BPM, Root, Scale, Phrase index (1V/phrase).
+
+See [docs/arrange-manual.md](docs/arrange-manual.md) for the full manual.
+
 #### Meter
 
 <img src="screenshots/Meter.png" alt="Meter panel" height="320"> 
@@ -323,6 +372,25 @@ A time-signature-aware musical clock. Most VCV clocks output evenly-spaced pulse
 - External Clock PPQN selector (1, 2, 4, 8, 12, 16, 24)
 - Apply time signature changes immediately (default: queue for next bar)
 - Reset on play (default: resume from current position)
+
+#### Meter X (Expander)
+
+<img src="screenshots/MeterX.png" alt="Meter X panel" height="320"> 
+
+**[Meter X on signalfunctionset.com →](https://signalfunctionset.com/projects/meter-x)**
+
+An expander for Meter that covers the long game. Meter's own panel handles the musical subdivisions; Meter X adds a high-resolution 24 PPQN clock, a run gate, and bar-multiple triggers out to 128 bars — structure that unfolds over minutes rather than beats. Place it immediately to the right of Meter; there are no cables to patch. Meter X is 8HP.
+
+**Features:**
+- **24 PPQN clock** — the MIDI-standard resolution, deliberately un-swung so downstream modules that apply their own swing don't double it.
+- **Bar multiples** — Bar / 2 / 4 / 8 / 16 / 32 / 64 / 128 triggers, all firing on the downbeat and aligned to reset (bars 1, 1+N, 1+2N…), so the whole hierarchy stays locked to the song.
+- **Cycle pies** — each bar row shows a pie that fills clockwise through its cycle and resets when it fires. You can see you're three-quarters through a 32-bar section instead of counting.
+- **Run gate** — 10V while Meter runs.
+- **Activity LEDs** on every row.
+
+**Outputs:** 24 PPQN, Run, Bar, 2 / 4 / 8 / 16 / 32 / 64 / 128 bars.
+
+See [docs/meterx-manual.md](docs/meterx-manual.md) for the full manual.
 
 #### Beat
 
@@ -383,6 +451,30 @@ A monophonic CV/gate pattern sequencer — Beat's pitched cousin. Eight patterns
 **Context Menu:**
 - "Advance only on bar trigger" (default ON)
 - Patterns: Randomize / Clear
+
+#### Chance
+
+<img src="screenshots/Chance.png" alt="Chance panel" height="320"> 
+
+**[Chance on signalfunctionset.com →](https://signalfunctionset.com/projects/chance)**
+
+A generative melodic sequencer built on one idea: a melody is a *walk*. You don't program notes — you set a key, a window, and a few probabilities, and Chance walks a line through the scale. Every decision is seeded, so a pattern is a fixed, repeatable melody rather than a stream of noise: it plays the same way every time it comes around, and every knob you turn changes it audibly. Chance is 26HP and needs an external clock.
+
+**Features:**
+- **Core + branch** — a deterministic skeleton melody (the core), plus a BRANCH probability that strays to a neighbouring note at each step. Strays are non-cascading, so the core always shows through: BRANCH at 0 is the pure tune, higher is the same tune wearing a different coat.
+- **Musical note choice** — hand-authored first-order Markov tables rather than a coin flip: chord-tone gravity, leading-tone pull, dominant resolution; dedicated tables for pentatonic and blues. Strays voice-lead from the previous played note.
+- **GRAV / DRIFT** — direction bias and move size (stepwise 2nds out to octave leaps).
+- **Per-step shaping** — Rest, Hold (2–4 clocks), Leap (±octave), and Ratchet (2–3 bursts *inside* a step), each with CV.
+- **8 seeded patterns** — each with its own micro-waveform, gates, and repeat count; rotate at the cycle level. Per-slot mode: *normal* (identical every visit) or *reseed* (a fresh variation each visit).
+- **On-screen editing** — click a pattern to load it into the walk, double-click to enable; per-step gates click to toggle, shift-click to tie. Gate edits apply immediately, mid-cycle.
+- **Second voice** — Harmony at a fixed diatonic interval, or *Varied*: a seeded weaving counter-line with contrary motion.
+- **Shared key convention** — Root and Scale CV interchangeable with Note, Fugue, Muse, and Arrange.
+
+**Controls:** Grav, Drift, Branch, Rest, Hold, Leap, Ratchet, Gate Len, Glide, Key, Root, Start, End, Harmony, Rnd, Rst.
+**Inputs:** Clock, Rnd, Rst, Root CV, Scale CV, and a CV jack under each walk/shaping control.
+**Outputs:** V/OCT, Gate, Harmony V/OCT, Harmony Gate.
+
+See [docs/chance-manual.md](docs/chance-manual.md) for the full manual.
 
 #### Fugue
 
@@ -709,6 +801,30 @@ A 4-output CV shift register with per-lane controls. Sample input CV at the cloc
 
 **Context Menu:**
 - "Clear all" — Wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
+
+#### Record
+
+<img src="screenshots/Record.png" alt="Record panel" height="320"> 
+
+**[Record on signalfunctionset.com →](https://signalfunctionset.com/projects/record)**
+
+An auto-sampler. Point it at any voice in your rack — a patch you've built, a granular texture, an FM bell — press RECORD, and it plays that voice across a range of notes and velocities, captures each one, and writes a complete multisampled instrument to disk: a folder of WAVs plus an `.sfz`. The result loads straight into [Play](#play), or any sampler that reads SFZ. Record is 16HP.
+
+**Features:**
+- **Drives and listens** — outputs V/OCT + GATE + VELOCITY to your patch, records the stereo return; per capture it holds the gate for SUSTAIN, records the TAIL after release, waits for silence, and advances.
+- **Sweep control** — Start note, Spacing (semitones between samples), Octaves, and Velocity layers.
+- **Audition** — run the same sweep with no capture or write, to check tuning and tail length before committing.
+- **Round-robins (1–4)** — capture each note several times for instruments that never repeat exactly (only worth it if the voice actually varies).
+- **Loop detection** — finds a loop point on positive zero-crossings, minimising the seam error, and writes `loop_start`/`loop_end`. Best on sustained material.
+- **Latency calibration** — measures your patch's round-trip delay and trims to the true onset instead of a threshold.
+- **Live scope + playable pads** — see the input arriving; tap a key or pad to audition the voice you're about to sample.
+- **File options** — mono/stereo, 16/24/32-bit float, normalize, auto-trim, gate vs trigger mode.
+
+**Controls:** Start, Spacing, Octaves, Vel Layers, Tail, Sustain, Audition, Record.
+**Inputs:** L / R (the voice's return).
+**Outputs:** V/Oct, Gate, Velocity, Done.
+
+See [docs/record-manual.md](docs/record-manual.md) for the full manual.
 
 ## Other Platforms
 

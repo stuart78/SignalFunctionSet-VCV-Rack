@@ -403,8 +403,10 @@ struct Beat : Module {
 
 
 // Pattern clipboard (shared across all Beat instances in this process).
-static Beat::Pattern g_beatClipboard;
+static Beat::Pattern g_beatClipboard;               // single pattern
 static bool g_beatClipboardValid = false;
+static Beat::Pattern g_beatClipboardAll[NUM_PATTERNS];   // whole bank
+static bool g_beatClipboardAllValid = false;
 
 
 // --- BeatDisplay implementation ---
@@ -1260,6 +1262,25 @@ struct BeatWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Advance only on bar trigger", "",
 			&module->advanceOnBarOnly));
+
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Copy / paste"));
+		menu->addChild(createMenuItem("Copy current pattern", "", [=]() {
+			g_beatClipboard = module->patterns[module->editPattern];
+			g_beatClipboardValid = true;
+		}));
+		menu->addChild(createMenuItem("Copy all patterns", "", [=]() {
+			for (int p = 0; p < NUM_PATTERNS; p++) g_beatClipboardAll[p] = module->patterns[p];
+			g_beatClipboardAllValid = true;
+		}));
+		menu->addChild(createMenuItem("Paste to current pattern", "", [=]() {
+			bool wasActive = module->patterns[module->editPattern].active;
+			module->patterns[module->editPattern] = g_beatClipboard;
+			module->patterns[module->editPattern].active = wasActive;   // keep slot on/off
+		}, !g_beatClipboardValid));
+		menu->addChild(createMenuItem("Paste all patterns", "", [=]() {
+			for (int p = 0; p < NUM_PATTERNS; p++) module->patterns[p] = g_beatClipboardAll[p];
+		}, !g_beatClipboardAllValid));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Patterns"));
