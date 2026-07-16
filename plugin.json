@@ -117,7 +117,7 @@
       "slug": "Meter",
       "name": "Meter",
       "description": "Time-signature-aware musical clock with bar/quarter/eighth/sixteenth/triplet outputs, CV-controllable time signature, and external clock sync",
-      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
+      "manualUrl": "https://signalfunctionset.com/projects/meter/",
       "tags": [
         "Clock generator",
         "Clock modulator",
@@ -128,7 +128,7 @@
       "slug": "MeterX",
       "name": "Meter X",
       "description": "Expander for Meter. Adds a 24 PPQN clock, a Run gate, and Bar / 2 / 4 / 8 / 16 / 32 / 64 / 128-bar trigger outputs, each with an activity LED. Place directly to the right of a Meter.",
-      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
+      "manualUrl": "https://signalfunctionset.com/projects/meter-x/",
       "tags": [
         "Clock generator",
         "Clock modulator",
@@ -140,7 +140,7 @@
       "slug": "Beat",
       "name": "Beat",
       "description": "Single-voice pattern sequencer with 8 patterns x 16 steps, on-screen step/velocity/accent editing, per-pattern length, and active-pattern progression",
-      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
+      "manualUrl": "https://signalfunctionset.com/projects/beat/",
       "tags": [
         "Sequencer",
         "Drum"
@@ -150,7 +150,7 @@
       "slug": "Note",
       "name": "Note",
       "description": "Monophonic CV/gate pattern sequencer with 12-note pitch matrix, scale and root selection (incl. just-intonation harmonic series), 8 patterns x 8 steps with velocity/accent/probability editing",
-      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
+      "manualUrl": "https://signalfunctionset.com/projects/note/",
       "tags": [
         "Sequencer",
         "Polyphonic",
@@ -318,7 +318,7 @@
       "slug": "Arrange",
       "name": "Arrange",
       "description": "Song-form / arrangement sequencer. A linear chain of 8 phrases (bar-length sections); each phrase has a bar length, root + scale, BPM (linkable — a linked phrase inherits BPM/root/scale from the previous one), a gate out that stays high while it plays, and 4 channel enables. The 4 channels are per-instrument clock buses with clock division and CLOCK / BAR / RESET / EOC outputs each, muted on phrases where the channel is off — instruments drop in and out per phrase. Driven by a bar-rate clock. Master outs: phrase index (1V/phrase), BPM CV (for Meter), root + scale CV. The arrangement brain above Beat / Note / Chance.",
-      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
+      "manualUrl": "https://signalfunctionset.com/projects/arrange/",
       "tags": [
         "Sequencer",
         "Clock modulator",
