@@ -318,7 +318,7 @@
       "slug": "Arrange",
       "name": "Arrange",
       "description": "Song-form / arrangement sequencer. A linear chain of 8 phrases (bar-length sections); each phrase has a bar length, root + scale, BPM (linkable — a linked phrase inherits BPM/root/scale from the previous one), a gate out that stays high while it plays, and 4 channel enables. The 4 channels are per-instrument clock buses with clock division and CLOCK / BAR / RESET / EOC outputs each, muted on phrases where the channel is off — instruments drop in and out per phrase. Driven by a bar-rate clock. Master outs: phrase index (1V/phrase), BPM CV (for Meter), root + scale CV. The arrangement brain above Beat / Note / Chance.",
-      "manualUrl": "https://signalfunctionset.com/projects/arrange/",
+      "manualUrl": "https://signalfunctionset.com/projects/sfs-sequencer-system/",
       "tags": [
         "Sequencer",
         "Clock modulator",
