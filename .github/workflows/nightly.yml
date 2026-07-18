@@ -5,6 +5,11 @@
 # modules are un-hidden. Artifacts (mac arm64/x64, win x64, lin x64) are attached to
 # a rolling "nightly" prerelease, and a Discord webhook is pinged on each build.
 #
+# Each platform is built NATIVELY on its own GitHub runner — no cross-compile
+# toolchain, no osxcross, no Apple SDK to smuggle. (The old approach built the
+# osxcross image, a ~3h LLVM compile that then failed at `cp MacOSX*.sdk.tar.*`
+# because Apple's SDK can't be redistributed. Native runners sidestep all of that.)
+#
 # SETUP (one-time, done by you — I can't do these):
 #   1. Discord: channel → Integrations → Webhooks → New Webhook → Copy URL.
 #   2. GitHub: repo → Settings → Secrets and variables → Actions → New secret
@@ -19,87 +24,157 @@ name: Nightly
 on:
   push:
     branches: [master]        # runs only when there's a new commit
-  workflow_dispatch:          # manual "Run workflow" button (use this for the first run)
+  workflow_dispatch:          # manual "Run workflow" button
 
 concurrency:
-  group: nightly              # newer push cancels an in-flight nightly
+  group: nightly              # a newer push cancels an in-flight nightly
   cancel-in-progress: true
 
+env:
+  RACK_SDK_VERSION: "2.6.4"
+
 jobs:
-  build:
+  # ── Unix platforms: mac-arm64, mac-x64, lin-x64 — plain bash ────────────────
+  build-unix:
+    name: Build ${{ matrix.sdk }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-14,      sdk: mac-arm64 }
+          - { runner: macos-13,      sdk: mac-x64   }
+          - { runner: ubuntu-latest, sdk: lin-x64   }
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Install build deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install zstd jq
+
+      - name: Install build deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zstd jq
+
+      - name: Download Rack SDK
+        run: |
+          curl -fL -o rack-sdk.zip \
+            "https://vcvrack.com/downloads/Rack-SDK-${RACK_SDK_VERSION}-${{ matrix.sdk }}.zip"
+          unzip -q rack-sdk.zip
+          echo "RACK_DIR=$PWD/Rack-SDK" >> "$GITHUB_ENV"
+
+      - name: Stamp nightly identity + un-hide WIP modules
+        run: |
+          jq '
+            .slug    += "-nightly"
+            | .name  += " (Nightly)"
+            | (if .brand then .brand += " Nightly" else . end)
+            | .version += "-nightly"
+            | .modules |= map(if .hidden then .hidden = false else . end)
+          ' plugin.json > plugin.json.tmp && mv plugin.json.tmp plugin.json
+          echo "SFS_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "--- nightly identity ---"
+          jq '{slug, name, version}' plugin.json
+
+      - name: Build
+        run: |
+          make clean
+          make -j"$(getconf _NPROCESSORS_ONLN)" dist
+          echo "Built:"; ls -la dist/*.vcvplugin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.sdk }}
+          path: dist/*.vcvplugin
+          if-no-files-found: error
+
+  # ── Windows: native MinGW64 via MSYS2 ───────────────────────────────────────
+  build-win:
+    name: Build win-x64
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            curl make tar zip unzip zstd
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-jq
+
+      - name: Download Rack SDK
+        run: |
+          curl -fL -o rack-sdk.zip \
+            "https://vcvrack.com/downloads/Rack-SDK-${RACK_SDK_VERSION}-win-x64.zip"
+          unzip -q rack-sdk.zip
+          echo "RACK_DIR=$PWD/Rack-SDK" >> "$GITHUB_ENV"
+
+      - name: Stamp nightly identity + un-hide WIP modules
+        run: |
+          jq '
+            .slug    += "-nightly"
+            | .name  += " (Nightly)"
+            | (if .brand then .brand += " Nightly" else . end)
+            | .version += "-nightly"
+            | .modules |= map(if .hidden then .hidden = false else . end)
+          ' plugin.json > plugin.json.tmp && mv plugin.json.tmp plugin.json
+          jq '{slug, name, version}' plugin.json
+
+      - name: Build
+        # Force libgcc + winpthread static so the .dll is self-contained (Rack on
+        # Windows ships neither libgcc_s_seh-1.dll nor libwinpthread-1.dll). Mirrors
+        # build.sh's native-Windows path.
+        run: |
+          make clean
+          EXTRA_LDFLAGS='-static-libgcc -Wl,--whole-archive,-l:libwinpthread.a,--no-whole-archive' \
+            make -j"$(nproc)" dist
+          echo "Built:"; ls -la dist/*.vcvplugin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-win-x64
+          path: dist/*.vcvplugin
+          if-no-files-found: error
+
+  # ── Collect, publish rolling prerelease, notify Discord ─────────────────────
+  release:
+    name: Publish nightly
+    needs: [build-unix, build-win]
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write         # needed to update the rolling "nightly" release
     env:
-      # Job-level so the notify steps can gate on it in their `if:` (a step can't
-      # read its own step-level env there). Empty when the secret isn't set.
+      # Job-level so the notify steps can gate on it in their `if:`.
       DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      ALL_OK: ${{ needs.build-unix.result == 'success' && needs.build-win.result == 'success' }}
     steps:
       - name: Check out plugin
         uses: actions/checkout@v4
+
+      - name: Compute short SHA
+        run: echo "SFS_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      - name: Download all artifacts
+        if: env.ALL_OK == 'true'
+        uses: actions/download-artifact@v4
         with:
-          path: plugin
-          fetch-depth: 0
-
-      - name: Stamp nightly identity + un-hide WIP modules
-        working-directory: plugin
-        run: |
-          # Same rewrite build.sh uses for dev builds, but "-nightly" instead of "-dev".
-          # Target the FIRST slug/name only (the plugin's, before the module list).
-          sed -i '0,/"slug":/ s/"slug": *"\([^"]*\)"/"slug": "\1-nightly"/' plugin.json
-          sed -i '0,/"name":/ s/"name": *"\([^"]*\)"/"name": "\1 (Nightly)"/' plugin.json
-          sed -i 's/"brand": *"\([^"]*\)"/"brand": "\1 Nightly"/' plugin.json
-          sed -i 's/"version": *"\([^"]*\)"/"version": "\1-nightly"/' plugin.json
-          # Nightly exposes everything (Wave, Ratio, …).
-          sed -i 's/"hidden": *true/"hidden": false/g' plugin.json
-          echo "SFS_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
-          echo "--- nightly plugin.json head ---"; head -8 plugin.json
-
-      - name: Check out rack-plugin-toolchain
-        uses: actions/checkout@v4
-        with:
-          repository: VCVRack/rack-plugin-toolchain
-          path: toolchain
-          fetch-depth: 1
-
-      # The toolchain Docker image (osxcross, mingw, SDKs) is expensive to build
-      # (~45–90 min the first time). Cache the built image between runs, keyed on the
-      # toolchain's Dockerfiles so it rebuilds only when the toolchain changes.
-      - name: Cache toolchain image
-        id: img
-        uses: actions/cache@v4
-        with:
-          path: ~/rack-toolchain-image.tar
-          key: rack-toolchain-19-${{ hashFiles('toolchain/Dockerfile', 'toolchain/Dockerfile.win', 'toolchain/Makefile') }}
-
-      - name: Load cached image
-        if: steps.img.outputs.cache-hit == 'true'
-        run: docker load -i ~/rack-toolchain-image.tar
-
-      - name: Build toolchain image (first run / after toolchain change)
-        if: steps.img.outputs.cache-hit != 'true'
-        working-directory: toolchain
-        run: |
-          make rack-sdk-all
-          JOBS=$(nproc) make docker-build
-          docker save rack-plugin-toolchain:19 -o ~/rack-toolchain-image.tar
-
-      - name: Ensure SDKs present (cache-hit path)
-        if: steps.img.outputs.cache-hit == 'true'
-        working-directory: toolchain
-        run: make rack-sdk-all
-
-      - name: Cross-compile all platforms
-        working-directory: toolchain
-        run: make -j"$(nproc)" docker-plugin-build PLUGIN_DIR="$GITHUB_WORKSPACE/plugin"
-
-      - name: Collect artifacts
-        run: |
-          mkdir -p out
-          cp toolchain/plugin-build/*.vcvplugin out/
-          echo "Built:"; ls -la out
+          path: out
+          pattern: nightly-*
+          merge-multiple: true
 
       - name: Publish rolling nightly prerelease
+        if: env.ALL_OK == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
@@ -111,11 +186,12 @@ jobs:
 
             - Commit `${{ env.SFS_SHA }}`
             - Includes work-in-progress modules (Wave, Ratio) that aren't in the stable release.
+            - Platforms: mac arm64, mac x64, Windows x64, Linux x64.
 
             ⚠️ This is a **separate plugin** (slug `SignalFunctionSet-nightly`, shows as *Signal Function Set (Nightly)*). It installs alongside the VCV Library build, but patches you make with it are **not** interchangeable with the release version. Unsigned — macOS may warn on first load.
 
       - name: Notify Discord (success)
-        if: success() && env.DISCORD_WEBHOOK != ''
+        if: env.ALL_OK == 'true' && env.DISCORD_WEBHOOK != ''
         run: |
           curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" -d @- <<JSON
           {
@@ -129,7 +205,7 @@ jobs:
           JSON
 
       - name: Notify Discord (failure)
-        if: failure() && env.DISCORD_WEBHOOK != ''
+        if: env.ALL_OK != 'true' && env.DISCORD_WEBHOOK != ''
         run: |
           curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" -d @- <<JSON
           {
