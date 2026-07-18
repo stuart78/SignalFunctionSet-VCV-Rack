@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "scales.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 
@@ -152,6 +153,7 @@ struct Note : Module {
 	// The step interval is measured from the time between successive step
 	// advances, so the gate tracks tempo automatically.
 	float gateLength = 0.5f;
+	int   pulseWidthIdx = 0;           // encoder-safe trigger/accent width (index into sfs::PULSE_WIDTHS)
 	int   stepIntervalSamples = 0;     // measured time between step advances
 	int   samplesSinceAdvance = 0;
 	int   gateRemaining = 0;           // samples of gate left to hold
@@ -272,7 +274,7 @@ struct Note : Module {
 		// with a gap before the next note.
 		auto holdGate = [&]() {
 			float frac = nextTie ? 1.0f : gateLength;
-			if (frac <= 0.f) { gatePulse.trigger(0.001f); return; }   // trigger mode
+			if (frac <= 0.f) { gatePulse.trigger(sfs::pulseWidthSec(pulseWidthIdx)); return; }   // trigger mode
 			gateRemaining = std::max(1, (int)(frac * ivl));
 		};
 
@@ -293,7 +295,7 @@ struct Note : Module {
 		currentVelocity = clamp(p.velocities[playStep], 0.f, 1.f);
 		currentVoct = voctForRow(pitch);
 		noteSounding = true;
-		if (p.accents[playStep]) accentPulse.trigger(0.001f);
+		if (p.accents[playStep]) accentPulse.trigger(sfs::pulseWidthSec(pulseWidthIdx));
 		holdGate();
 	}
 
@@ -438,6 +440,7 @@ struct Note : Module {
 		json_object_set_new(root, "octaveShift", json_integer(octaveShift));
 		json_object_set_new(root, "advanceOnBarOnly", json_boolean(advanceOnBarOnly));
 		json_object_set_new(root, "gateLength", json_real(gateLength));
+		json_object_set_new(root, "pulseWidthIdx", json_integer(pulseWidthIdx));
 
 		json_t* patArray = json_array();
 		for (int p = 0; p < N_PATTERNS; p++) {
@@ -489,6 +492,8 @@ struct Note : Module {
 			advanceOnBarOnly = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "gateLength"))
 			gateLength = (float)json_real_value(j);
+		if (json_t* j = json_object_get(root, "pulseWidthIdx"))
+			pulseWidthIdx = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
 
 		json_t* patArray = json_object_get(root, "patterns");
 		if (patArray && json_is_array(patArray)) {
@@ -1523,6 +1528,10 @@ struct NoteWidget : ModuleWidget {
 				[=]() { return std::fabs(module->gateLength - v) < 1e-4f; },
 				[=]() { module->gateLength = v; }));
 		}
+		// Trigger-mode gate + accent pulse width (encoder-safe). Only affects the
+		// 1ms trigger path (gate length "Trigger") and the accent output; held
+		// gates already stretch across the step.
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx, "Trigger/accent width");
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Patterns"));

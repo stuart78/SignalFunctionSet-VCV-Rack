@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 
@@ -133,6 +134,7 @@ struct Beat : Module {
 	// When true, pattern only advances on a BAR pulse (default — most musical
 	// behavior). When false, pattern wrap also advances when BAR isn't patched.
 	bool advanceOnBarOnly = true;
+	int pulseWidthIdx = 0;   // encoder-safe pulse width (index into sfs::PULSE_WIDTHS)
 
 	dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger barTrigger;
@@ -203,9 +205,10 @@ struct Beat : Module {
 		// Probability check — fires only if random draw is below the set
 		// probability. p=1 always fires, p=0 never fires.
 		if (random::uniform() >= p.probabilities[playStep]) return;
-		gatePulse.trigger(0.001f);
+		const float pw = sfs::pulseWidthSec(pulseWidthIdx);
+		gatePulse.trigger(pw);
 		currentVelocity = clamp(p.velocities[playStep], 0.f, 1.f);
-		if (p.accents[playStep]) accentPulse.trigger(0.001f);
+		if (p.accents[playStep]) accentPulse.trigger(pw);
 	}
 
 	void doReset() {
@@ -320,6 +323,7 @@ struct Beat : Module {
 		json_object_set_new(root, "playStep", json_integer(playStep));
 		json_object_set_new(root, "currentBar", json_integer(currentBar));
 		json_object_set_new(root, "advanceOnBarOnly", json_boolean(advanceOnBarOnly));
+		json_object_set_new(root, "pulseWidthIdx", json_integer(pulseWidthIdx));
 
 		json_t* patArray = json_array();
 		for (int p = 0; p < NUM_PATTERNS; p++) {
@@ -360,6 +364,8 @@ struct Beat : Module {
 			currentBar = clamp((int)json_integer_value(j), 1, MAX_REPEATS);
 		if (json_t* j = json_object_get(root, "advanceOnBarOnly"))
 			advanceOnBarOnly = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "pulseWidthIdx"))
+			pulseWidthIdx = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
 
 		json_t* patArray = json_object_get(root, "patterns");
 		if (patArray && json_is_array(patArray)) {
@@ -1262,6 +1268,7 @@ struct BeatWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Advance only on bar trigger", "",
 			&module->advanceOnBarOnly));
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Copy / paste"));

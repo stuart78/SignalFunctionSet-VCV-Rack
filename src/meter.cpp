@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "meter-messages.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 
@@ -133,6 +134,9 @@ struct Meter : Module {
 
 	// --- Run state ---
 	bool running = true;
+
+	// --- Encoder-safe pulse width (index into sfs::PULSE_WIDTHS) ---
+	int pulseWidthIdx = 0;   // 0 == 1 ms (legacy default)
 
 	// --- External clock measurement ---
 	int samplesSinceLastExtPulse = 0;
@@ -325,7 +329,7 @@ struct Meter : Module {
 		// here would inject an extra CLOCK into modules clocked from a grid
 		// output without a Reset cable.
 		for (int i = 0; i < NUM_OUTPUTS; i++) {
-			pulses[i].trigger(0.001f);
+			pulses[i].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 		}
 		displayedSixteenth = 0;
 		barsSinceReset = 0;
@@ -378,7 +382,7 @@ struct Meter : Module {
 			&& resetInputTrigger.process(inputs[RESET_INPUT].getVoltage());
 		if (resetBtn || resetIn) {
 			doReset();
-			resetOutPulse.trigger(0.001f);
+			resetOutPulse.trigger(sfs::pulseWidthSec(pulseWidthIdx));
 		}
 
 		// --- Read CV-modulated parameters ---
@@ -545,7 +549,7 @@ struct Meter : Module {
 		for (int i = 0; i < 5; i++) {
 			if (samplesSinceGrid[i] >= gridBase[i]) {
 				samplesSinceGrid[i] -= gridBase[i];
-				pulses_grid[i].trigger(0.001f);
+				pulses_grid[i].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 			}
 		}
 
@@ -563,7 +567,7 @@ struct Meter : Module {
 
 		// Helper to fire a pulse and update its flash state
 		auto firePulse = [&](int outIdx) {
-			pulses[outIdx].trigger(0.001f);
+			pulses[outIdx].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 			if (outIdx == SUB_BAR) msgBar = true;   // notify the expander
 			pulseFlashIdx[outIdx] = pulseInBar[outIdx];
 			pulseInBar[outIdx]++;
@@ -644,7 +648,7 @@ struct Meter : Module {
 				// the downbeat straight pulses, mirroring the swung set).
 				for (int i = 0; i < 5; i++) {
 					samplesSinceGrid[i] = 0.f;
-					pulses_grid[i].trigger(0.001f);
+					pulses_grid[i].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 				}
 				// Commit pending swing → active for the new bar. Doing it
 				// only on bar boundaries prevents mid-period accumulator
@@ -686,6 +690,7 @@ struct Meter : Module {
 		json_object_set_new(rootJ, "resetOnPlay", json_boolean(resetOnPlay));
 		json_object_set_new(rootJ, "bpmCvAbsolute", json_boolean(bpmCvAbsolute));
 		json_object_set_new(rootJ, "barsSinceReset", json_integer(barsSinceReset));
+		json_object_set_new(rootJ, "pulseWidthIdx", json_integer(pulseWidthIdx));
 		return rootJ;
 	}
 
@@ -702,6 +707,8 @@ struct Meter : Module {
 		if (bcaJ) bpmCvAbsolute = json_boolean_value(bcaJ);
 		json_t* bsrJ = json_object_get(rootJ, "barsSinceReset");
 		if (bsrJ) barsSinceReset = (int)json_integer_value(bsrJ);
+		json_t* pwJ = json_object_get(rootJ, "pulseWidthIdx");
+		if (pwJ) pulseWidthIdx = clamp((int)json_integer_value(pwJ), 0, sfs::NUM_PULSE_WIDTHS - 1);
 	}
 };
 
@@ -1133,6 +1140,10 @@ struct MeterWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"BPM CV absolute (0.01V/BPM — for Arrange)", "",
 			&module->bpmCvAbsolute));
+
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Outputs"));
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
 
 		if (module->extClockConnected && module->extClockHasMeasurement) {
 			menu->addChild(new MenuSeparator);

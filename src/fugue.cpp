@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "scales.hpp"
+#include "pulse-width.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
 // Scales come from the shared canonical list (src/scales.hpp) so SCALE CV values
@@ -193,6 +194,7 @@ struct Fugue : Module {
 	// the gate just mirrored the clock's high time, so a trigger clock produced
 	// trigger-width "gates"; this makes a proper musical gate.
 	float gateLength = 0.5f;
+	int pulseWidthIdx = 0;   // encoder-safe trigger-mode gate width (index into sfs::PULSE_WIDTHS)
 
 	// ─── Constructor ─────────────────────────────────────────────────────────
 
@@ -274,6 +276,7 @@ struct Fugue : Module {
 		json_object_set_new(rootJ, "faderRange", json_real(faderRangeVolts));
 		json_object_set_new(rootJ, "harmonicLock", json_boolean(harmonicLock));
 		json_object_set_new(rootJ, "gateLength", json_real(gateLength));
+		json_object_set_new(rootJ, "pulseWidthIdx", json_integer(pulseWidthIdx));
 		// Marks this patch as using the canonical shared scale order. Its ABSENCE on
 		// load means the patch predates the migration and its SCALE_PARAM index must
 		// be remapped from Fugue's old private order (see dataFromJson).
@@ -288,6 +291,8 @@ struct Fugue : Module {
 		if (hlJ) harmonicLock = json_boolean_value(hlJ);
 		json_t* glJ = json_object_get(rootJ, "gateLength");
 		if (glJ) gateLength = json_number_value(glJ);
+		json_t* pwJ = json_object_get(rootJ, "pulseWidthIdx");
+		if (pwJ) pulseWidthIdx = clamp((int)json_integer_value(pwJ), 0, sfs::NUM_PULSE_WIDTHS - 1);
 
 		// Patch migration: params are already loaded by the base class before this
 		// runs, so params[SCALE_PARAM] holds the saved index. A pre-canonical patch
@@ -654,7 +659,7 @@ struct Fugue : Module {
 				if (gateTriggerMode) {
 					int ti = v * NUM_STEPS + voice.currentStep;
 					if (params[GATE_TOGGLE_PARAM_0 + ti].getValue() > 0.5f)
-						voice.gatePulse.trigger(0.001f);
+						voice.gatePulse.trigger(sfs::pulseWidthSec(pulseWidthIdx));
 				}
 			}
 
@@ -919,6 +924,9 @@ struct FugueWidget : ModuleWidget {
 				[=]() { return std::fabs(module->gateLength - gv) < 1e-4f; },
 				[=]() { module->gateLength = gv; }));
 		}
+		// Trigger-mode gate width (encoder-safe). Only affects the "Trigger" gate
+		// length; duty-cycle gates already stretch across the step.
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx, "Trigger width");
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Randomize Sequence", "",
