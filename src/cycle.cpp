@@ -91,9 +91,11 @@ struct Cycle : Module {
 	float dispOffset[N_CH] = {};
 	float  secSinceBar = 0.f, barSec = 0.5f;
 	bool   barValid = false;
+	bool   sawBar = false;           // a bar pulse has started the stopwatch (first interval isn't a real duration)
 	int    barCounter = 0;
 	float  secSinceBeat = 0.f, beatSec = 0.25f;
 	bool   beatValid = false;
+	bool   sawBeat = false;
 
 	float stabPhase[N_CH] = {}, stabTarget[N_CH] = {}, stabVal[N_CH] = {};
 
@@ -161,6 +163,9 @@ struct Cycle : Module {
 			// barCounter = -1 so the next downbeat (barCounter++ → 0) is the
 			// cycle start (phase 0), not the second division.
 			phase = 0.0; freePhase = 0.0; barCounter = -1; secSinceBar = 0.f;
+			// A reset can land mid-bar; don't let the partial interval to the next
+			// downbeat be measured as a bar. Keep the existing barSec (stay locked).
+			sawBar = false;
 			fillRand();
 		}
 
@@ -168,10 +173,15 @@ struct Cycle : Module {
 		// stepped-shape step grid (and draw display beat ticks).
 		if (inputs[CLOCK_INPUT].isConnected()
 			&& clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f)) {
-			if (secSinceBeat > 1e-4f) {
-				beatSec = beatValid ? (beatSec + (secSinceBeat - beatSec) * 0.5f) : secSinceBeat;
+			// The first pulse only starts the stopwatch — the elapsed time to it is
+			// not a beat duration. From the second pulse on, snap to a genuine
+			// interval (catches tempo changes); lightly de-jitter a steady one.
+			if (sawBeat && secSinceBeat > 1e-4f) {
+				if (!beatValid || std::fabs(secSinceBeat - beatSec) > beatSec * 0.1f) beatSec = secSinceBeat;
+				else beatSec += (secSinceBeat - beatSec) * 0.25f;
 				beatValid = true;
 			}
+			sawBeat = true;
 			secSinceBeat = 0.f;
 		}
 
@@ -198,10 +208,17 @@ struct Cycle : Module {
 
 		// BAR: measure duration, hard-align the cycle to the bar grid.
 		if (barConn && barTrig.process(inputs[BAR_INPUT].getVoltage(), 0.1f, 1.f)) {
-			if (secSinceBar > 1e-4f) {
-				barSec = barValid ? (barSec + (secSinceBar - barSec) * 0.5f) : secSinceBar;
+			// The first pulse only starts the stopwatch — the time to it is a phase
+			// offset, not a bar duration, so measuring it (as before) locked Cycle to
+			// a wrong tempo that took several bars to converge. From the second pulse
+			// on, snap to a genuine interval (locks in one bar, tracks tempo changes);
+			// lightly de-jitter a steady clock.
+			if (sawBar && secSinceBar > 1e-4f) {
+				if (!barValid || std::fabs(secSinceBar - barSec) > barSec * 0.1f) barSec = secSinceBar;
+				else barSec += (secSinceBar - barSec) * 0.25f;
 				barValid = true;
 			}
+			sawBar = true;
 			secSinceBar = 0.f;
 			barCounter++;
 			if (barsPerCycle >= 1.f) {

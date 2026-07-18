@@ -735,7 +735,7 @@ struct PlayWidget : ModuleWidget {
 		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 81.18f)), module, Play::INSTR_PARAM));
 		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 101.50f)), module, Play::LEVEL_PARAM));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(26.25f, 81.73f)), module, Play::INSTR_CV_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 81.18f)), module, Play::INSTR_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 101.50f)), module, Play::LEVEL_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 121.82f)), module, Play::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 121.82f)), module, Play::GATE_INPUT));
