@@ -916,7 +916,7 @@ struct MetaFugue : Module {
 			if (clockRose && stepFires) {
 				int step = voice.currentStep;
 				if (step >= 0 && step < NUM_STEPS) {
-					triggerPulses[v][step].trigger(1e-3f);
+					triggerPulses[v][step].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 				}
 			}
 			int gateBase = (v == 0) ? GATE_A_STEP_OUTPUT_0
