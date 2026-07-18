@@ -1,0 +1,143 @@
+# Nightly cross-platform build of Signal Function Set.
+#
+# Publishes a SEPARATE plugin (slug "SignalFunctionSet-nightly", name "… (Nightly)")
+# so it installs ALONGSIDE the VCV Library build without a slug collision. All WIP
+# modules are un-hidden. Artifacts (mac arm64/x64, win x64, lin x64) are attached to
+# a rolling "nightly" prerelease, and a Discord webhook is pinged on each build.
+#
+# SETUP (one-time, done by you — I can't do these):
+#   1. Discord: channel → Integrations → Webhooks → New Webhook → Copy URL.
+#   2. GitHub: repo → Settings → Secrets and variables → Actions → New secret
+#        name: DISCORD_WEBHOOK   value: <the webhook URL>
+#      (If the secret is absent the build still runs; the notify step just no-ops.)
+#
+# NOTE: patches made with the nightly are NOT portable to the Library build — its
+# modules live under the "SignalFunctionSet-nightly" slug namespace.
+
+name: Nightly
+
+on:
+  push:
+    branches: [master]        # runs only when there's a new commit
+  workflow_dispatch:          # manual "Run workflow" button (use this for the first run)
+
+concurrency:
+  group: nightly              # newer push cancels an in-flight nightly
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write         # needed to update the rolling "nightly" release
+    env:
+      # Job-level so the notify steps can gate on it in their `if:` (a step can't
+      # read its own step-level env there). Empty when the secret isn't set.
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    steps:
+      - name: Check out plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+          fetch-depth: 0
+
+      - name: Stamp nightly identity + un-hide WIP modules
+        working-directory: plugin
+        run: |
+          # Same rewrite build.sh uses for dev builds, but "-nightly" instead of "-dev".
+          # Target the FIRST slug/name only (the plugin's, before the module list).
+          sed -i '0,/"slug":/ s/"slug": *"\([^"]*\)"/"slug": "\1-nightly"/' plugin.json
+          sed -i '0,/"name":/ s/"name": *"\([^"]*\)"/"name": "\1 (Nightly)"/' plugin.json
+          sed -i 's/"brand": *"\([^"]*\)"/"brand": "\1 Nightly"/' plugin.json
+          sed -i 's/"version": *"\([^"]*\)"/"version": "\1-nightly"/' plugin.json
+          # Nightly exposes everything (Wave, Ratio, …).
+          sed -i 's/"hidden": *true/"hidden": false/g' plugin.json
+          echo "SFS_SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          echo "--- nightly plugin.json head ---"; head -8 plugin.json
+
+      - name: Check out rack-plugin-toolchain
+        uses: actions/checkout@v4
+        with:
+          repository: VCVRack/rack-plugin-toolchain
+          path: toolchain
+          fetch-depth: 1
+
+      # The toolchain Docker image (osxcross, mingw, SDKs) is expensive to build
+      # (~45–90 min the first time). Cache the built image between runs, keyed on the
+      # toolchain's Dockerfiles so it rebuilds only when the toolchain changes.
+      - name: Cache toolchain image
+        id: img
+        uses: actions/cache@v4
+        with:
+          path: ~/rack-toolchain-image.tar
+          key: rack-toolchain-19-${{ hashFiles('toolchain/Dockerfile', 'toolchain/Dockerfile.win', 'toolchain/Makefile') }}
+
+      - name: Load cached image
+        if: steps.img.outputs.cache-hit == 'true'
+        run: docker load -i ~/rack-toolchain-image.tar
+
+      - name: Build toolchain image (first run / after toolchain change)
+        if: steps.img.outputs.cache-hit != 'true'
+        working-directory: toolchain
+        run: |
+          make rack-sdk-all
+          JOBS=$(nproc) make docker-build
+          docker save rack-plugin-toolchain:19 -o ~/rack-toolchain-image.tar
+
+      - name: Ensure SDKs present (cache-hit path)
+        if: steps.img.outputs.cache-hit == 'true'
+        working-directory: toolchain
+        run: make rack-sdk-all
+
+      - name: Cross-compile all platforms
+        working-directory: toolchain
+        run: make -j"$(nproc)" docker-plugin-build PLUGIN_DIR="$GITHUB_WORKSPACE/plugin"
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p out
+          cp toolchain/plugin-build/*.vcvplugin out/
+          echo "Built:"; ls -la out
+
+      - name: Publish rolling nightly prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly
+          name: Nightly build
+          prerelease: true
+          files: out/*.vcvplugin
+          body: |
+            **Automated nightly build** — the bleeding edge, rebuilt on every commit to `master`.
+
+            - Commit `${{ env.SFS_SHA }}`
+            - Includes work-in-progress modules (Wave, Ratio) that aren't in the stable release.
+
+            ⚠️ This is a **separate plugin** (slug `SignalFunctionSet-nightly`, shows as *Signal Function Set (Nightly)*). It installs alongside the VCV Library build, but patches you make with it are **not** interchangeable with the release version. Unsigned — macOS may warn on first load.
+
+      - name: Notify Discord (success)
+        if: success() && env.DISCORD_WEBHOOK != ''
+        run: |
+          curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" -d @- <<JSON
+          {
+            "embeds": [{
+              "title": "🌙 SFS nightly built",
+              "description": "Commit \`${SFS_SHA}\` — new nightly ready for mac, Windows & Linux.",
+              "url": "https://github.com/${GITHUB_REPOSITORY}/releases/tag/nightly",
+              "color": 52479
+            }]
+          }
+          JSON
+
+      - name: Notify Discord (failure)
+        if: failure() && env.DISCORD_WEBHOOK != ''
+        run: |
+          curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" -d @- <<JSON
+          {
+            "embeds": [{
+              "title": "⚠️ SFS nightly build FAILED",
+              "description": "Commit \`${SFS_SHA}\` — see the Actions log.",
+              "url": "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}",
+              "color": 15548997
+            }]
+          }
+          JSON
