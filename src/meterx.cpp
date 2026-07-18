@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "meter-messages.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 // ─── Meter X — clock/bar expander for Meter ──────────────────────────────────
@@ -26,6 +27,7 @@ struct MeterX : Module {
 	dsp::PulseGenerator ppqnPulse, barPulse[8];
 	float flash[10] = {};          // LED flash: [0]=ppqn, [1]=run(unused), [2..9]=bars
 	float barPos = 0.f;            // continuous bars-since-reset (drives the cycle pies)
+	int pulseWidthIdx = 0;         // encoder-safe pulse width (index into sfs::PULSE_WIDTHS)
 
 	MeterX() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -50,18 +52,30 @@ struct MeterX : Module {
 		lights[RUN_LIGHT].setBrightness(msg.running ? 1.f : 0.f);
 
 		// 24 PPQN
-		if (msg.ppqn24) { ppqnPulse.trigger(0.001f); flash[0] = 1.f; }
+		const float pw = sfs::pulseWidthSec(pulseWidthIdx);
+		if (msg.ppqn24) { ppqnPulse.trigger(pw); flash[0] = 1.f; }
 		outputs[PPQN24_OUTPUT].setVoltage(ppqnPulse.process(dt) ? 10.f : 0.f);
 		flash[0] = std::max(0.f, flash[0] - decay);
 		lights[PPQN24_LIGHT].setBrightness(flash[0]);
 
 		// Bar divisions
 		for (int k = 0; k < 8; k++) {
-			if (msg.bar[k]) { barPulse[k].trigger(0.001f); flash[2 + k] = 1.f; }
+			if (msg.bar[k]) { barPulse[k].trigger(pw); flash[2 + k] = 1.f; }
 			outputs[BAR_OUTPUT + k].setVoltage(barPulse[k].process(dt) ? 10.f : 0.f);
 			flash[2 + k] = std::max(0.f, flash[2 + k] - decay);
 			lights[BAR_LIGHT + k].setBrightness(flash[2 + k]);
 		}
+	}
+
+	json_t* dataToJson() override {
+		json_t* rootJ = json_object();
+		json_object_set_new(rootJ, "pulseWidthIdx", json_integer(pulseWidthIdx));
+		return rootJ;
+	}
+
+	void dataFromJson(json_t* rootJ) override {
+		json_t* pwJ = json_object_get(rootJ, "pulseWidthIdx");
+		if (pwJ) pulseWidthIdx = clamp((int)json_integer_value(pwJ), 0, sfs::NUM_PULSE_WIDTHS - 1);
 	}
 };
 
@@ -126,6 +140,14 @@ struct MeterXWidget : ModuleWidget {
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(MX_X_JACK, ys[2 + k])), module, MeterX::BAR_OUTPUT + k));
 			addChild(createLightCentered<SmallLight<YellowLight>>(mm2px(Vec(MX_X_LED, ys[2 + k])), module, MeterX::BAR_LIGHT + k));
 		}
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		MeterX* module = dynamic_cast<MeterX*>(this->module);
+		if (!module) return;
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Outputs"));
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
 	}
 };
 

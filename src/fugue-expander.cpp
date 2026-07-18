@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "fugue-messages.hpp"
+#include "pulse-width.hpp"
 
 static const int SLEEP_VALUES[] = {0, 1, 2, 4, 5, 8, 16, 32, 48, 64};
 static const int NUM_SLEEP_VALUES = 10;
@@ -65,6 +66,7 @@ struct FugueX : Module {
 	dsp::SchmittTrigger randSeqButtonTrigger;
 	bool randomizeRequested = false;
 	dsp::PulseGenerator triggerPulses[FUGUE_NUM_VOICES][FUGUE_NUM_STEPS];
+	int pulseWidthIdx = 0;   // encoder-safe pulse width (index into sfs::PULSE_WIDTHS)
 
 	~FugueX() {
 		delete (ExpanderToFugueMessage*)leftExpander.producerMessage;
@@ -202,7 +204,7 @@ struct FugueX : Module {
 			if (hasFugue && fugueState.voices[v].clockRose && fugueState.voices[v].gateOn) {
 				int step = fugueState.voices[v].currentStep;
 				if (step >= 0 && step < FUGUE_NUM_STEPS) {
-					triggerPulses[v][step].trigger(1e-3f);
+					triggerPulses[v][step].trigger(sfs::pulseWidthSec(pulseWidthIdx));
 				}
 			}
 
@@ -250,6 +252,17 @@ struct FugueX : Module {
 				lights[SLEEP_LED_0 + v].setBrightness(0.f);
 			}
 		}
+	}
+
+	json_t* dataToJson() override {
+		json_t* rootJ = json_object();
+		json_object_set_new(rootJ, "pulseWidthIdx", json_integer(pulseWidthIdx));
+		return rootJ;
+	}
+
+	void dataFromJson(json_t* rootJ) override {
+		json_t* pwJ = json_object_get(rootJ, "pulseWidthIdx");
+		if (pwJ) pulseWidthIdx = clamp((int)json_integer_value(pwJ), 0, sfs::NUM_PULSE_WIDTHS - 1);
 	}
 };
 
@@ -363,6 +376,14 @@ struct FugueXWidget : ModuleWidget {
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, gateBY)), module, FugueX::GATE_B_OUTPUT_0 + s));
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, gateCY)), module, FugueX::GATE_C_OUTPUT_0 + s));
 		}
+	}
+
+	void appendContextMenu(Menu* menu) override {
+		FugueX* module = dynamic_cast<FugueX*>(this->module);
+		if (!module) return;
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Outputs"));
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
 	}
 };
 
