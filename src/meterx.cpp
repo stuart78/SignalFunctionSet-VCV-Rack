@@ -65,7 +65,6 @@ struct MeterX : Module {
 	}
 };
 
-static const char* MX_LABELS[10] = {"24PPQN", "RUN", "BAR", "2 BAR", "4 BAR", "8 BAR", "16 BAR", "32 BAR", "64 BAR", "128 BAR"};
 static const float MX_YS[10] = {20.f, 31.f, 42.f, 53.f, 64.f, 75.f, 86.f, 97.f, 108.f, 119.f};
 // Cycle length (in bars) each row's pie tracks. PPQN/RUN spin once per bar.
 static const float MX_PERIOD[10] = {1, 1, 1, 2, 4, 8, 16, 32, 64, 128};
@@ -75,22 +74,8 @@ static const float MX_X_PIE  = 18.f;
 static const float MX_X_JACK = 27.f;
 static const float MX_X_LED  = 35.f;
 
-// nanovg-drawn placeholder labels (VCV ignores SVG <text>) — see panel convention.
-struct MXLabels : Widget {
-	std::shared_ptr<Font> font;
-	void draw(const DrawArgs& args) override {
-		if (!font) font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
-		if (!font) return;
-		NVGcontext* vg = args.vg;
-		nvgFontFaceId(vg, font->handle);
-		nvgFillColor(vg, nvgRGB(0x23, 0x1f, 0x20));
-		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		nvgFontSize(vg, 11.f);
-		Vec t = mm2px(Vec(3.f, 12.f)); nvgText(vg, t.x, t.y, "METER X", NULL);
-		nvgFontSize(vg, 7.5f);
-		for (int i = 0; i < 10; i++) { Vec p = mm2px(Vec(3.f, MX_YS[i])); nvgText(vg, p.x, p.y, MX_LABELS[i], NULL); }
-	}
-};
+// Labels are baked into res/meterx.svg as vector outlines (Stuart's final art), so
+// there's no code-drawn label layer — drawing one here would double every label.
 
 // Per-output cycle indicators: a small pie that fills clockwise as we advance
 // through that output's cycle (e.g. the 4-bar output fills over four bars, then
@@ -127,8 +112,7 @@ struct MeterXWidget : ModuleWidget {
 	MeterXWidget(MeterX* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/meterx.svg")));
-		// No virtual screws — see CLAUDE.md.
-		addChild(new MXLabels());
+		// No virtual screws — see CLAUDE.md. Labels come from the SVG art (not code).
 		MXPies* pies = new MXPies(); pies->module = module; pies->box.size = box.size; addChild(pies);
 
 		const float* ys = MX_YS;
