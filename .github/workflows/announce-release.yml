@@ -1,0 +1,43 @@
+# Posts an announcement to Discord whenever a release is published.
+#
+# Reuses the DISCORD_WEBHOOK repo secret already set up for nightly.yml
+# (Discord: channel → Integrations → Webhooks → New Webhook → Copy URL).
+#
+# Fires on `release: published` — covers releases made via the web UI, gh CLI,
+# or other workflows. Draft releases don't trigger it; editing an existing
+# release doesn't re-post.
+
+name: Announce release on Discord
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-24.04
+    env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    steps:
+      - name: Post to Discord
+        if: env.DISCORD_WEBHOOK != ''
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+          BODY: ${{ github.event.release.body }}
+        run: |
+          # Discord embed descriptions cap at 4096 chars; trim the notes and
+          # escape them as a JSON string with jq.
+          DESC=$(printf '%s' "$BODY" | head -c 3500 | jq -Rs .)
+          TITLE=$(printf '📦 %s' "${NAME:-$TAG}" | jq -Rs .)
+          curl -sf -H "Content-Type: application/json" -X POST "$DISCORD_WEBHOOK" -d @- <<JSON
+          {
+            "embeds": [{
+              "title": ${TITLE},
+              "description": ${DESC},
+              "url": "${URL}",
+              "color": 52479
+            }]
+          }
+          JSON
