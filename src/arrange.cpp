@@ -169,9 +169,15 @@ struct Arrange : Module {
 
 		// CLOCK edge — per-channel division (counters run even while a channel is off
 		// so a re-enabled channel stays phase-locked to the master).
+		// Gate the OUTPUT on `started`: before the first BAR (e.g. just after a
+		// reset while Meter keeps running) the division phase is anchored to the
+		// reset moment, not the bar. Emitting those pre-downbeat clocks makes Note
+		// play off-grid until the next BAR snaps clkCount back — the "takes a
+		// measure or two to click" bug. Counters still advance so a channel
+		// re-enabled mid-arrangement stays phase-locked.
 		if (clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f)) {
 			for (int c = 0; c < NUM_CHANNELS; c++) {
-				if (clkCount[c] % divOf(c) == 0 && chanOn[curPhrase][c]) chClk[c].trigger(1e-3f);
+				if (started && clkCount[c] % divOf(c) == 0 && chanOn[curPhrase][c]) chClk[c].trigger(1e-3f);
 				clkCount[c]++;
 			}
 		}
