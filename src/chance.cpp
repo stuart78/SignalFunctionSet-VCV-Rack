@@ -208,7 +208,7 @@ struct Chance : Module {
 		}
 		std::vector<std::string> scaleNames;
 		for (int i = 0; i < NUM_SCALES; i++) scaleNames.push_back(sfs::SCALES[i].longName);
-		configSwitch(KEY_PARAM, 0.f, (float)(NUM_SCALES - 1), 0.f, "Key / scale", scaleNames);
+		configSwitch(KEY_PARAM, 0.f, (float)(NUM_SCALES - 1), 0.f, "Scale", scaleNames);
 		configSwitch(ROOT_PARAM, 0.f, 11.f, 0.f, "Root note",
 			{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});
 		configSwitch(START_PARAM, 0.f, (float)(NUM_NODES - 1), 0.f, "Start step",
