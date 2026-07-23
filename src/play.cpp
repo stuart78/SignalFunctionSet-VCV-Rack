@@ -39,6 +39,8 @@ struct SfzRegion {
 	std::vector<float> L, R;
 	long  frames = 0; float srcRate = 48000.f; bool loaded = false;
 	float volGain = 1.f;
+	// Amp envelope (SFZ ampeg / DecentSampler): attack·decay·release in seconds, sustain 0..1.
+	float egAttack = 0.f, egDecay = 0.f, egSustain = 1.f, egRelease = 0.f;
 };
 
 struct Instrument {
@@ -96,6 +98,10 @@ static bool parseSfz(const std::string& path, Instrument& inst) {
 		r.lovel = geti(m, "lovel", 0); r.hivel = geti(m, "hivel", 127);
 		r.tuneCents = getf(m, "tune", 0.f); r.volumeDb = getf(m, "volume", 0.f);
 		r.volGain = std::pow(10.f, r.volumeDb / 20.f);
+		r.egAttack  = getf(m, "ampeg_attack", 0.f);
+		r.egDecay   = getf(m, "ampeg_decay", 0.f);
+		r.egSustain = clamp(getf(m, "ampeg_sustain", 100.f) / 100.f, 0.f, 1.f);
+		r.egRelease = getf(m, "ampeg_release", 0.f);
 		std::string lm = m.count("loop_mode") ? m["loop_mode"] : "";
 		r.loopMode = (lm == "loop_continuous" || lm == "loop_sustain") ? 1 : 0;
 		r.loopStart = m.count("loop_start") ? atol(m["loop_start"].c_str()) : -1;
@@ -240,6 +246,11 @@ static bool parseDecentSampler(const std::string& path, Instrument& inst) {
 		{ std::string s = pick("loopEnd"); if (!s.empty()) r.loopEnd = atol(s.c_str()); }
 		{ std::string s = pick("seqLength"); r.seqLength = s.empty() ? 1 : atoi(s.c_str()); }
 		{ std::string s = pick("seqPosition"); r.seqPos = s.empty() ? 1 : atoi(s.c_str()); }
+		// Amp envelope (DecentSampler: seconds; sustain 0..1)
+		{ std::string s = pick("attack");  if (!s.empty()) r.egAttack  = (float)atof(s.c_str()); }
+		{ std::string s = pick("decay");   if (!s.empty()) r.egDecay   = (float)atof(s.c_str()); }
+		{ std::string s = pick("sustain"); if (!s.empty()) r.egSustain = clamp((float)atof(s.c_str()), 0.f, 1.f); }
+		{ std::string s = pick("release"); if (!s.empty()) r.egRelease = (float)atof(s.c_str()); }
 		inst.regions.push_back(std::move(r));
 	}
 	return !inst.regions.empty();
@@ -324,12 +335,18 @@ struct Play : Module {
 		bool active = false, held = false;
 		int chan = -1, instr = -1, reg = -1, note = 60;
 		double pos = 0, ratio = 1; float amp = 1.f, env = 0.f;
+		int   envStage = 0;                                 // 0 attack, 1 decay, 2 sustain, 3 release
+		float cA = 1.f, cD = 1.f, cR = 1.f, susL = 1.f;     // one-pole coefficients resolved at note-on
 	};
 	Voice voices[PLAY_MAX_VOICES];
 	std::vector<Instrument> instruments;
 	int curInstrument = 0;
 	int rrCounter = 0;                       // rotates through round-robin takes
 	bool oneShot = false;                   // true = play samples through, ignoring gate-off (drums)
+	// Amp-envelope mode: Off = fast anti-click AR (legacy); SFZ = the instrument's own ampeg
+	// (falls back to Off's shape if the region defines none); Default = one fixed smooth ADSR.
+	enum EnvMode { ENV_OFF, ENV_SFZ, ENV_DEFAULT };
+	int envMode = ENV_OFF;
 	bool suspended = false;                 // true while (re)loading on the GUI thread
 	bool gateWas[PLAY_MAX_VOICES] = {};
 
@@ -387,8 +404,26 @@ struct Play : Module {
 		if (slot < 0) { double best = -1; for (int i = 0; i < PLAY_MAX_VOICES; i++) if (voices[i].pos > best) { best = voices[i].pos; slot = i; } }
 		Voice& v = voices[slot];
 		v.active = true; v.held = true; v.chan = chan; v.instr = curInstrument; v.reg = regIdx; v.note = note;
-		v.pos = 0; v.amp = clamp(vel / 127.f, 0.f, 1.f); v.env = 0.f;
+		v.pos = 0; v.amp = clamp(vel / 127.f, 0.f, 1.f); v.envStage = 0;   // attack from wherever env is (smooth on steal)
 		v.ratio = std::pow(2.0, (note - r->keycenter) / 12.0 + r->tuneCents / 1200.0) * (r->srcRate / APP->engine->getSampleRate());
+		resolveEnv(v, *r, (float)APP->engine->getSampleRate());
+	}
+
+	// Resolve a voice's ADSR (one-pole coefficients) from the current envelope mode + region.
+	void resolveEnv(Voice& v, const SfzRegion& r, float sr) {
+		float A, D, S, R;
+		bool sfzHasEnv = (r.egAttack > 0.f || r.egDecay > 0.f || r.egRelease > 0.f || r.egSustain < 1.f);
+		switch (envMode) {
+			default:
+			case ENV_OFF:     A = 0.002f; D = 0.f; S = 1.f; R = 0.030f; break;
+			case ENV_SFZ:     if (sfzHasEnv) { A = r.egAttack; D = r.egDecay; S = r.egSustain; R = r.egRelease; }
+			                  else           { A = 0.002f; D = 0.f; S = 1.f; R = 0.030f; }   // no ampeg → Off shape
+			                  break;
+			case ENV_DEFAULT: A = 0.005f; D = 0.f; S = 1.f; R = 0.200f; break;
+		}
+		A = std::max(A, 0.001f); R = std::max(R, 0.002f);   // anti-click floors so A/R=0 doesn't click
+		auto coef = [&](float t) { return 1.f - std::exp(-1.f / (std::max(t, 1e-5f) * sr)); };
+		v.cA = coef(A); v.cD = (D > 1e-5f) ? coef(D) : 1.f; v.cR = coef(R); v.susL = clamp(S, 0.f, 1.f);
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -423,8 +458,6 @@ struct Play : Module {
 			uiNotePrev = uiNote;
 		}
 
-		const float atkC = 1.f - std::exp(-1.f / (0.002f * args.sampleRate));
-		const float relC = 1.f - std::exp(-1.f / (0.030f * args.sampleRate));
 		float outL = 0.f, outR = 0.f;
 		for (auto& v : voices) {
 			if (!v.active) continue;
@@ -436,15 +469,22 @@ struct Play : Module {
 			double f = v.pos - i0;
 			float sl = r.L[i0] * (1 - f) + r.L[i0 + 1] * f;
 			float sr = r.R[i0] * (1 - f) + r.R[i0 + 1] * f;
-			// gate-controlled: note releases on gate-off. "One-shot" mode plays
-			// the sample through, ignoring gate-off (for percussion / triggers).
-			float targ = (v.held || oneShot) ? 1.f : 0.f;
-			v.env += ((targ) - v.env) * (targ > v.env ? atkC : relC);
-			if (targ == 0.f && v.env < 0.0008f) { v.active = false; continue; }
+			// Per-voice ADSR (coefficients resolved at note-on). Gate-off starts the
+			// release; one-shot mode ignores gate-off and plays the sample through.
+			if (!v.held && !oneShot && v.envStage < 3) v.envStage = 3;
+			switch (v.envStage) {
+				case 0: v.env += (1.f - v.env) * v.cA;    if (v.env >= 0.999f) { v.env = 1.f; v.envStage = 1; } break;
+				case 1: v.env += (v.susL - v.env) * v.cD; if (std::fabs(v.env - v.susL) < 0.001f) { v.env = v.susL; v.envStage = 2; } break;
+				case 2: v.env = v.susL; break;
+				case 3: v.env += (0.f - v.env) * v.cR; break;
+			}
+			if (v.envStage == 3 && v.env < 0.0008f) { v.active = false; continue; }
 			float ggain = v.amp * v.env * r.volGain;
 			outL += sl * ggain; outR += sr * ggain;
 			v.pos += v.ratio;
-			if (r.loopMode == 1 && v.held && r.loopEnd > r.loopStart && v.pos >= r.loopEnd)
+			// Keep looping through the release too (so a sustain loop fades out rather than
+			// jumping to the post-loop tail); one-shot never releases, so it plays through.
+			if (r.loopMode == 1 && (v.held || v.envStage == 3) && r.loopEnd > r.loopStart && v.pos >= r.loopEnd)
 				v.pos -= (r.loopEnd - r.loopStart);
 		}
 		float lvl = params[LEVEL_PARAM].getValue();
@@ -519,6 +559,7 @@ struct Play : Module {
 		for (auto& in : instruments) json_array_append_new(arr, json_string(in.srcPath.c_str()));
 		json_object_set_new(root, "sfzPaths", arr);
 		json_object_set_new(root, "oneShot", json_boolean(oneShot));
+		json_object_set_new(root, "envMode", json_integer(envMode));
 		json_object_set_new(root, "kbView", json_integer(kbView));
 		json_object_set_new(root, "gridLayout", json_integer(gridLayout));
 		json_object_set_new(root, "gridRoot", json_integer(gridRoot));
@@ -528,6 +569,7 @@ struct Play : Module {
 	}
 	void dataFromJson(json_t* root) override {
 		if (json_t* j = json_object_get(root, "oneShot")) oneShot = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "envMode")) envMode = clamp((int)json_integer_value(j), 0, 2);
 		if (json_t* j = json_object_get(root, "kbView")) kbView = clamp((int)json_integer_value(j), 0, 1);
 		if (json_t* j = json_object_get(root, "gridLayout")) gridLayout = clamp((int)json_integer_value(j), 0, 2);
 		if (json_t* j = json_object_get(root, "gridRoot")) gridRoot = clamp((int)json_integer_value(j), 0, 11);
@@ -768,6 +810,9 @@ struct PlayWidget : ModuleWidget {
 			menu->addChild(createMenuItem("Remove current instrument", "", [m]() { m->removeInstrument(m->curInstrument); }));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("One-shot (play through, ignore gate-off)", "", &m->oneShot));
+		menu->addChild(createIndexPtrSubmenuItem("Amp envelope",
+			{"Off (fast release)", "Use envelopes (SFZ)", "Default ADSR (smooth)"},
+			&m->envMode));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Grid view"));
