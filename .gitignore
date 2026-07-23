@@ -19,3 +19,4 @@ Design Files/
 Reference/
 SVG/
 ~ai-*.tmp
+__pycache__/

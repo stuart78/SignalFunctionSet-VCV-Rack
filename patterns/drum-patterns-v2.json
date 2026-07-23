@@ -1,0 +1,9516 @@
+{
+ "formatVersion": 1,
+ "meta": {
+  "title": "SFS drum pattern library v2 (global expansion)",
+  "license": "CC0-1.0",
+  "provenance": "Original stylizations of traditional and genre-conventional rhythms; not transcriptions of specific recordings. Key-pattern placements cross-checked against the sources in global-drum-patterns-report.md; kind='timeline' marks cyclic key patterns, 'source' cites the verifying reference."
+ },
+ "lanes": [
+  "kick",
+  "snare",
+  "chh",
+  "ohh",
+  "lo",
+  "hi",
+  "cp",
+  "bell"
+ ],
+ "patterns": [
+  {
+   "id": "rock.motorik.sparse",
+   "name": "Motorik — sparse",
+   "family": "rock",
+   "tags": [
+    "krautrock",
+    "motorik"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9.......",
+     "a": "A..............."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   }
+  },
+  {
+   "id": "rock.motorik.main",
+   "name": "Motorik — main",
+   "family": "rock",
+   "tags": [
+    "krautrock",
+    "motorik"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.9.......",
+     "a": "A..............."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   },
+   "notes": "Dinger-beat stylization: forward kick lean, relentless 8th hats."
+  },
+  {
+   "id": "rock.motorik.lift",
+   "name": "Motorik — lift",
+   "family": "rock",
+   "tags": [
+    "krautrock",
+    "motorik"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.9.....7.",
+     "a": "A..............."
+    },
+    "snare": {
+     "v": "....8.....3.8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6565656565656565"
+    },
+    "ohh": {
+     "v": "..............7."
+    },
+    "hi": {
+     "v": "..5.......5....."
+    }
+   }
+  },
+  {
+   "id": "rock.motorik.fill",
+   "name": "Motorik — fill",
+   "family": "rock",
+   "tags": [
+    "krautrock",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9......."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "snare": {
+     "v": "........55667789",
+     "a": "...............A"
+    }
+   },
+   "notes": "The pulse never stops; snare builds under the hats into the downbeat."
+  },
+  {
+   "id": "rock.basic.sparse",
+   "name": "Basic rock — sparse",
+   "family": "rock",
+   "tags": [
+    "rock",
+    "pop"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    96,
+    132
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......7......."
+    },
+    "snare": {
+     "v": "....8.......8..."
+    },
+    "chh": {
+     "v": "7...7...7...7..."
+    }
+   }
+  },
+  {
+   "id": "rock.basic.main",
+   "name": "Basic rock — main",
+   "family": "rock",
+   "tags": [
+    "rock",
+    "pop",
+    "backbeat"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    96,
+    132
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9.9....."
+    },
+    "snare": {
+     "v": "....9.......9...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "8.6.8.6.8.6.8.6."
+    }
+   }
+  },
+  {
+   "id": "rock.basic.lift",
+   "name": "Basic rock — lift",
+   "family": "rock",
+   "tags": [
+    "rock",
+    "pop"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    96,
+    132
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.9.9....."
+    },
+    "snare": {
+     "v": "....9.......9..3",
+     "a": "....A.......A..."
+    },
+    "ohh": {
+     "v": "8.7.8.7.8.7.8.7."
+    },
+    "bell": {
+     "v": "9..............."
+    }
+   },
+   "notes": "Open hats replace closed; bell step 1 as crash proxy."
+  },
+  {
+   "id": "rock.basic.fill",
+   "name": "Basic rock — fill",
+   "family": "rock",
+   "tags": [
+    "rock",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    96,
+    132
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "....9...7788....",
+     "a": "....A..........."
+    },
+    "chh": {
+     "v": "8.6.8.6........."
+    },
+    "hi": {
+     "v": "............88.."
+    },
+    "lo": {
+     "v": "..............99",
+     "a": "..............AA"
+    }
+   },
+   "notes": "Half-bar groove, then snare-tom run down to the floor."
+  },
+  {
+   "id": "funk.sixteen.sparse",
+   "name": "Funk 16ths — sparse",
+   "family": "funk",
+   "tags": [
+    "funk"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "cp": {
+     "v": "....7.......7..."
+    },
+    "chh": {
+     "v": "7...7...7...7..."
+    }
+   },
+   "notes": "Cross-stick on cp."
+  },
+  {
+   "id": "funk.sixteen.main",
+   "name": "Funk 16ths — main",
+   "family": "funk",
+   "tags": [
+    "funk",
+    "ghost-notes"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.6....7..8....."
+    },
+    "snare": {
+     "v": "....9..3.3..9..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7464746474647464"
+    },
+    "ohh": {
+     "v": "..............7."
+    }
+   }
+  },
+  {
+   "id": "funk.sixteen.lift",
+   "name": "Funk 16ths — lift",
+   "family": "funk",
+   "tags": [
+    "funk"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.6....7..8..6.."
+    },
+    "snare": {
+     "v": "....9..3.3..9..3",
+     "a": "....A.......A..."
+    },
+    "cp": {
+     "v": "....9.......9..."
+    },
+    "chh": {
+     "v": "7464746474647464"
+    },
+    "ohh": {
+     "v": "......7.......7."
+    },
+    "hi": {
+     "v": "6363636363636363"
+    }
+   },
+   "notes": "Clap doubles the backbeat, shaker 16ths on hi."
+  },
+  {
+   "id": "funk.sixteen.fill",
+   "name": "Funk 16ths — fill",
+   "family": "funk",
+   "tags": [
+    "funk",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.6....7........"
+    },
+    "snare": {
+     "v": "....9...35357899",
+     "a": "....A..........A"
+    },
+    "chh": {
+     "v": "74647464........"
+    }
+   }
+  },
+  {
+   "id": "pop.motown.sparse",
+   "name": "Motown four — sparse",
+   "family": "pop",
+   "tags": [
+    "motown",
+    "soul"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    112,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9......."
+    },
+    "cp": {
+     "v": "....8.......8..."
+    },
+    "hi": {
+     "v": "7...7...7...7..."
+    }
+   },
+   "notes": "Tambourine on hi."
+  },
+  {
+   "id": "pop.motown.main",
+   "name": "Motown four — main",
+   "family": "pop",
+   "tags": [
+    "motown",
+    "soul"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    112,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8...9...8..."
+    },
+    "snare": {
+     "v": "8...9...8...9...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.5.7.5.7.5.7.5."
+    },
+    "hi": {
+     "v": "7.5.7.5.7.5.7.57"
+    }
+   },
+   "notes": "Snare on all four, heavier on 2 and 4."
+  },
+  {
+   "id": "pop.motown.lift",
+   "name": "Motown four — lift",
+   "family": "pop",
+   "tags": [
+    "motown",
+    "soul"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    112,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8...9...8..."
+    },
+    "snare": {
+     "v": "8...9...8...9...",
+     "a": "....A.......A..."
+    },
+    "cp": {
+     "v": "....9.......9..."
+    },
+    "chh": {
+     "v": "7.5.7.5.7.5.7.5."
+    },
+    "ohh": {
+     "v": "..............7."
+    },
+    "hi": {
+     "v": "7575757575757575"
+    }
+   },
+   "notes": "Tambourine moves to 16ths, claps join the backbeat."
+  },
+  {
+   "id": "pop.motown.fill",
+   "name": "Motown four — fill",
+   "family": "pop",
+   "tags": [
+    "motown",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    112,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8...9......."
+    },
+    "snare": {
+     "v": "5.5.6.6.7.7.8899",
+     "a": "...............A"
+    },
+    "hi": {
+     "v": "7.5.7.5.7.5.7.5."
+    }
+   }
+  },
+  {
+   "id": "rock.shuffle.sparse",
+   "name": "Blues shuffle — sparse",
+   "family": "rock",
+   "tags": [
+    "shuffle",
+    "blues",
+    "triplet"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    66,
+    92
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..........."
+    },
+    "cp": {
+     "v": "...8.....8.."
+    },
+    "chh": {
+     "v": "7..7..7..7.."
+    }
+   }
+  },
+  {
+   "id": "rock.shuffle.main",
+   "name": "Blues shuffle — main",
+   "family": "rock",
+   "tags": [
+    "shuffle",
+    "blues",
+    "triplet"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    66,
+    92
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9....."
+    },
+    "snare": {
+     "v": "...9.....9..",
+     "a": "...A.....A.."
+    },
+    "chh": {
+     "v": "7.57.57.57.5"
+    }
+   },
+   "notes": "Hat plays 1-and-a shuffle (skips the middle triplet)."
+  },
+  {
+   "id": "rock.shuffle.lift",
+   "name": "Blues shuffle — lift",
+   "family": "rock",
+   "tags": [
+    "shuffle",
+    "blues",
+    "triplet"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    66,
+    92
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9....5"
+    },
+    "snare": {
+     "v": "...9.....9..",
+     "a": "...A.....A.."
+    },
+    "bell": {
+     "v": "9.59.59.59.5"
+    },
+    "chh": {
+     "v": "5..5..5..5.."
+    }
+   },
+   "notes": "Shuffle moves to the ride; hat foot on quarters."
+  },
+  {
+   "id": "rock.shuffle.fill",
+   "name": "Blues shuffle — fill",
+   "family": "rock",
+   "tags": [
+    "shuffle",
+    "fill",
+    "triplet"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    66,
+    92
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..........."
+    },
+    "snare": {
+     "v": "445566778899",
+     "a": "...........A"
+    }
+   },
+   "notes": "Full-bar triplet roll, crescendo into the downbeat."
+  },
+  {
+   "id": "edm.house.sparse",
+   "name": "Classic house — sparse",
+   "family": "electronic",
+   "tags": [
+    "house"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   }
+  },
+  {
+   "id": "edm.house.main",
+   "name": "Classic house — main",
+   "family": "electronic",
+   "tags": [
+    "house"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "cp": {
+     "v": "....9.......9..."
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "chh": {
+     "v": "5.4.5.4.5.4.5.4."
+    },
+    "hi": {
+     "v": "3434343434343434"
+    }
+   },
+   "notes": "Offbeat opens, claps on 2/4, shaker 16ths underneath."
+  },
+  {
+   "id": "edm.house.lift",
+   "name": "Classic house — lift",
+   "family": "electronic",
+   "tags": [
+    "house"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "....8.......8..."
+    },
+    "cp": {
+     "v": "....9.......9..."
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "chh": {
+     "v": "5454545454545454"
+    },
+    "hi": {
+     "v": "4343434343434343"
+    },
+    "lo": {
+     "v": "...7......7....."
+    }
+   }
+  },
+  {
+   "id": "edm.house.fill",
+   "name": "Classic house — fill",
+   "family": "electronic",
+   "tags": [
+    "house",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "5555666677778888"
+    },
+    "cp": {
+     "v": "....9.......9..."
+    }
+   },
+   "notes": "Snare build over an unbroken four-on-the-floor."
+  },
+  {
+   "id": "edm.techno.sparse",
+   "name": "Driving techno — sparse",
+   "family": "electronic",
+   "tags": [
+    "techno"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    128,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "chh": {
+     "v": "4.4.4.4.4.4.4.4."
+    },
+    "lo": {
+     "v": "..3.....3.....3."
+    }
+   }
+  },
+  {
+   "id": "edm.techno.main",
+   "name": "Driving techno — main",
+   "family": "electronic",
+   "tags": [
+    "techno"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    128,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "chh": {
+     "v": "5353535353535353"
+    },
+    "lo": {
+     "v": "..5.....5....5.."
+    },
+    "cp": {
+     "v": ".........6......"
+    }
+   }
+  },
+  {
+   "id": "edm.techno.lift",
+   "name": "Driving techno — lift",
+   "family": "electronic",
+   "tags": [
+    "techno"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    128,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "....7.......7..."
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "chh": {
+     "v": "5454545454545454"
+    },
+    "bell": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "lo": {
+     "v": "..5.....5....5.."
+    }
+   },
+   "notes": "Ride 8ths on bell for the peak section."
+  },
+  {
+   "id": "edm.techno.fill",
+   "name": "Driving techno — fill",
+   "family": "electronic",
+   "tags": [
+    "techno",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    128,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9......."
+    },
+    "snare": {
+     "v": "........55667788",
+     "a": "...............A"
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "chh": {
+     "v": "53535353........"
+    }
+   },
+   "notes": "Kick drops out under the snare rush — tension, not addition."
+  },
+  {
+   "id": "edm.dnb.sparse",
+   "name": "DnB two-step — sparse",
+   "family": "electronic",
+   "tags": [
+    "dnb",
+    "halftime"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    168,
+    178
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "........8......."
+    },
+    "chh": {
+     "v": "6.4.6.4.6.4.6.4."
+    }
+   },
+   "notes": "Half-time intro feel."
+  },
+  {
+   "id": "edm.dnb.main",
+   "name": "DnB two-step — main",
+   "family": "electronic",
+   "tags": [
+    "dnb",
+    "jungle"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    168,
+    178
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.........9....."
+    },
+    "snare": {
+     "v": "....9.3....39...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6353635363536353"
+    },
+    "ohh": {
+     "v": "..............5."
+    }
+   },
+   "notes": "Two-step: kick 1 and the 'and' of 3; ghosts around the backbeat."
+  },
+  {
+   "id": "edm.dnb.lift",
+   "name": "DnB two-step — lift",
+   "family": "electronic",
+   "tags": [
+    "dnb",
+    "jungle"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    168,
+    178
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.........9..7.."
+    },
+    "snare": {
+     "v": "....9.3..3.39..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6454645464546454"
+    },
+    "bell": {
+     "v": "5.5.5.5.5.5.5.5."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "edm.dnb.fill",
+   "name": "DnB two-step — fill",
+   "family": "electronic",
+   "tags": [
+    "dnb",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    168,
+    178
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.........9....."
+    },
+    "snare": {
+     "v": "....9...56678899",
+     "a": "....A..........A"
+    },
+    "chh": {
+     "v": "63536353........"
+    }
+   }
+  },
+  {
+   "id": "hiphop.boombap.sparse",
+   "name": "Boom bap — sparse",
+   "family": "hiphop",
+   "tags": [
+    "boombap"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    84,
+    96
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "cp": {
+     "v": "............8..."
+    },
+    "chh": {
+     "v": "6...6...6...6..."
+    }
+   }
+  },
+  {
+   "id": "hiphop.boombap.main",
+   "name": "Boom bap — main",
+   "family": "hiphop",
+   "tags": [
+    "boombap"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    84,
+    96
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......6..9....."
+    },
+    "snare": {
+     "v": "....9.......9...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.5.7.5.7.5.7.5."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "hiphop.boombap.lift",
+   "name": "Boom bap — lift",
+   "family": "hiphop",
+   "tags": [
+    "boombap"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    84,
+    96
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......6..9..6.."
+    },
+    "snare": {
+     "v": "....9.......9..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.5.7.5.7.5.7.5."
+    },
+    "ohh": {
+     "v": "......6.......6."
+    },
+    "hi": {
+     "v": "..3...3...3...3."
+    }
+   }
+  },
+  {
+   "id": "hiphop.boombap.fill",
+   "name": "Boom bap — fill",
+   "family": "hiphop",
+   "tags": [
+    "boombap",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    84,
+    96
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......6........"
+    },
+    "snare": {
+     "v": "....9.......9899",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.5.7.5.7.5....."
+    }
+   },
+   "notes": "Snare stutter at the bar's tail rather than a run."
+  },
+  {
+   "id": "hiphop.trap.sparse",
+   "name": "Trap halftime — sparse",
+   "family": "hiphop",
+   "tags": [
+    "trap",
+    "halftime"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "........9.......",
+     "a": "........A......."
+    },
+    "chh": {
+     "v": "6...6...6...6..."
+    }
+   }
+  },
+  {
+   "id": "hiphop.trap.main",
+   "name": "Trap halftime — main",
+   "family": "hiphop",
+   "tags": [
+    "trap",
+    "halftime"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7....9...."
+    },
+    "snare": {
+     "v": "........9.......",
+     "a": "........A......."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6.",
+     "r": "......2.......2."
+    }
+   },
+   "notes": "Snare only on beat 3 (halftime); ratchets are hat rolls."
+  },
+  {
+   "id": "hiphop.trap.lift",
+   "name": "Trap halftime — lift",
+   "family": "hiphop",
+   "tags": [
+    "trap",
+    "halftime"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7....9...."
+    },
+    "snare": {
+     "v": "........9.......",
+     "a": "........A......."
+    },
+    "cp": {
+     "v": "........9......."
+    },
+    "chh": {
+     "v": "6666666666666666",
+     "r": "....2.......3..."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "hiphop.trap.fill",
+   "name": "Trap halftime — fill",
+   "family": "hiphop",
+   "tags": [
+    "trap",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "........9...5678",
+     "a": "........A......."
+    },
+    "chh": {
+     "v": "6.6.6.6.66667777",
+     "r": "............2222"
+    }
+   }
+  },
+  {
+   "id": "latin.son.sparse",
+   "name": "Son montuno — sparse",
+   "family": "latin",
+   "tags": [
+    "salsa",
+    "son",
+    "clave-3-2"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    108
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9..9..9...9.9...",
+     "a": "A..A..A........."
+    },
+    "chh": {
+     "v": "5.5.5.5.5.5.5.5."
+    },
+    "bell": {
+     "v": "7.......7......."
+    }
+   },
+   "notes": "cp = claves (3-2 son); chh = maracas."
+  },
+  {
+   "id": "latin.son.main",
+   "name": "Son montuno — main",
+   "family": "latin",
+   "tags": [
+    "salsa",
+    "son",
+    "tumbao"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    108
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "......7.....9..."
+    },
+    "cp": {
+     "v": "9..9..9...9.9...",
+     "a": "A..A..A........."
+    },
+    "hi": {
+     "v": "..3.9..3..3.8.8.",
+     "a": "....A..........."
+    },
+    "chh": {
+     "v": "5.5.5.5.5.5.5.5."
+    },
+    "bell": {
+     "v": "9...7...9...7..."
+    }
+   },
+   "notes": "Conga tumbao on hi: slap on 2, open tones on beat 4 (steps 12,14) per pedagogy sources; kick = bombo (and-of-2, 3-side) / ponche (beat 4)."
+  },
+  {
+   "id": "latin.son.lift",
+   "name": "Son montuno — lift",
+   "family": "latin",
+   "tags": [
+    "salsa",
+    "mambo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    108
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "......7.....9..."
+    },
+    "cp": {
+     "v": "9..9..9...9.9...",
+     "a": "A..A..A........."
+    },
+    "hi": {
+     "v": "..3.9..3..3.8.88",
+     "a": "....A..........."
+    },
+    "chh": {
+     "v": "5454545454545454"
+    },
+    "bell": {
+     "v": "9..7.7.99..7.7.9"
+    }
+   },
+   "notes": "Stylized mambo-section bell; maracas to 16ths."
+  },
+  {
+   "id": "latin.son.fill",
+   "name": "Son montuno — fill",
+   "family": "latin",
+   "tags": [
+    "salsa",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    108
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "......7.....9..."
+    },
+    "cp": {
+     "v": "9..9..9...9.9...",
+     "a": "A..A..A........."
+    },
+    "snare": {
+     "v": "........55667789",
+     "a": "...............A"
+    },
+    "lo": {
+     "v": "............7.9."
+    }
+   },
+   "notes": "Timbale-style roll into the downbeat. Clave never stops."
+  },
+  {
+   "id": "latin.samba.sparse",
+   "name": "Samba — sparse",
+   "family": "latin",
+   "tags": [
+    "samba",
+    "brazil"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    96,
+    116
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "....9.......9..8",
+     "a": "....A.......A..."
+    },
+    "hi": {
+     "v": "6467646764676467"
+    }
+   },
+   "notes": "kick = surdo answer on 2 and 4 with pickup; hi = ganzá. Swing approximates the samba 16th feel."
+  },
+  {
+   "id": "latin.samba.main",
+   "name": "Samba — main",
+   "family": "latin",
+   "tags": [
+    "samba",
+    "brazil"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    96,
+    116
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "....9.......9..8",
+     "a": "....A.......A..."
+    },
+    "snare": {
+     "v": "4449444944494449"
+    },
+    "cp": {
+     "v": "9..9..9.9..9..9."
+    },
+    "hi": {
+     "v": "6467646764676467"
+    }
+   },
+   "notes": "snare = caixa; cp = stylized tamborim telecoteco."
+  },
+  {
+   "id": "latin.samba.lift",
+   "name": "Samba — lift",
+   "family": "latin",
+   "tags": [
+    "samba",
+    "batucada"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    96,
+    116
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "....9.......9..8",
+     "a": "....A.......A..."
+    },
+    "snare": {
+     "v": "4449444944494449"
+    },
+    "cp": {
+     "v": "9..9..9.9..9..9."
+    },
+    "lo": {
+     "v": "..6.....6.....6."
+    },
+    "hi": {
+     "v": "6467646764676467"
+    },
+    "bell": {
+     "v": "9..7..9..7..9..7"
+    }
+   },
+   "notes": "lo = third-surdo cuts; bell = agogô cross-rhythm."
+  },
+  {
+   "id": "latin.samba.fill",
+   "name": "Samba — fill",
+   "family": "latin",
+   "tags": [
+    "samba",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    96,
+    116
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "....9.......99..",
+     "a": "....A.......AA.."
+    },
+    "snare": {
+     "v": "5555666677778888",
+     "a": "...............A"
+    },
+    "hi": {
+     "v": "6467646764676467"
+    }
+   },
+   "notes": "Caixa crescendo; ganzá never stops."
+  },
+  {
+   "id": "latin.bossa.sparse",
+   "name": "Bossa nova — sparse",
+   "family": "latin",
+   "tags": [
+    "bossa",
+    "brazil"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    58,
+    84
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9.9.....9."
+    },
+    "cp": {
+     "v": "9..9..9...9..9.."
+    }
+   },
+   "notes": "cp = rim, playing the bossa clave."
+  },
+  {
+   "id": "latin.bossa.main",
+   "name": "Bossa nova — main",
+   "family": "latin",
+   "tags": [
+    "bossa",
+    "brazil"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    58,
+    84
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9.9.....9."
+    },
+    "cp": {
+     "v": "9..9..9...9..9.."
+    },
+    "chh": {
+     "v": "6.4.6.4.6.4.6.4."
+    }
+   }
+  },
+  {
+   "id": "latin.bossa.lift",
+   "name": "Bossa nova — lift",
+   "family": "latin",
+   "tags": [
+    "bossa",
+    "brazil"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    58,
+    84
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9.9.....9."
+    },
+    "cp": {
+     "v": "9..9..9...9..9.."
+    },
+    "bell": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "hi": {
+     "v": "3232323232323232"
+    }
+   },
+   "notes": "Ride 8ths and soft shaker for the lift — bossa peaks are gentle."
+  },
+  {
+   "id": "latin.bossa.fill",
+   "name": "Bossa nova — fill",
+   "family": "latin",
+   "tags": [
+    "bossa",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    58,
+    84
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....9.9......."
+    },
+    "snare": {
+     "v": "..........335678"
+    },
+    "cp": {
+     "v": "9..9..9........."
+    },
+    "chh": {
+     "v": "6.4.6.4.6.4....."
+    }
+   },
+   "notes": "A soft brushed drag, not a rock run."
+  },
+  {
+   "id": "latin.dembow.sparse",
+   "name": "Dembow — sparse",
+   "family": "latin",
+   "tags": [
+    "reggaeton",
+    "dembow"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    102
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   }
+  },
+  {
+   "id": "latin.dembow.main",
+   "name": "Dembow — main",
+   "family": "latin",
+   "tags": [
+    "reggaeton",
+    "dembow"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    102
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "...9..9....9..9."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "hi": {
+     "v": "3434343434343434"
+    }
+   },
+   "notes": "The dembow snare: 3-3-2 across each half-bar."
+  },
+  {
+   "id": "latin.dembow.lift",
+   "name": "Dembow — lift",
+   "family": "latin",
+   "tags": [
+    "reggaeton",
+    "dembow"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    102
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "...9..9....9..9."
+    },
+    "cp": {
+     "v": "....9.......9..."
+    },
+    "chh": {
+     "v": "6464646464646464"
+    },
+    "hi": {
+     "v": "3434343434343434"
+    },
+    "ohh": {
+     "v": "..............7."
+    }
+   }
+  },
+  {
+   "id": "latin.dembow.fill",
+   "name": "Dembow — fill",
+   "family": "latin",
+   "tags": [
+    "reggaeton",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    88,
+    102
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9......."
+    },
+    "snare": {
+     "v": "...9..9.55667889"
+    },
+    "chh": {
+     "v": "6.6.6.6........."
+    }
+   }
+  },
+  {
+   "id": "africa.bembe.sparse",
+   "name": "Bembé 12/8 — sparse",
+   "family": "africa",
+   "tags": [
+    "bembe",
+    "west-african",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.7.7"
+    },
+    "hi": {
+     "v": "6..6..6..6.."
+    }
+   },
+   "notes": "Standard bell (X.X.XX.X.X.X); hi = shekere on the dotted-quarter pulse."
+  },
+  {
+   "id": "africa.bembe.main",
+   "name": "Bembé 12/8 — main",
+   "family": "africa",
+   "tags": [
+    "bembe",
+    "west-african",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.7.7"
+    },
+    "kick": {
+     "v": "9..5..8..5.."
+    },
+    "lo": {
+     "v": "..5.7...5.7."
+    },
+    "hi": {
+     "v": "6..6..6..6.."
+    }
+   },
+   "notes": "Low drum on the pulse, conga tones answering off it."
+  },
+  {
+   "id": "africa.bembe.lift",
+   "name": "Bembé 12/8 — lift",
+   "family": "africa",
+   "tags": [
+    "bembe",
+    "west-african",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.7.7"
+    },
+    "kick": {
+     "v": "9..5..8..5.5"
+    },
+    "lo": {
+     "v": "..5.7...5.7."
+    },
+    "hi": {
+     "v": "6.36.36.36.3"
+    },
+    "cp": {
+     "v": "...9.....9.."
+    }
+   }
+  },
+  {
+   "id": "africa.bembe.fill",
+   "name": "Bembé 12/8 — fill",
+   "family": "africa",
+   "tags": [
+    "bembe",
+    "fill",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.7.7"
+    },
+    "kick": {
+     "v": "9..........."
+    },
+    "lo": {
+     "v": "...45677899.",
+     "a": "..........A."
+    }
+   },
+   "notes": "Drum flourish under an unbroken bell."
+  },
+  {
+   "id": "africa.afrobeat.sparse",
+   "name": "Afrobeat — sparse",
+   "family": "africa",
+   "tags": [
+    "afrobeat"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "cp": {
+     "v": "....7.....7....."
+    },
+    "chh": {
+     "v": "5454545454545454"
+    }
+   }
+  },
+  {
+   "id": "africa.afrobeat.main",
+   "name": "Afrobeat — main",
+   "family": "africa",
+   "tags": [
+    "afrobeat"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......7..7....."
+    },
+    "snare": {
+     "v": "..3....3.3....3."
+    },
+    "cp": {
+     "v": "....7.....7....."
+    },
+    "chh": {
+     "v": "6454645464546454"
+    },
+    "ohh": {
+     "v": "......6.......6."
+    },
+    "bell": {
+     "v": "9..9..9.9..9...."
+    }
+   },
+   "notes": "Broken kick, ghosted snare, busy hats — stylized Afrobeat kit part."
+  },
+  {
+   "id": "africa.afrobeat.lift",
+   "name": "Afrobeat — lift",
+   "family": "africa",
+   "tags": [
+    "afrobeat"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..4...7..7...4."
+    },
+    "snare": {
+     "v": "..3....3.3....3."
+    },
+    "cp": {
+     "v": "....7.....7....."
+    },
+    "chh": {
+     "v": "6454645464546454"
+    },
+    "ohh": {
+     "v": "..6...6...6...6."
+    },
+    "bell": {
+     "v": "9..9..9.9..9..9."
+    },
+    "hi": {
+     "v": "3.3.3.3.3.3.3.3."
+    }
+   }
+  },
+  {
+   "id": "africa.afrobeat.fill",
+   "name": "Afrobeat — fill",
+   "family": "africa",
+   "tags": [
+    "afrobeat",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    126
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......7........"
+    },
+    "snare": {
+     "v": "..3....3........"
+    },
+    "lo": {
+     "v": "........66.7.99."
+    },
+    "bell": {
+     "v": "9..9..9.9..9...."
+    },
+    "chh": {
+     "v": "64546454........"
+    }
+   },
+   "notes": "Tom conversation; bell keeps the topline."
+  },
+  {
+   "id": "carib.onedrop.sparse",
+   "name": "Reggae one drop — sparse",
+   "family": "caribbean",
+   "tags": [
+    "reggae"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.15,
+   "bpm": [
+    58,
+    80
+   ],
+   "kind": "groove",
+   "grid": {
+    "chh": {
+     "v": "7.4.7.4.7.4.7.4."
+    },
+    "cp": {
+     "v": "........8......."
+    }
+   }
+  },
+  {
+   "id": "carib.onedrop.main",
+   "name": "Reggae one drop — main",
+   "family": "caribbean",
+   "tags": [
+    "reggae",
+    "one-drop"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.15,
+   "bpm": [
+    58,
+    80
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "........9.......",
+     "a": "........A......."
+    },
+    "cp": {
+     "v": "........8......."
+    },
+    "chh": {
+     "v": "7.4.7.4.7.4.7.4."
+    }
+   },
+   "notes": "Everything lands on beat 3; beat 1 stays empty — that IS the one drop."
+  },
+  {
+   "id": "carib.onedrop.lift",
+   "name": "Reggae steppers — lift",
+   "family": "caribbean",
+   "tags": [
+    "reggae",
+    "steppers"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.15,
+   "bpm": [
+    58,
+    80
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "cp": {
+     "v": "........8......."
+    },
+    "chh": {
+     "v": "7.4.7.4.7.4.7.4."
+    },
+    "ohh": {
+     "v": "..............7."
+    }
+   },
+   "notes": "The lift is the steppers variant: four-on-the-floor kick."
+  },
+  {
+   "id": "carib.onedrop.fill",
+   "name": "Reggae one drop — fill",
+   "family": "caribbean",
+   "tags": [
+    "reggae",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.15,
+   "bpm": [
+    58,
+    80
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "........9......."
+    },
+    "snare": {
+     "v": "........5566...."
+    },
+    "lo": {
+     "v": "............7789"
+    },
+    "chh": {
+     "v": "7.4.7.4........."
+    }
+   }
+  },
+  {
+   "id": "mena.maqsum.sparse",
+   "name": "Maqsum — sparse",
+   "family": "mena",
+   "tags": [
+    "maqsum",
+    "middle-eastern"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......7......."
+    },
+    "cp": {
+     "v": "..8...8.....8..."
+    }
+   },
+   "notes": "kick = dum, cp = tek. The maqsum skeleton: D T . T D . T ."
+  },
+  {
+   "id": "mena.maqsum.main",
+   "name": "Maqsum — main",
+   "family": "mena",
+   "tags": [
+    "maqsum",
+    "middle-eastern"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......7......."
+    },
+    "cp": {
+     "v": "..8...8.....8..."
+    },
+    "hi": {
+     "v": ".....3.3..3...3."
+    }
+   },
+   "notes": "hi = ka finger ornaments between the skeleton strokes."
+  },
+  {
+   "id": "mena.maqsum.lift",
+   "name": "Baladi — lift",
+   "family": "mena",
+   "tags": [
+    "baladi",
+    "middle-eastern"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.7.....7......."
+    },
+    "cp": {
+     "v": "..8...8.....8.8."
+    },
+    "hi": {
+     "v": "2323232323232323"
+    },
+    "bell": {
+     "v": "6.......6......."
+    }
+   },
+   "notes": "Lift is the heavier baladi cousin (doubled dum); hi = riqq; bell = finger cymbals."
+  },
+  {
+   "id": "mena.maqsum.fill",
+   "name": "Maqsum — fill",
+   "family": "mena",
+   "tags": [
+    "maqsum",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    92,
+    112
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "cp": {
+     "v": "..8...8........."
+    },
+    "hi": {
+     "v": "..3344556677889.",
+     "a": "..............A."
+    }
+   },
+   "notes": "Darbuka roll crescendo."
+  },
+  {
+   "id": "tl.clave.son",
+   "name": "Son clave (3-2)",
+   "family": "timeline",
+   "tags": [
+    "cuba",
+    "clave"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9..9..9...9.9..."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.clave.rumba",
+   "name": "Rumba clave (3-2)",
+   "family": "timeline",
+   "tags": [
+    "cuba",
+    "clave"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9..9...9..9.9..."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.clave.bossa",
+   "name": "Bossa clave",
+   "family": "timeline",
+   "tags": [
+    "brazil",
+    "clave"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9..9..9...9..9.."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.shiko",
+   "name": "Shiko bell",
+   "family": "timeline",
+   "tags": [
+    "nigeria",
+    "bell"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9...9.9...9.9..."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.soukous",
+   "name": "Soukous bell",
+   "family": "timeline",
+   "tags": [
+    "congo",
+    "bell"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9..9..9..99....."
+    }
+   },
+   "notes": "Clustered strokes 9,10 give the characteristic limp.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.gahu",
+   "name": "Gahu bell",
+   "family": "timeline",
+   "tags": [
+    "ghana",
+    "ewe",
+    "bell"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9..9..9...9...9."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.cell.tresillo",
+   "name": "Tresillo",
+   "family": "timeline",
+   "tags": [
+    "cell",
+    "3+3+2"
+   ],
+   "meter": "2/4",
+   "beats": 2,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9..9..9."
+    }
+   },
+   "notes": "Seed of dembow, baiao, malfuf, habanera.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.cell.cinquillo",
+   "name": "Cinquillo",
+   "family": "timeline",
+   "tags": [
+    "cell",
+    "cuba",
+    "haiti"
+   ],
+   "meter": "2/4",
+   "beats": 2,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9.99.99."
+    }
+   },
+   "notes": "Danzon baqueteo cell; Haitian ti-bwa; klezmer bulgar.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.cell.habanera",
+   "name": "Habanera",
+   "family": "timeline",
+   "tags": [
+    "cell",
+    "cuba",
+    "argentina"
+   ],
+   "meter": "2/4",
+   "beats": 2,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9..99.9."
+    }
+   },
+   "notes": "Tango/milonga cell; early jazz 'Spanish tinge'.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.standard",
+   "name": "Standard pattern (Bembe bell)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.7.7"
+    }
+   },
+   "notes": "Ewe/Yoruba; Cuban bembe. Rotation start disagreement Anlo-Ewe vs Yoruba (Agawu) - flag.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.soli",
+   "name": "Soli bell (Guinea)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.7.7.7.77.7"
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.tambu",
+   "name": "Tambu bell",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.7.7.77.7.7"
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.bembe2",
+   "name": "Bembe-2 bell",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "99.7.77.7.7."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.yoruba",
+   "name": "Yoruba bell (konkolo)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.7.77.7.77."
+    }
+   },
+   "notes": "Used in Cuban columbia (Toussaint).",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.tonada",
+   "name": "Tonada bell (Ashanti adowa)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.77.77.7.7."
+    }
+   },
+   "notes": "Also Guinea Mandiani (Toussaint).",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.asaadua",
+   "name": "Asaadua bell (Akan)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.7.7.77.77."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.sorsonet",
+   "name": "Sorsonet bell (Guinea)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "997.7.7.7.7."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.bemba",
+   "name": "Bemba clap (N. Zimbabwe)",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.77.7.7.77."
+    }
+   },
+   "notes": "Hand-clap/axe-blade timeline.",
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.bell.ashanti",
+   "name": "Ashanti bell",
+   "family": "timeline",
+   "tags": [
+    "ternary",
+    "12-8",
+    "bell"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.77.7.77.7."
+    }
+   },
+   "source": "Toussaint, African Ternary Rhythm Timelines / Geometry of Musical Rhythm"
+  },
+  {
+   "id": "tl.aksak.pajdushko",
+   "name": "Pajdushko (Bulgaria)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+3"
+   ],
+   "meter": "5/16",
+   "beats": 5,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    180,
+    260
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.8..",
+     "a": "A.A.."
+    }
+   },
+   "notes": "Grouping 2+3; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.racenitsa",
+   "name": "Racenitsa (Bulgaria)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+2+3"
+   ],
+   "meter": "7/16",
+   "beats": 7,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    240
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "8.8.9..",
+     "a": "A.A.A.."
+    }
+   },
+   "notes": "Grouping 2+2+3; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.dajchovo",
+   "name": "Dajchovo (Bulgaria)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+2+2+3"
+   ],
+   "meter": "9/16",
+   "beats": 9,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    240
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.8.8.8..",
+     "a": "A.A.A.A.."
+    }
+   },
+   "notes": "Grouping 2+2+2+3; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.kopanica",
+   "name": "Kopanica (Bulgaria)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+2+3+2+2"
+   ],
+   "meter": "11/16",
+   "beats": 11,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    260
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.8.9..8.8.",
+     "a": "A.A.A..A.A."
+    }
+   },
+   "notes": "Grouping 2+2+3+2+2; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.krivo",
+   "name": "Krivo Sadovsko",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+2+2+3+2+2"
+   ],
+   "meter": "13/16",
+   "beats": 13,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    260
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.8.8.9..8.8.",
+     "a": "A.A.A.A..A.A."
+    }
+   },
+   "notes": "Grouping 2+2+2+3+2+2; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.bucimis",
+   "name": "Bucimis (Bulgaria)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "2+2+2+2+3+2+2"
+   ],
+   "meter": "15/16",
+   "beats": 15,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    280
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.8.8.8.9..8.8.",
+     "a": "A.A.A.A.A..A.A."
+    }
+   },
+   "notes": "Grouping 2+2+2+2+3+2+2; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.kalamatianos",
+   "name": "Kalamatianos / Makedonsko",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "3+2+2"
+   ],
+   "meter": "7/16",
+   "beats": 7,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    200
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9..8.8.",
+     "a": "A..A.A."
+    }
+   },
+   "notes": "Grouping 3+2+2; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.aksak.curcuna",
+   "name": "Curcuna (Turkey)",
+   "family": "timeline",
+   "tags": [
+    "aksak",
+    "balkan",
+    "3+2+2+3"
+   ],
+   "meter": "10/16",
+   "beats": 10,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    150
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9..8.8.9..",
+     "a": "A..A.A.A.."
+    }
+   },
+   "notes": "Grouping 3+2+2+3; strokes on quick/slow group starts (tapan dum). Pulse up to ~520/min in fast dances.",
+   "source": "Folkdance Footnotes / Chromatone Balkan systems"
+  },
+  {
+   "id": "tl.tala.tintal",
+   "name": "Tintal theka (16)",
+   "family": "timeline",
+   "tags": [
+    "india",
+    "tala"
+   ],
+   "meter": "16 matras",
+   "beats": 16,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    200
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "77777777....7777",
+     "a": "A...A.......A..."
+    },
+    "hi": {
+     "v": "9777777777777777"
+    }
+   },
+   "notes": "Vibhags 4+4+4+4; tali at 0,4,12, khali at 8 (bass drops steps 8-11). Sam = step 0.",
+   "source": "ragajunglism.org tala index / RagaNet"
+  },
+  {
+   "id": "tl.tala.keherwa",
+   "name": "Keherwa theka (8)",
+   "family": "timeline",
+   "tags": [
+    "india",
+    "tala"
+   ],
+   "meter": "8 matras",
+   "beats": 8,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    160
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "97....8.",
+     "a": "A......."
+    },
+    "hi": {
+     "v": "97777677"
+    }
+   },
+   "notes": "Dha Ge Na Ti | Na Ka Dhi Na - the film/folk workhorse.",
+   "source": "ragajunglism.org tala index"
+  },
+  {
+   "id": "tl.tala.dadra",
+   "name": "Dadra theka (6)",
+   "family": "timeline",
+   "tags": [
+    "india",
+    "tala"
+   ],
+   "meter": "6 matras",
+   "beats": 6,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    160
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "98.7..",
+     "a": "A....."
+    },
+    "hi": {
+     "v": "977767"
+    }
+   },
+   "notes": "Dha Dhin Na | Dha Tun Na (3+3).",
+   "source": "ragajunglism.org tala index"
+  },
+  {
+   "id": "tl.tala.rupak",
+   "name": "Rupak theka (7)",
+   "family": "timeline",
+   "tags": [
+    "india",
+    "tala"
+   ],
+   "meter": "7 matras",
+   "beats": 7,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    140
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "...7.7.",
+     "a": "...A.A."
+    },
+    "hi": {
+     "v": "9777777"
+    }
+   },
+   "notes": "3+2+2; unique: cycle BEGINS with khali (no bass on beat 1).",
+   "source": "ragajunglism.org tala index"
+  },
+  {
+   "id": "tl.tala.jhaptal",
+   "name": "Jhaptal theka (10)",
+   "family": "timeline",
+   "tags": [
+    "india",
+    "tala"
+   ],
+   "meter": "10 matras",
+   "beats": 10,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    140
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.77...77.",
+     "a": "A.A....A.."
+    },
+    "hi": {
+     "v": "9777777777"
+    }
+   },
+   "notes": "2+3+2+3; khali at step 5.",
+   "source": "ragajunglism.org tala index"
+  },
+  {
+   "id": "tl.gamelan.lancaran",
+   "name": "Lancaran colotomy (Java)",
+   "family": "timeline",
+   "tags": [
+    "indonesia",
+    "gamelan"
+   ],
+   "meter": "lancaran",
+   "beats": 16,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    140
+   ],
+   "kind": "timeline",
+   "grid": {
+    "hi": {
+     "v": "7.7.7.7.7.7.7.7."
+    },
+    "bell": {
+     "v": "...8...8...8...8"
+    },
+    "lo": {
+     "v": ".....7...7...7.."
+    },
+    "kick": {
+     "v": "...............9",
+     "a": "...............A"
+    }
+   },
+   "notes": "hi=ketuk, bell=kenong, lo=kempul (wela/rest at step 1), kick=gong ageng WITH kenong on final step. End-weighted: strong beat is the LAST step, not step 0.",
+   "source": "Colotomy (Wikipedia et al.)"
+  },
+  {
+   "id": "tl.gamelan.ketawang",
+   "name": "Ketawang colotomy (Java)",
+   "family": "timeline",
+   "tags": [
+    "indonesia",
+    "gamelan"
+   ],
+   "meter": "ketawang",
+   "beats": 16,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    40,
+    100
+   ],
+   "kind": "timeline",
+   "grid": {
+    "hi": {
+     "v": "7.7.7.7.7.7.7.7."
+    },
+    "cp": {
+     "v": ".6...6...6...6.."
+    },
+    "bell": {
+     "v": ".......8.......8"
+    },
+    "lo": {
+     "v": "...........7...."
+    },
+    "kick": {
+     "v": "...............9",
+     "a": "...............A"
+    }
+   },
+   "notes": "hi=kempyang, cp=ketuk, bell=kenong (7,15), lo=kempul (11; wela at 3), kick=gong (15).",
+   "source": "Colotomy (Wikipedia et al.)"
+  },
+  {
+   "id": "tl.usa.bodiddley",
+   "name": "Bo Diddley beat",
+   "family": "timeline",
+   "tags": [
+    "usa",
+    "clave"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    115
+   ],
+   "kind": "timeline",
+   "grid": {
+    "lo": {
+     "v": "9..7..7...7.7...",
+     "a": "A...........A..."
+    }
+   },
+   "notes": "3-2 son clave orchestrated on floor toms.",
+   "source": "Drum Magazine '49 Beats'"
+  },
+  {
+   "id": "tl.flamenco.compas12",
+   "name": "Flamenco 12-count compas",
+   "family": "timeline",
+   "tags": [
+    "spain",
+    "flamenco"
+   ],
+   "meter": "12-count",
+   "beats": 12,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    240
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "977977979797",
+     "a": "A..A..A.A.A."
+    },
+    "kick": {
+     "v": "8..8..8.8.8."
+    }
+   },
+   "notes": "Accents 12,3,6,8,10 encoded from count 12 as step 0 (bulerias convention). Count-start varies by school - variants-disagree."
+  },
+  {
+   "id": "tl.mena.malfuf",
+   "name": "Malfuf (Egypt)",
+   "family": "timeline",
+   "tags": [
+    "egypt",
+    "malfuf"
+   ],
+   "meter": "2/4",
+   "beats": 2,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    140
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9.......",
+     "a": "A......."
+    },
+    "hi": {
+     "v": "...7..7."
+    }
+   },
+   "notes": "D..T..T. - tresillo-shaped.",
+   "source": "khafif.com Middle Eastern Rhythms FAQ"
+  },
+  {
+   "id": "tl.mena.ayyub",
+   "name": "Ayyub / Zar (Egypt)",
+   "family": "timeline",
+   "tags": [
+    "egypt",
+    "ayyub"
+   ],
+   "meter": "2/4",
+   "beats": 2,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    150
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "9..7..7.",
+     "a": "A......."
+    },
+    "hi": {
+     "v": "....7..."
+    }
+   },
+   "notes": "D..D T.D. rendering; sources disagree on tek placement - variants-disagree.",
+   "source": "khafif.com Middle Eastern Rhythms FAQ"
+  },
+  {
+   "id": "tl.mena.masmoudi",
+   "name": "Masmoudi kabir (Egypt)",
+   "family": "timeline",
+   "tags": [
+    "egypt",
+    "masmoudi"
+   ],
+   "meter": "8/4",
+   "beats": 8,
+   "stepsPerBeat": 2,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    90
+   ],
+   "kind": "timeline",
+   "grid": {
+    "kick": {
+     "v": "99......7.......",
+     "a": "AA.............."
+    },
+    "hi": {
+     "v": "....7......77.7."
+    }
+   },
+   "notes": "Slow 8/4: D D..T...D..T T.T.; heavily ornamented in practice.",
+   "source": "khafif.com Middle Eastern Rhythms FAQ"
+  },
+  {
+   "id": "tl.cuba.cascara",
+   "name": "Cascara (3-2)",
+   "family": "timeline",
+   "tags": [
+    "cuba",
+    "timbale"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    110
+   ],
+   "kind": "timeline",
+   "grid": {
+    "bell": {
+     "v": "9.77.77.7.77.7.7"
+    }
+   },
+   "notes": "Timbale-shell pattern against 3-2 clave; stylized - schools vary on two strokes."
+  },
+  {
+   "id": "tl.cuba.baqueteo",
+   "name": "Danzon baqueteo",
+   "family": "timeline",
+   "tags": [
+    "cuba",
+    "danzon"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    105
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9.77.77.9.77.77."
+    }
+   },
+   "notes": "Cinquillo doubled across the cycle; also the Haitian kompa ti-bwa line.",
+   "source": "Fiol, Hidden Rhythm (cinquillo derivation)"
+  },
+  {
+   "id": "tl.eire.slipjig",
+   "name": "Slip-jig timeline (Ireland)",
+   "family": "timeline",
+   "tags": [
+    "ireland",
+    "9-8"
+   ],
+   "meter": "9/8",
+   "beats": 9,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    140
+   ],
+   "kind": "timeline",
+   "grid": {
+    "cp": {
+     "v": "9.87.87..",
+     "a": "A..A..A.."
+    }
+   },
+   "notes": "9-pulse jig-family cell, IOI 2-1-2-1-3.",
+   "source": "Gotham (MTO 19.2) jig timeline [2-1-2-1-3]"
+  },
+  {
+   "id": "latin.cumbia.main",
+   "name": "Cumbia - main",
+   "family": "latin",
+   "tags": [
+    "colombia",
+    "cumbia"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.25,
+   "bpm": [
+    85,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8......."
+    },
+    "cp": {
+     "v": "....8.......8..."
+    },
+    "lo": {
+     "v": "......7.......7."
+    },
+    "hi": {
+     "v": "7.377.377.377.37"
+    }
+   },
+   "notes": "cp = llamador backbeat; lo = tambora; hi = guacharaca gallop (x.xx per beat), swung."
+  },
+  {
+   "id": "latin.cumbia.lift",
+   "name": "Cumbia - lift",
+   "family": "latin",
+   "tags": [
+    "colombia",
+    "cumbia"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.25,
+   "bpm": [
+    85,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8......."
+    },
+    "snare": {
+     "v": "....7.......7..."
+    },
+    "cp": {
+     "v": "....8.......8..."
+    },
+    "lo": {
+     "v": "..5...7...5...7."
+    },
+    "hi": {
+     "v": "7.377.377.377.37"
+    },
+    "bell": {
+     "v": "9.......8......."
+    }
+   }
+  },
+  {
+   "id": "latin.cumbia.fill",
+   "name": "Cumbia - fill",
+   "family": "latin",
+   "tags": [
+    "colombia",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.25,
+   "bpm": [
+    85,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "lo": {
+     "v": "........55667789"
+    },
+    "hi": {
+     "v": "7.377.377.377.37"
+    }
+   }
+  },
+  {
+   "id": "latin.merengue.main",
+   "name": "Merengue - main",
+   "family": "latin",
+   "tags": [
+    "dominican",
+    "merengue"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9......."
+    },
+    "lo": {
+     "v": "9...6.6.9...6.6."
+    },
+    "hi": {
+     "v": "6464646464646464"
+    },
+    "snare": {
+     "v": "..............67"
+    }
+   },
+   "notes": "lo = tambora (low + rim taps), snare = roll pickup into 1, hi = guira 16ths. Tempo verified 120-160."
+  },
+  {
+   "id": "latin.merengue.fill",
+   "name": "Merengue - fill (jaleo)",
+   "family": "latin",
+   "tags": [
+    "dominican",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9..99......."
+    },
+    "snare": {
+     "v": "........55667889"
+    },
+    "hi": {
+     "v": "6464646464646464"
+    }
+   }
+  },
+  {
+   "id": "latin.bachata.main",
+   "name": "Bachata - main",
+   "family": "latin",
+   "tags": [
+    "dominican",
+    "bachata"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    108,
+    135
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "8.......8......."
+    },
+    "hi": {
+     "v": "7.5.7.5.7.5.9.5.",
+     "a": "............A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "hi = bongo martillo 8ths with the verified beat-4 accent (step 12); chh = guira."
+  },
+  {
+   "id": "latin.bachata.fill",
+   "name": "Bachata - fill",
+   "family": "latin",
+   "tags": [
+    "dominican",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    108,
+    135
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "8..............."
+    },
+    "hi": {
+     "v": "7.5.7.5.66778899",
+     "a": "...............A"
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   }
+  },
+  {
+   "id": "latin.candombe.main",
+   "name": "Candombe - main",
+   "family": "latin",
+   "tags": [
+    "uruguay",
+    "candombe"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    105,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9..7..7...7.7...",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": ".655.655.655.655"
+    },
+    "kick": {
+     "v": "9.....7.8..7...."
+    },
+    "lo": {
+     "v": "...7.......7..7."
+    }
+   },
+   "notes": "cp = madera (clave on drum shell), hi = chico cell (rest ON the beat, strokes on 2nd-4th 16ths - verified), kick = piano (stylized), lo = repique figures. Microtiming: pushed/contracted, near-ternary lean (Jure & Rocamora)."
+  },
+  {
+   "id": "latin.candombe.lift",
+   "name": "Candombe - lift",
+   "family": "latin",
+   "tags": [
+    "uruguay",
+    "candombe"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    105,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9..7..7...7.7...",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": ".655.655.655.655"
+    },
+    "kick": {
+     "v": "9.....7.8..7..7."
+    },
+    "lo": {
+     "v": "...7..7....7.77."
+    }
+   }
+  },
+  {
+   "id": "latin.candombe.fill",
+   "name": "Candombe - fill (repique call)",
+   "family": "latin",
+   "tags": [
+    "uruguay",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    105,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9..7..7...7.7...",
+     "a": "A..............."
+    },
+    "kick": {
+     "v": "9..............."
+    },
+    "lo": {
+     "v": "7..77..77..7889."
+    }
+   },
+   "notes": "The madera never stops."
+  },
+  {
+   "id": "latin.festejo.main",
+   "name": "Festejo - main",
+   "family": "latin",
+   "tags": [
+    "peru",
+    "festejo",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..5..7....."
+    },
+    "hi": {
+     "v": "..7.7...7.7."
+    },
+    "bell": {
+     "v": "7..7..7..7.."
+    },
+    "cp": {
+     "v": "........7..."
+    }
+   },
+   "notes": "Cajon-led Afro-Peruvian 12/8 (verified meter); placements stylized. cp = quijada rattle."
+  },
+  {
+   "id": "latin.festejo.fill",
+   "name": "Festejo - fill",
+   "family": "latin",
+   "tags": [
+    "peru",
+    "fill",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..........."
+    },
+    "lo": {
+     "v": "556677889999"
+    }
+   }
+  },
+  {
+   "id": "latin.baiao.main",
+   "name": "Baiao - main",
+   "family": "latin",
+   "tags": [
+    "brazil",
+    "baiao"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7....9..7...."
+    },
+    "chh": {
+     "v": "5656565656565656"
+    },
+    "cp": {
+     "v": "....7.......7..."
+    }
+   },
+   "notes": "kick = zabumba on the doubled tresillo (0,3,8,11); chh = triangle open/closed 16ths."
+  },
+  {
+   "id": "latin.baiao.lift",
+   "name": "Baiao - lift",
+   "family": "latin",
+   "tags": [
+    "brazil",
+    "baiao"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7....9..7...."
+    },
+    "snare": {
+     "v": "....7..3.3..7..3"
+    },
+    "chh": {
+     "v": "6767676767676767"
+    },
+    "cp": {
+     "v": "....7.......7..."
+    }
+   }
+  },
+  {
+   "id": "latin.baiao.fill",
+   "name": "Baiao - fill",
+   "family": "latin",
+   "tags": [
+    "brazil",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7....9......."
+    },
+    "snare": {
+     "v": "........55667789"
+    },
+    "chh": {
+     "v": "56565656........"
+    }
+   }
+  },
+  {
+   "id": "latin.chacarera.main",
+   "name": "Chacarera - main",
+   "family": "latin",
+   "tags": [
+    "argentina",
+    "6-8",
+    "hemiola"
+   ],
+   "meter": "6/8+3/4",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..8.7.7.",
+     "a": "A.....A....."
+    },
+    "cp": {
+     "v": "666666666666",
+     "a": "A..A..A.A.A."
+    }
+   },
+   "notes": "Bombo leguero sesquialtera: bar 1 in 6/8 (0,3), bar 2 in 3/4 (6,8,10). cp = rim clicks."
+  },
+  {
+   "id": "latin.chacarera.fill",
+   "name": "Chacarera - fill",
+   "family": "latin",
+   "tags": [
+    "argentina",
+    "fill"
+   ],
+   "meter": "6/8+3/4",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..9..7.."
+    },
+    "lo": {
+     "v": "......556789"
+    }
+   }
+  },
+  {
+   "id": "latin.bomba.main",
+   "name": "Bomba sica - main",
+   "family": "latin",
+   "tags": [
+    "puertorico",
+    "bomba"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9.7.7..79.7.7..7"
+    },
+    "kick": {
+     "v": "9.....7.9.....7."
+    },
+    "hi": {
+     "v": "..5...5....5..5."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "cp = cua sticks timeline, kick = buleador, hi = primo answers (stylized), chh = maraca."
+  },
+  {
+   "id": "latin.bomba.fill",
+   "name": "Bomba sica - fill",
+   "family": "latin",
+   "tags": [
+    "puertorico",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9.7.7..79.7.7..7"
+    },
+    "kick": {
+     "v": "9.....7.9......."
+    },
+    "lo": {
+     "v": "....77.77..7889."
+    }
+   }
+  },
+  {
+   "id": "carib.soca.main",
+   "name": "Soca - main",
+   "family": "caribbean",
+   "tags": [
+    "trinidad",
+    "soca"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    150,
+    165
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "....8.......8.8."
+    },
+    "hi": {
+     "v": "8686868686868686"
+    },
+    "bell": {
+     "v": "..7...7...7...7."
+    }
+   },
+   "notes": "Power soca: four-floor kick, engine-room iron 16ths on hi, cowbell offbeats."
+  },
+  {
+   "id": "carib.soca.lift",
+   "name": "Soca - lift",
+   "family": "caribbean",
+   "tags": [
+    "trinidad",
+    "soca"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    150,
+    165
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "....8......58.8."
+    },
+    "hi": {
+     "v": "8686868686868686"
+    },
+    "ohh": {
+     "v": "..7...7...7...7."
+    },
+    "bell": {
+     "v": "..7...7...7...7."
+    }
+   }
+  },
+  {
+   "id": "carib.soca.fill",
+   "name": "Soca - fill",
+   "family": "caribbean",
+   "tags": [
+    "trinidad",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    150,
+    165
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...9...9...9...",
+     "a": "A...A...A...A..."
+    },
+    "snare": {
+     "v": "55667788999.9.9."
+    },
+    "hi": {
+     "v": "8686868686868686"
+    }
+   }
+  },
+  {
+   "id": "carib.ska.main",
+   "name": "Ska - main",
+   "family": "caribbean",
+   "tags": [
+    "jamaica",
+    "ska"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......9......."
+    },
+    "snare": {
+     "v": "....9.......9...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "..8...8...8...8."
+    }
+   },
+   "notes": "Everything leans on the offbeat 8ths (2,6,10,14)."
+  },
+  {
+   "id": "carib.ska.fill",
+   "name": "Ska - fill",
+   "family": "caribbean",
+   "tags": [
+    "jamaica",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "....9...66778899",
+     "a": "....A..........A"
+    },
+    "chh": {
+     "v": "..8...8........."
+    }
+   }
+  },
+  {
+   "id": "carib.dancehall.main",
+   "name": "Dancehall - main",
+   "family": "caribbean",
+   "tags": [
+    "jamaica",
+    "dancehall"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7.8..7..7."
+    },
+    "cp": {
+     "v": "....8.......8..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "Double-tresillo kick (Bam Bam / dembow skeleton - verified lineage); cp = rim."
+  },
+  {
+   "id": "carib.dancehall.lift",
+   "name": "Dancehall - lift",
+   "family": "caribbean",
+   "tags": [
+    "jamaica",
+    "dancehall"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7.8..7..7."
+    },
+    "cp": {
+     "v": "....8.......8..."
+    },
+    "chh": {
+     "v": "6464646464646464"
+    },
+    "bell": {
+     "v": "9.......8......."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "carib.dancehall.fill",
+   "name": "Dancehall - fill",
+   "family": "caribbean",
+   "tags": [
+    "jamaica",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    105
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7........."
+    },
+    "snare": {
+     "v": "......9....98.99"
+    },
+    "chh": {
+     "v": "6.6.6.6........."
+    }
+   }
+  },
+  {
+   "id": "carib.kompa.main",
+   "name": "Kompa - main",
+   "family": "caribbean",
+   "tags": [
+    "haiti",
+    "kompa"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9.77.77.9.77.77."
+    },
+    "bell": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "kick": {
+     "v": "8...8...8...8..."
+    },
+    "lo": {
+     "v": "..5..7....5..7.."
+    }
+   },
+   "notes": "cp = ti-bwa playing the cinquillo timeline (verified cell); lo = tanbou (stylized)."
+  },
+  {
+   "id": "carib.kompa.fill",
+   "name": "Kompa - fill",
+   "family": "caribbean",
+   "tags": [
+    "haiti",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "9.77.77.9.77.77."
+    },
+    "kick": {
+     "v": "8...8...8...8..."
+    },
+    "lo": {
+     "v": "....55667788999."
+    }
+   }
+  },
+  {
+   "id": "africa.gahu.main",
+   "name": "Gahu - main",
+   "family": "africa",
+   "tags": [
+    "ghana",
+    "ewe",
+    "gahu"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7...7...7."
+    },
+    "kick": {
+     "v": "9...7...9...7.7."
+    },
+    "cp": {
+     "v": "..77..77..77..77"
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "Bell verified (Toussaint 0,3,6,10,14); kick/sticks from Pocket Operations kit reduction."
+  },
+  {
+   "id": "africa.gahu.fill",
+   "name": "Gahu - fill",
+   "family": "africa",
+   "tags": [
+    "ghana",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7...7...7."
+    },
+    "kick": {
+     "v": "9...7..........."
+    },
+    "lo": {
+     "v": "....77..77..889."
+    }
+   },
+   "notes": "The bell never stops."
+  },
+  {
+   "id": "africa.highlife.main",
+   "name": "Highlife - main",
+   "family": "africa",
+   "tags": [
+    "ghana",
+    "highlife"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7...7.7..."
+    },
+    "kick": {
+     "v": "9.......8......."
+    },
+    "cp": {
+     "v": "....7.......7..."
+    },
+    "hi": {
+     "v": "6565656565656565"
+    }
+   },
+   "notes": "Son-shaped bell; guitar carries most syncopation."
+  },
+  {
+   "id": "africa.highlife.lift",
+   "name": "Highlife - lift",
+   "family": "africa",
+   "tags": [
+    "ghana",
+    "highlife"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7...7.7..."
+    },
+    "kick": {
+     "v": "9.......8.7....."
+    },
+    "cp": {
+     "v": "....7.......7..."
+    },
+    "hi": {
+     "v": "6565656565656565"
+    },
+    "ohh": {
+     "v": "..6...6...6...6."
+    }
+   }
+  },
+  {
+   "id": "africa.highlife.fill",
+   "name": "Highlife - fill",
+   "family": "africa",
+   "tags": [
+    "ghana",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7...7.7..."
+    },
+    "kick": {
+     "v": "9..............."
+    },
+    "snare": {
+     "v": "........66778899"
+    }
+   }
+  },
+  {
+   "id": "africa.kuku.main",
+   "name": "Kuku - main",
+   "family": "africa",
+   "tags": [
+    "guinea",
+    "djembe",
+    "kuku"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.........7....."
+    },
+    "lo": {
+     "v": "....7.......7..."
+    },
+    "bell": {
+     "v": "8.8.8.8.8.8.8.8."
+    },
+    "hi": {
+     "v": "..7...7...7...7."
+    },
+    "cp": {
+     "v": "..77..7...77..7."
+    }
+   },
+   "notes": "Stylized ensemble reduction (kick=dununba, lo=sangban, hi=kenkeni, cp=djembe accompaniment). Full parts: WAP Pages box-notation book."
+  },
+  {
+   "id": "africa.kuku.fill",
+   "name": "Kuku - fill (echauffement)",
+   "family": "africa",
+   "tags": [
+    "guinea",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "bell": {
+     "v": "8.8.8.8.8.8.8.8."
+    },
+    "lo": {
+     "v": "5566778899999999"
+    }
+   }
+  },
+  {
+   "id": "africa.soukous.main",
+   "name": "Soukous - main",
+   "family": "africa",
+   "tags": [
+    "congo",
+    "soukous"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7..77....."
+    },
+    "kick": {
+     "v": "9...9...9...9..."
+    },
+    "snare": {
+     "v": "....7.......7..7"
+    },
+    "hi": {
+     "v": "5654565456545654"
+    }
+   },
+   "notes": "Bell verified (Toussaint 0,3,6,9,10)."
+  },
+  {
+   "id": "africa.soukous.lift",
+   "name": "Soukous - lift (seben)",
+   "family": "africa",
+   "tags": [
+    "congo",
+    "soukous"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7..77....."
+    },
+    "kick": {
+     "v": "9...9...9...9..."
+    },
+    "snare": {
+     "v": "..7.7..77.7.7..7"
+    },
+    "hi": {
+     "v": "5654565456545654"
+    },
+    "ohh": {
+     "v": "..6...6...6...6."
+    }
+   }
+  },
+  {
+   "id": "africa.soukous.fill",
+   "name": "Soukous - fill",
+   "family": "africa",
+   "tags": [
+    "congo",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    130,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9..7..7..77....."
+    },
+    "kick": {
+     "v": "9...9...9......."
+    },
+    "snare": {
+     "v": "....7...66778899"
+    }
+   }
+  },
+  {
+   "id": "africa.gnawa.main",
+   "name": "Gnawa - main",
+   "family": "africa",
+   "tags": [
+    "morocco",
+    "gnawa",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.77.77.77.7"
+    },
+    "kick": {
+     "v": "9.....7....."
+    },
+    "lo": {
+     "v": "...5....5..."
+    }
+   },
+   "notes": "bell = qraqeb gallop; ceremonies accelerate continuously - map tempo CV."
+  },
+  {
+   "id": "africa.gnawa.fill",
+   "name": "Gnawa - fill",
+   "family": "africa",
+   "tags": [
+    "morocco",
+    "fill",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "bell": {
+     "v": "9.77.77.77.7"
+    },
+    "kick": {
+     "v": "9..7..7..7.."
+    }
+   }
+  },
+  {
+   "id": "africa.amapiano.main",
+   "name": "Amapiano - main",
+   "family": "africa",
+   "tags": [
+    "southafrica",
+    "amapiano"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8......."
+    },
+    "lo": {
+     "v": "...8..8...8..8.."
+    },
+    "hi": {
+     "v": "5555555555555555"
+    },
+    "cp": {
+     "v": "....7.....7....."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "lo = log drum on tresillo-leaning hits (3,6,10,13); half-time feel over house tempo. Stylized."
+  },
+  {
+   "id": "africa.amapiano.lift",
+   "name": "Amapiano - lift",
+   "family": "africa",
+   "tags": [
+    "southafrica",
+    "amapiano"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8......."
+    },
+    "lo": {
+     "v": "...8..8.8.8..8.8"
+    },
+    "hi": {
+     "v": "5656565656565656"
+    },
+    "cp": {
+     "v": "....7.....7....."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "africa.amapiano.fill",
+   "name": "Amapiano - fill",
+   "family": "africa",
+   "tags": [
+    "southafrica",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "lo": {
+     "v": "...8..8.55667788"
+    },
+    "hi": {
+     "v": "5555555555555555"
+    }
+   }
+  },
+  {
+   "id": "africa.gqom.main",
+   "name": "Gqom - main",
+   "family": "africa",
+   "tags": [
+    "southafrica",
+    "gqom"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..8..8....8...."
+    },
+    "lo": {
+     "v": "........7....7.."
+    },
+    "cp": {
+     "v": "....8........8.."
+    },
+    "chh": {
+     "v": "..6...6...6...6."
+    }
+   },
+   "notes": "Broken 3+3+2 kick, no four-floor; dark tom stabs. Stylized."
+  },
+  {
+   "id": "africa.gqom.fill",
+   "name": "Gqom - fill",
+   "family": "africa",
+   "tags": [
+    "southafrica",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    128
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..8..8........."
+    },
+    "lo": {
+     "v": "....55667788999."
+    }
+   }
+  },
+  {
+   "id": "mena.saidi.main",
+   "name": "Saidi - main",
+   "family": "mena",
+   "tags": [
+    "egypt",
+    "saidi"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.8.......",
+     "a": "A..............."
+    },
+    "cp": {
+     "v": "..8.........8..."
+    },
+    "hi": {
+     "v": ".....3.3..3...3."
+    }
+   },
+   "notes": "D T . D D . T . (verified skeleton, khafif.com): dums 0,6,8; teks 2,12; hi = ka ornaments."
+  },
+  {
+   "id": "mena.saidi.lift",
+   "name": "Saidi - lift",
+   "family": "mena",
+   "tags": [
+    "egypt",
+    "saidi"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.8.......",
+     "a": "A..............."
+    },
+    "cp": {
+     "v": "..8.........8..."
+    },
+    "chh": {
+     "v": "2323232323232323"
+    },
+    "bell": {
+     "v": "6.......6......."
+    },
+    "hi": {
+     "v": ".....3.3..3...3."
+    }
+   },
+   "notes": "chh = riqq 16ths, bell = finger cymbals."
+  },
+  {
+   "id": "mena.saidi.fill",
+   "name": "Saidi - fill",
+   "family": "mena",
+   "tags": [
+    "egypt",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "hi": {
+     "v": "..3344556677889.",
+     "a": "..............A."
+    },
+    "cp": {
+     "v": "..8............."
+    }
+   }
+  },
+  {
+   "id": "mena.karsilama.main",
+   "name": "Karsilama - main",
+   "family": "mena",
+   "tags": [
+    "turkey",
+    "9-8",
+    "aksak"
+   ],
+   "meter": "9/8",
+   "beats": 9,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8....",
+     "a": "A...A...."
+    },
+    "cp": {
+     "v": "..7...7.7"
+    }
+   },
+   "notes": "2+2+2+3: dums 0,4; teks 2,6,8. Roman havasi adds offbeat teks - variants-disagree."
+  },
+  {
+   "id": "mena.karsilama.fill",
+   "name": "Karsilama - fill",
+   "family": "mena",
+   "tags": [
+    "turkey",
+    "fill"
+   ],
+   "meter": "9/8",
+   "beats": 9,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8...."
+    },
+    "cp": {
+     "v": "..7.7.777"
+    }
+   }
+  },
+  {
+   "id": "persia.shesh.main",
+   "name": "Shesh-o-hasht - main",
+   "family": "mena",
+   "tags": [
+    "iran",
+    "6-8"
+   ],
+   "meter": "6/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..9..7.."
+    },
+    "hi": {
+     "v": "..6.66..6.66"
+    }
+   },
+   "notes": "Persian 6/8 pop/classical groove; kick = tombak bass strokes, hi = tek chatter. Stylized."
+  },
+  {
+   "id": "persia.shesh.fill",
+   "name": "Shesh-o-hasht - fill",
+   "family": "mena",
+   "tags": [
+    "iran",
+    "fill"
+   ],
+   "meter": "6/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7........"
+    },
+    "hi": {
+     "v": "..6.66667788"
+    }
+   }
+  },
+  {
+   "id": "europe.racenitsa.main",
+   "name": "Racenitsa - main",
+   "family": "europe",
+   "tags": [
+    "bulgaria",
+    "7-16",
+    "aksak"
+   ],
+   "meter": "7/16",
+   "beats": 7,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    240
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "7.7.9..",
+     "a": "A.A.A.."
+    },
+    "hi": {
+     "v": ".4.4.44"
+    }
+   },
+   "notes": "2+2+3 quick-quick-slow (verified grouping); tapan dums on group starts, accent on the slow."
+  },
+  {
+   "id": "europe.racenitsa.fill",
+   "name": "Racenitsa - fill",
+   "family": "europe",
+   "tags": [
+    "bulgaria",
+    "fill"
+   ],
+   "meter": "7/16",
+   "beats": 7,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    160,
+    240
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......"
+    },
+    "hi": {
+     "v": "4455667"
+    }
+   }
+  },
+  {
+   "id": "eire.jig.main",
+   "name": "Jig - main",
+   "family": "europe",
+   "tags": [
+    "ireland",
+    "jig",
+    "6-8"
+   ],
+   "meter": "6/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..9..7..",
+     "a": "A.....A....."
+    },
+    "hi": {
+     "v": "755755755755"
+    }
+   },
+   "notes": "Bodhran: low on dotted beats, tip 8ths in DUD lilt."
+  },
+  {
+   "id": "eire.jig.lift",
+   "name": "Jig - lift",
+   "family": "europe",
+   "tags": [
+    "ireland",
+    "jig",
+    "6-8"
+   ],
+   "meter": "6/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..9.7.7.",
+     "a": "A.....A....."
+    },
+    "hi": {
+     "v": "756756756756"
+    },
+    "cp": {
+     "v": "9.....7....."
+    }
+   },
+   "notes": "Hemiola tease in the second half."
+  },
+  {
+   "id": "eire.jig.fill",
+   "name": "Jig - fill",
+   "family": "europe",
+   "tags": [
+    "ireland",
+    "fill"
+   ],
+   "meter": "6/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..........."
+    },
+    "hi": {
+     "v": "455667788999"
+    }
+   }
+  },
+  {
+   "id": "eire.reel.main",
+   "name": "Reel - main",
+   "family": "europe",
+   "tags": [
+    "ireland",
+    "reel"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    100,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "lo": {
+     "v": "9.6.7.6.8.6.7.6."
+    }
+   },
+   "notes": "Bodhran continuous 8ths, accents on 0 and 8; light lilt."
+  },
+  {
+   "id": "eire.reel.fill",
+   "name": "Reel - fill",
+   "family": "europe",
+   "tags": [
+    "ireland",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.2,
+   "bpm": [
+    100,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "lo": {
+     "v": "9.6.7.6.55667889"
+    }
+   }
+  },
+  {
+   "id": "flamenco.bulerias.main",
+   "name": "Bulerias - main",
+   "family": "europe",
+   "tags": [
+    "spain",
+    "flamenco",
+    "12-count"
+   ],
+   "meter": "12-count",
+   "beats": 12,
+   "stepsPerBeat": 1,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    180,
+    240
+   ],
+   "kind": "groove",
+   "grid": {
+    "cp": {
+     "v": "977977979797",
+     "a": "A..A..A.A.A."
+    },
+    "kick": {
+     "v": "8..8..8.8.8."
+    }
+   },
+   "notes": "Palmas + cajon on the 12-count compas (accents 12,3,6,8,10 from count 12). Count-start varies by school."
+  },
+  {
+   "id": "asia.keherwa.main",
+   "name": "Keherwa groove - main",
+   "family": "asia",
+   "tags": [
+    "india",
+    "keherwa"
+   ],
+   "meter": "8 matras",
+   "beats": 4,
+   "stepsPerBeat": 2,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "97....8.",
+     "a": "A......."
+    },
+    "hi": {
+     "v": "76767676"
+    }
+   },
+   "notes": "Dha Ge Na Ti Na Ka Dhi Na as a groove (verified theka); kick = baya/dhol bass."
+  },
+  {
+   "id": "asia.keherwa.lift",
+   "name": "Keherwa groove - lift",
+   "family": "asia",
+   "tags": [
+    "india",
+    "keherwa"
+   ],
+   "meter": "8 matras",
+   "beats": 4,
+   "stepsPerBeat": 2,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "97....8.",
+     "a": "A......."
+    },
+    "hi": {
+     "v": "76767676"
+    },
+    "chh": {
+     "v": "56565656"
+    }
+   }
+  },
+  {
+   "id": "asia.keherwa.fill",
+   "name": "Keherwa groove - fill",
+   "family": "asia",
+   "tags": [
+    "india",
+    "fill"
+   ],
+   "meter": "8 matras",
+   "beats": 4,
+   "stepsPerBeat": 2,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9......."
+    },
+    "hi": {
+     "v": "66778899"
+    }
+   }
+  },
+  {
+   "id": "asia.bhangra.main",
+   "name": "Bhangra chaal - main",
+   "family": "asia",
+   "tags": [
+    "punjab",
+    "bhangra"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.3,
+   "bpm": [
+    95,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7.8.....7."
+    },
+    "hi": {
+     "v": "....8.......8..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "Dhol chaal: bass on 0,6,8,14 (bossa-kick shape), dagga tak on 2 and 4. Stylized."
+  },
+  {
+   "id": "asia.bhangra.fill",
+   "name": "Bhangra chaal - fill",
+   "family": "asia",
+   "tags": [
+    "punjab",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.3,
+   "bpm": [
+    95,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....7........."
+    },
+    "hi": {
+     "v": "....8...55667889"
+    },
+    "chh": {
+     "v": "6.6.6.6........."
+    }
+   }
+  },
+  {
+   "id": "asia.taiko.main",
+   "name": "Taiko matsuri - main",
+   "family": "asia",
+   "tags": [
+    "japan",
+    "taiko"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8.......",
+     "a": "A..............."
+    },
+    "lo": {
+     "v": "......55......55"
+    },
+    "cp": {
+     "v": "..7.......7....."
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "'Don doko' cells: kick = odaiko don, lo = doko doubles, cp = ka rim, hi = shime ji. Stylized."
+  },
+  {
+   "id": "asia.taiko.lift",
+   "name": "Taiko matsuri - lift",
+   "family": "asia",
+   "tags": [
+    "japan",
+    "taiko"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...8...8...8...",
+     "a": "A..............."
+    },
+    "lo": {
+     "v": "..55..55..55..55"
+    },
+    "cp": {
+     "v": "..7.......7....."
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   }
+  },
+  {
+   "id": "asia.taiko.fill",
+   "name": "Taiko matsuri - fill",
+   "family": "asia",
+   "tags": [
+    "japan",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "lo": {
+     "v": "5566778899999.9.",
+     "a": "..............A."
+    }
+   }
+  },
+  {
+   "id": "asia.gutgeori.main",
+   "name": "Gutgeori jangdan - main",
+   "family": "asia",
+   "tags": [
+    "korea",
+    "12-8"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    90
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7.....7..",
+     "a": "A..........."
+    },
+    "cp": {
+     "v": "....7..7..7."
+    }
+   },
+   "notes": "Janggu cycle (verified 12/8 compound meter; stroke placements stylized): kick = kung/deong low, cp = deok rim."
+  },
+  {
+   "id": "asia.gutgeori.fill",
+   "name": "Gutgeori jangdan - fill",
+   "family": "asia",
+   "tags": [
+    "korea",
+    "fill"
+   ],
+   "meter": "12/8",
+   "beats": 4,
+   "stepsPerBeat": 3,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    60,
+    90
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..........."
+    },
+    "cp": {
+     "v": "....77778899"
+    }
+   }
+  },
+  {
+   "id": "oceania.tahiti.main",
+   "name": "'Ote'a - main",
+   "family": "oceania",
+   "tags": [
+    "tahiti",
+    "toere"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "hi": {
+     "v": "9669669696969696",
+     "a": "A..A..A.A......."
+    },
+    "kick": {
+     "v": "9.......8......."
+    },
+    "lo": {
+     "v": "..7...7...7...7."
+    }
+   },
+   "notes": "To'ere log drums at 16th density with 3+3+2 accents over pahu bass. Stylized."
+  },
+  {
+   "id": "oceania.tahiti.lift",
+   "name": "'Ote'a - lift",
+   "family": "oceania",
+   "tags": [
+    "tahiti",
+    "toere"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "hi": {
+     "v": "9669669696969696",
+     "a": "A..A..A.A......."
+    },
+    "kick": {
+     "v": "9.......8...8..."
+    },
+    "lo": {
+     "v": "..7.7.7...7.7.7."
+    }
+   }
+  },
+  {
+   "id": "oceania.tahiti.fill",
+   "name": "'Ote'a - fill",
+   "family": "oceania",
+   "tags": [
+    "tahiti",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    120,
+    160
+   ],
+   "kind": "groove",
+   "grid": {
+    "hi": {
+     "v": "999999999999999.",
+     "a": "A..............."
+    },
+    "kick": {
+     "v": "9..............."
+    }
+   }
+  },
+  {
+   "id": "usa.secondline.main",
+   "name": "Second line - main",
+   "family": "usa",
+   "tags": [
+    "neworleans",
+    "secondline"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    90,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7...7.7..."
+    },
+    "snare": {
+     "v": "..3.8..3..3.8..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.7.7.7.7.7.7.7."
+    }
+   },
+   "notes": "Kick walks the 3-2 son clave (verified basis); swung, laid-back. Snare = press-roll figures."
+  },
+  {
+   "id": "usa.secondline.lift",
+   "name": "Second line - lift",
+   "family": "usa",
+   "tags": [
+    "neworleans",
+    "secondline"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    90,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7...7.7..."
+    },
+    "snare": {
+     "v": "3.3.8..33.3.8..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "7.7.7.7.7.7.7.7."
+    },
+    "bell": {
+     "v": "9..7..7...7.7..."
+    }
+   }
+  },
+  {
+   "id": "usa.secondline.fill",
+   "name": "Second line - fill",
+   "family": "usa",
+   "tags": [
+    "neworleans",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.35,
+   "bpm": [
+    90,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7............"
+    },
+    "snare": {
+     "v": "....8...55667889",
+     "a": "....A..........A"
+    }
+   }
+  },
+  {
+   "id": "eucl.tresillo.sparse",
+   "name": "Tresillo E(3,8) — sparse",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "tresillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....8.....8..."
+    },
+    "chh": {
+     "v": "6...6...6...6..."
+    }
+   }
+  },
+  {
+   "id": "eucl.tresillo.main",
+   "name": "Tresillo E(3,8) — main",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "tresillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....8.....8..."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "E(3,8) kick under a straight backbeat."
+  },
+  {
+   "id": "eucl.tresillo.lift",
+   "name": "Tresillo E(3,8) — lift",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "tresillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....8.....8..."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6464646464646464"
+    },
+    "bell": {
+     "v": "7..7.7.7..7.7.7."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   },
+   "notes": "E(7,16) bell against the E(3,8) kick."
+  },
+  {
+   "id": "eucl.tresillo.fill",
+   "name": "Tresillo E(3,8) — fill",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    90,
+    130
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.....8.....8..."
+    },
+    "snare": {
+     "v": "..........668899",
+     "a": "...............A"
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6....."
+    },
+    "ohh": {
+     "v": "............7..."
+    }
+   }
+  },
+  {
+   "id": "eucl.cinquillo.sparse",
+   "name": "Cinquillo E(5,8) — sparse",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "cinquillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......8......."
+    },
+    "cp": {
+     "v": "5...5.5...5.5..."
+    }
+   }
+  },
+  {
+   "id": "eucl.cinquillo.main",
+   "name": "Cinquillo E(5,8) — main",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "cinquillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...7.7...7.7..."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "E(5,8) kick — the cinquillo cell."
+  },
+  {
+   "id": "eucl.cinquillo.lift",
+   "name": "Cinquillo E(5,8) — lift",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "cinquillo"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...7.7...7.7..."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6565656565656565"
+    },
+    "hi": {
+     "v": "..5..5..5..5..5."
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "eucl.cinquillo.fill",
+   "name": "Cinquillo E(5,8) — fill",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    120
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...7.7...7.7..."
+    },
+    "snare": {
+     "v": "........77889999",
+     "a": "...............A"
+    },
+    "lo": {
+     "v": "............88.."
+    }
+   }
+  },
+  {
+   "id": "eucl.five16.sparse",
+   "name": "Euclid E(5,16) — sparse",
+   "family": "euclidean",
+   "tags": [
+    "euclidean"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7..7..7..."
+    },
+    "chh": {
+     "v": "6...6...6...6..."
+    }
+   }
+  },
+  {
+   "id": "eucl.five16.main",
+   "name": "Euclid E(5,16) — main",
+   "family": "euclidean",
+   "tags": [
+    "euclidean"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7..7..7..."
+    },
+    "snare": {
+     "v": "....8.......8...",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "E(5,16) kick — quasi-bossa spacing."
+  },
+  {
+   "id": "eucl.five16.lift",
+   "name": "Euclid E(5,16) — lift",
+   "family": "euclidean",
+   "tags": [
+    "euclidean"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7..7..7..."
+    },
+    "snare": {
+     "v": "....8..3....8..3",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "6464646464646464"
+    },
+    "bell": {
+     "v": "7..7.5.7..7.5.7."
+    }
+   }
+  },
+  {
+   "id": "eucl.five16.fill",
+   "name": "Euclid E(5,16) — fill",
+   "family": "euclidean",
+   "tags": [
+    "euclidean",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    95,
+    125
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..7..7..7..7..."
+    },
+    "snare": {
+     "v": ".........7788999",
+     "a": "...............A"
+    },
+    "ohh": {
+     "v": "..............6."
+    }
+   }
+  },
+  {
+   "id": "indian.keherwa.sparse",
+   "name": "Keherwa — sparse",
+   "family": "indian",
+   "tags": [
+    "keherwa",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...........7..."
+    },
+    "hi": {
+     "v": "....5...5......."
+    }
+   }
+  },
+  {
+   "id": "indian.keherwa.main",
+   "name": "Keherwa — main",
+   "family": "indian",
+   "tags": [
+    "keherwa",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.7.........7...",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "....7.6.7.....6."
+    },
+    "cp": {
+     "v": "..........5....."
+    },
+    "chh": {
+     "v": "5.5.5.5.5.5.5.5."
+    }
+   },
+   "notes": "Dha ge na ti · na ka dhi na, one stroke per 8th."
+  },
+  {
+   "id": "indian.keherwa.lift",
+   "name": "Keherwa — lift",
+   "family": "indian",
+   "tags": [
+    "keherwa",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.7.........7...",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "....7.6.7.3...6."
+    },
+    "cp": {
+     "v": "..........5....."
+    },
+    "chh": {
+     "v": "4444444444444444"
+    },
+    "lo": {
+     "v": "............7..."
+    }
+   }
+  },
+  {
+   "id": "indian.keherwa.fill",
+   "name": "Keherwa — fill",
+   "family": "indian",
+   "tags": [
+    "keherwa",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    85,
+    115
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...........9..."
+    },
+    "hi": {
+     "v": "..55..66..778899",
+     "a": "...............A"
+    }
+   },
+   "notes": "Tirakita-style run into sam."
+  },
+  {
+   "id": "indian.teental.sparse",
+   "name": "Teental — sparse",
+   "family": "indian",
+   "tags": [
+    "teental",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9.......7......."
+    },
+    "hi": {
+     "v": "7...5...5...5..."
+    }
+   }
+  },
+  {
+   "id": "indian.teental.main",
+   "name": "Teental — main",
+   "family": "indian",
+   "tags": [
+    "teental",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "955675567....567",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "7555755575557555",
+     "a": "....A.......A..."
+    }
+   },
+   "notes": "16 matras, one per 16th; khali (matras 10-12) drops the bass."
+  },
+  {
+   "id": "indian.teental.lift",
+   "name": "Teental — lift",
+   "family": "indian",
+   "tags": [
+    "teental",
+    "tabla"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "955675567....567",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "7565756575657565",
+     "a": "....A.......A..."
+    },
+    "chh": {
+     "v": "4444444444444444"
+    },
+    "lo": {
+     "v": "9...........7..."
+    }
+   }
+  },
+  {
+   "id": "indian.teental.fill",
+   "name": "Teental — fill",
+   "family": "indian",
+   "tags": [
+    "teental",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    80,
+    110
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "hi": {
+     "v": "77.5.77.5.77.5.9",
+     "a": "...............A"
+    }
+   },
+   "notes": "Tihai-flavoured: the figure states three times into sam."
+  },
+  {
+   "id": "gamelan.lancaran.sparse",
+   "name": "Lancaran — sparse",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "lancaran"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "bell": {
+     "v": "....6...6...6..."
+    },
+    "hi": {
+     "v": "5...5...5...5..."
+    }
+   }
+  },
+  {
+   "id": "gamelan.lancaran.main",
+   "name": "Lancaran — main",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "lancaran"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "bell": {
+     "v": "....7...7...7..."
+    },
+    "lo": {
+     "v": "......6...6...6."
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    }
+   },
+   "notes": "Gong on 1, kenong on the beats, kempul between, balungan 8ths."
+  },
+  {
+   "id": "gamelan.lancaran.lift",
+   "name": "Lancaran — lift",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "lancaran"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "bell": {
+     "v": "....7...7...7..."
+    },
+    "lo": {
+     "v": "......6...6...6."
+    },
+    "hi": {
+     "v": "6.6.6.6.6.6.6.6."
+    },
+    "cp": {
+     "v": "4545454545454545"
+    }
+   },
+   "notes": "Peking-style 16th doubling on cp."
+  },
+  {
+   "id": "gamelan.lancaran.fill",
+   "name": "Lancaran — fill",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    100,
+    140
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "bell": {
+     "v": "....7...7...7..."
+    },
+    "hi": {
+     "v": ".......566778899",
+     "a": "...............A"
+    }
+   }
+  },
+  {
+   "id": "gamelan.kotekan.sparse",
+   "name": "Kotekan — sparse",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "kotekan"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "7.7.7..7.7.7..7."
+    }
+   }
+  },
+  {
+   "id": "gamelan.kotekan.main",
+   "name": "Kotekan — main",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "kotekan"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "7.7.7..7.7.7..7."
+    },
+    "cp": {
+     "v": ".6.6..66.6.6..66"
+    },
+    "bell": {
+     "v": "....6.......6..."
+    }
+   },
+   "notes": "Interlocking polos/sangsih; together they fill the 16ths."
+  },
+  {
+   "id": "gamelan.kotekan.lift",
+   "name": "Kotekan — lift",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "kotekan"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9...............",
+     "a": "A..............."
+    },
+    "hi": {
+     "v": "7.7.7..7.7.7..7.",
+     "a": "A..............."
+    },
+    "cp": {
+     "v": ".6.6..66.6.6..66"
+    },
+    "bell": {
+     "v": "....7...7...7..."
+    },
+    "lo": {
+     "v": "9.......9......."
+    }
+   }
+  },
+  {
+   "id": "gamelan.kotekan.fill",
+   "name": "Kotekan — fill",
+   "family": "gamelan",
+   "tags": [
+    "gamelan",
+    "fill"
+   ],
+   "meter": "4/4",
+   "beats": 4,
+   "stepsPerBeat": 4,
+   "bars": 1,
+   "swing": 0.0,
+   "bpm": [
+    110,
+    150
+   ],
+   "kind": "groove",
+   "grid": {
+    "kick": {
+     "v": "9..............."
+    },
+    "hi": {
+     "v": ".......577889999",
+     "a": "...............A"
+    },
+    "cp": {
+     "v": ".......577889999"
+    }
+   },
+   "notes": "Unison run — the interlock collapses into one line into the gong."
+  }
+ ],
+ "sets": [
+  {
+   "id": "rock.motorik",
+   "name": "Motorik",
+   "family": "rock",
+   "bpm": 132,
+   "vary": 0.1,
+   "axis": "genre",
+   "roles": {
+    "sparse": "rock.motorik.sparse",
+    "main": "rock.motorik.main",
+    "lift": "rock.motorik.lift",
+    "fill": [
+     "rock.motorik.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ],
+   "notes": "Default set. Krautrock pulse — the hats are the engine."
+  },
+  {
+   "id": "rock.basic",
+   "name": "Basic rock",
+   "family": "rock",
+   "bpm": 118,
+   "vary": 0.4,
+   "axis": "genre",
+   "roles": {
+    "sparse": "rock.basic.sparse",
+    "main": "rock.basic.main",
+    "lift": "rock.basic.lift",
+    "fill": [
+     "rock.basic.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "funk.sixteen",
+   "name": "Funk sixteenths",
+   "family": "funk",
+   "bpm": 102,
+   "vary": 0.7,
+   "axis": "genre",
+   "roles": {
+    "sparse": "funk.sixteen.sparse",
+    "main": "funk.sixteen.main",
+    "lift": "funk.sixteen.lift",
+    "fill": [
+     "funk.sixteen.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "pop.motown",
+   "name": "Motown four-on-the-snare",
+   "family": "pop",
+   "bpm": 118,
+   "vary": 0.4,
+   "axis": "genre",
+   "roles": {
+    "sparse": "pop.motown.sparse",
+    "main": "pop.motown.main",
+    "lift": "pop.motown.lift",
+    "fill": [
+     "pop.motown.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "rock.shuffle",
+   "name": "Blues shuffle (12/8)",
+   "family": "rock",
+   "bpm": 76,
+   "vary": 0.4,
+   "axis": "genre",
+   "roles": {
+    "sparse": "rock.shuffle.sparse",
+    "main": "rock.shuffle.main",
+    "lift": "rock.shuffle.lift",
+    "fill": [
+     "rock.shuffle.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "edm.house",
+   "name": "Classic house",
+   "family": "electronic",
+   "bpm": 124,
+   "vary": 0.45,
+   "axis": "genre",
+   "roles": {
+    "sparse": "edm.house.sparse",
+    "main": "edm.house.main",
+    "lift": "edm.house.lift",
+    "fill": [
+     "edm.house.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 8
+    },
+    {
+     "role": "main",
+     "bars": 16,
+     "fillEvery": 8
+    },
+    {
+     "role": "lift",
+     "bars": 16,
+     "fillEvery": 8
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "edm.techno",
+   "name": "Driving techno",
+   "family": "electronic",
+   "bpm": 134,
+   "vary": 0.45,
+   "axis": "genre",
+   "roles": {
+    "sparse": "edm.techno.sparse",
+    "main": "edm.techno.main",
+    "lift": "edm.techno.lift",
+    "fill": [
+     "edm.techno.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 8
+    },
+    {
+     "role": "main",
+     "bars": 16,
+     "fillEvery": 8
+    },
+    {
+     "role": "lift",
+     "bars": 16,
+     "fillEvery": 8
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "edm.dnb",
+   "name": "Drum & bass two-step",
+   "family": "electronic",
+   "bpm": 174,
+   "vary": 0.6,
+   "axis": "genre",
+   "roles": {
+    "sparse": "edm.dnb.sparse",
+    "main": "edm.dnb.main",
+    "lift": "edm.dnb.lift",
+    "fill": [
+     "edm.dnb.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "hiphop.boombap",
+   "name": "Boom bap",
+   "family": "hiphop",
+   "bpm": 90,
+   "vary": 0.6,
+   "axis": "genre",
+   "roles": {
+    "sparse": "hiphop.boombap.sparse",
+    "main": "hiphop.boombap.main",
+    "lift": "hiphop.boombap.lift",
+    "fill": [
+     "hiphop.boombap.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "hiphop.trap",
+   "name": "Trap halftime",
+   "family": "hiphop",
+   "bpm": 140,
+   "vary": 0.5,
+   "axis": "genre",
+   "roles": {
+    "sparse": "hiphop.trap.sparse",
+    "main": "hiphop.trap.main",
+    "lift": "hiphop.trap.lift",
+    "fill": [
+     "hiphop.trap.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.son",
+   "name": "Son montuno (3-2)",
+   "family": "latin",
+   "bpm": 96,
+   "vary": 0.2,
+   "axis": "region",
+   "roles": {
+    "sparse": "latin.son.sparse",
+    "main": "latin.son.main",
+    "lift": "latin.son.lift",
+    "fill": [
+     "latin.son.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ],
+   "notes": "Join sections only on clave-cycle boundaries."
+  },
+  {
+   "id": "latin.samba",
+   "name": "Samba",
+   "family": "latin",
+   "bpm": 104,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "sparse": "latin.samba.sparse",
+    "main": "latin.samba.main",
+    "lift": "latin.samba.lift",
+    "fill": [
+     "latin.samba.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.bossa",
+   "name": "Bossa nova",
+   "family": "latin",
+   "bpm": 72,
+   "vary": 0.2,
+   "axis": "region",
+   "roles": {
+    "sparse": "latin.bossa.sparse",
+    "main": "latin.bossa.main",
+    "lift": "latin.bossa.lift",
+    "fill": [
+     "latin.bossa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.dembow",
+   "name": "Dembow / reggaetón",
+   "family": "latin",
+   "bpm": 94,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "sparse": "latin.dembow.sparse",
+    "main": "latin.dembow.main",
+    "lift": "latin.dembow.lift",
+    "fill": [
+     "latin.dembow.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "africa.bembe",
+   "name": "Bembé (12/8)",
+   "family": "africa",
+   "bpm": 112,
+   "vary": 0.2,
+   "axis": "region",
+   "roles": {
+    "sparse": "africa.bembe.sparse",
+    "main": "africa.bembe.main",
+    "lift": "africa.bembe.lift",
+    "fill": [
+     "africa.bembe.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ],
+   "notes": "The bell never stops across any section change."
+  },
+  {
+   "id": "africa.afrobeat",
+   "name": "Afrobeat",
+   "family": "africa",
+   "bpm": 112,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "sparse": "africa.afrobeat.sparse",
+    "main": "africa.afrobeat.main",
+    "lift": "africa.afrobeat.lift",
+    "fill": [
+     "africa.afrobeat.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "carib.onedrop",
+   "name": "Reggae one drop / steppers",
+   "family": "caribbean",
+   "bpm": 70,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "sparse": "carib.onedrop.sparse",
+    "main": "carib.onedrop.main",
+    "lift": "carib.onedrop.lift",
+    "fill": [
+     "carib.onedrop.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "mena.maqsum",
+   "name": "Maqsum / baladi",
+   "family": "mena",
+   "bpm": 100,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "sparse": "mena.maqsum.sparse",
+    "main": "mena.maqsum.main",
+    "lift": "mena.maqsum.lift",
+    "fill": [
+     "mena.maqsum.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.cumbia",
+   "name": "Cumbia",
+   "family": "latin",
+   "bpm": 95,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.cumbia.main",
+    "lift": "latin.cumbia.lift",
+    "fill": [
+     "latin.cumbia.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.merengue",
+   "name": "Merengue",
+   "family": "latin",
+   "bpm": 140,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.merengue.main",
+    "fill": [
+     "latin.merengue.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "latin.bachata",
+   "name": "Bachata",
+   "family": "latin",
+   "bpm": 120,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.bachata.main",
+    "fill": [
+     "latin.bachata.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "latin.candombe",
+   "name": "Candombe",
+   "family": "latin",
+   "bpm": 130,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.candombe.main",
+    "lift": "latin.candombe.lift",
+    "fill": [
+     "latin.candombe.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.festejo",
+   "name": "Festejo",
+   "family": "latin",
+   "bpm": 112,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.festejo.main",
+    "fill": [
+     "latin.festejo.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "latin.baiao",
+   "name": "Baiao",
+   "family": "latin",
+   "bpm": 104,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.baiao.main",
+    "lift": "latin.baiao.lift",
+    "fill": [
+     "latin.baiao.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "latin.chacarera",
+   "name": "Chacarera",
+   "family": "latin",
+   "bpm": 112,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.chacarera.main",
+    "fill": [
+     "latin.chacarera.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "latin.bomba",
+   "name": "Bomba sica",
+   "family": "latin",
+   "bpm": 100,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "latin.bomba.main",
+    "fill": [
+     "latin.bomba.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "carib.soca",
+   "name": "Soca",
+   "family": "caribbean",
+   "bpm": 158,
+   "vary": 0.35,
+   "axis": "region",
+   "roles": {
+    "main": "carib.soca.main",
+    "lift": "carib.soca.lift",
+    "fill": [
+     "carib.soca.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "carib.ska",
+   "name": "Ska",
+   "family": "caribbean",
+   "bpm": 128,
+   "vary": 0.35,
+   "axis": "region",
+   "roles": {
+    "main": "carib.ska.main",
+    "fill": [
+     "carib.ska.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "carib.dancehall",
+   "name": "Dancehall",
+   "family": "caribbean",
+   "bpm": 100,
+   "vary": 0.35,
+   "axis": "region",
+   "roles": {
+    "main": "carib.dancehall.main",
+    "lift": "carib.dancehall.lift",
+    "fill": [
+     "carib.dancehall.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "carib.kompa",
+   "name": "Kompa",
+   "family": "caribbean",
+   "bpm": 105,
+   "vary": 0.35,
+   "axis": "region",
+   "roles": {
+    "main": "carib.kompa.main",
+    "fill": [
+     "carib.kompa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "africa.gahu",
+   "name": "Gahu",
+   "family": "africa",
+   "bpm": 120,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.gahu.main",
+    "fill": [
+     "africa.gahu.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "africa.highlife",
+   "name": "Highlife",
+   "family": "africa",
+   "bpm": 112,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.highlife.main",
+    "lift": "africa.highlife.lift",
+    "fill": [
+     "africa.highlife.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "africa.kuku",
+   "name": "Kuku",
+   "family": "africa",
+   "bpm": 130,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.kuku.main",
+    "fill": [
+     "africa.kuku.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "africa.soukous",
+   "name": "Soukous",
+   "family": "africa",
+   "bpm": 145,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.soukous.main",
+    "lift": "africa.soukous.lift",
+    "fill": [
+     "africa.soukous.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "africa.gnawa",
+   "name": "Gnawa",
+   "family": "africa",
+   "bpm": 110,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.gnawa.main",
+    "fill": [
+     "africa.gnawa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "africa.amapiano",
+   "name": "Amapiano",
+   "family": "africa",
+   "bpm": 112,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.amapiano.main",
+    "lift": "africa.amapiano.lift",
+    "fill": [
+     "africa.amapiano.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "africa.gqom",
+   "name": "Gqom",
+   "family": "africa",
+   "bpm": 124,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "africa.gqom.main",
+    "fill": [
+     "africa.gqom.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "mena.saidi",
+   "name": "Saidi",
+   "family": "mena",
+   "bpm": 100,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "mena.saidi.main",
+    "lift": "mena.saidi.lift",
+    "fill": [
+     "mena.saidi.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "mena.karsilama",
+   "name": "Karsilama",
+   "family": "mena",
+   "bpm": 115,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "mena.karsilama.main",
+    "fill": [
+     "mena.karsilama.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "persia.shesh",
+   "name": "Shesh-o-hasht (6/8)",
+   "family": "mena",
+   "bpm": 120,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "persia.shesh.main",
+    "fill": [
+     "persia.shesh.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "europe.racenitsa",
+   "name": "Racenitsa",
+   "family": "europe",
+   "bpm": 200,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "europe.racenitsa.main",
+    "fill": [
+     "europe.racenitsa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "eire.jig",
+   "name": "Irish jig",
+   "family": "europe",
+   "bpm": 120,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "eire.jig.main",
+    "lift": "eire.jig.lift",
+    "fill": [
+     "eire.jig.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "eire.reel",
+   "name": "Irish reel",
+   "family": "europe",
+   "bpm": 110,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "eire.reel.main",
+    "fill": [
+     "eire.reel.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "flamenco.bulerias",
+   "name": "Bulerias",
+   "family": "europe",
+   "bpm": 210,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "flamenco.bulerias.main"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 16
+    }
+   ]
+  },
+  {
+   "id": "asia.keherwa",
+   "name": "Keherwa",
+   "family": "asia",
+   "bpm": 105,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "asia.keherwa.main",
+    "lift": "asia.keherwa.lift",
+    "fill": [
+     "asia.keherwa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "asia.bhangra",
+   "name": "Bhangra chaal",
+   "family": "asia",
+   "bpm": 102,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "asia.bhangra.main",
+    "fill": [
+     "asia.bhangra.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "asia.taiko",
+   "name": "Taiko matsuri",
+   "family": "asia",
+   "bpm": 110,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "asia.taiko.main",
+    "lift": "asia.taiko.lift",
+    "fill": [
+     "asia.taiko.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "asia.gutgeori",
+   "name": "Gutgeori jangdan",
+   "family": "asia",
+   "bpm": 72,
+   "vary": 0.25,
+   "axis": "region",
+   "roles": {
+    "main": "asia.gutgeori.main",
+    "fill": [
+     "asia.gutgeori.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "oceania.tahiti",
+   "name": "'Ote'a (Tahiti)",
+   "family": "oceania",
+   "bpm": 140,
+   "vary": 0.3,
+   "axis": "region",
+   "roles": {
+    "main": "oceania.tahiti.main",
+    "lift": "oceania.tahiti.lift",
+    "fill": [
+     "oceania.tahiti.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "usa.secondline",
+   "name": "New Orleans second line",
+   "family": "usa",
+   "bpm": 100,
+   "vary": 0.4,
+   "axis": "region",
+   "roles": {
+    "main": "usa.secondline.main",
+    "lift": "usa.secondline.lift",
+    "fill": [
+     "usa.secondline.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "eucl.tresillo",
+   "name": "Tresillo E(3,8)",
+   "family": "euclidean",
+   "bpm": 110,
+   "vary": 0.3,
+   "axis": "genre",
+   "roles": {
+    "sparse": "eucl.tresillo.sparse",
+    "main": "eucl.tresillo.main",
+    "lift": "eucl.tresillo.lift",
+    "fill": [
+     "eucl.tresillo.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "eucl.cinquillo",
+   "name": "Cinquillo E(5,8)",
+   "family": "euclidean",
+   "bpm": 96,
+   "vary": 0.3,
+   "axis": "genre",
+   "roles": {
+    "sparse": "eucl.cinquillo.sparse",
+    "main": "eucl.cinquillo.main",
+    "lift": "eucl.cinquillo.lift",
+    "fill": [
+     "eucl.cinquillo.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "eucl.five16",
+   "name": "Euclid E(5,16)",
+   "family": "euclidean",
+   "bpm": 105,
+   "vary": 0.3,
+   "axis": "genre",
+   "roles": {
+    "sparse": "eucl.five16.sparse",
+    "main": "eucl.five16.main",
+    "lift": "eucl.five16.lift",
+    "fill": [
+     "eucl.five16.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "indian.keherwa",
+   "name": "Keherwa (8)",
+   "family": "indian",
+   "bpm": 100,
+   "vary": 0.2,
+   "axis": "region",
+   "roles": {
+    "sparse": "indian.keherwa.sparse",
+    "main": "indian.keherwa.main",
+    "lift": "indian.keherwa.lift",
+    "fill": [
+     "indian.keherwa.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "indian.teental",
+   "name": "Teental (16)",
+   "family": "indian",
+   "bpm": 92,
+   "vary": 0.2,
+   "axis": "region",
+   "roles": {
+    "sparse": "indian.teental.sparse",
+    "main": "indian.teental.main",
+    "lift": "indian.teental.lift",
+    "fill": [
+     "indian.teental.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "gamelan.lancaran",
+   "name": "Lancaran (gamelan)",
+   "family": "asia",
+   "bpm": 120,
+   "vary": 0.15,
+   "axis": "region",
+   "roles": {
+    "sparse": "gamelan.lancaran.sparse",
+    "main": "gamelan.lancaran.main",
+    "lift": "gamelan.lancaran.lift",
+    "fill": [
+     "gamelan.lancaran.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "gamelan.kotekan",
+   "name": "Kotekan (gamelan)",
+   "family": "asia",
+   "bpm": 132,
+   "vary": 0.15,
+   "axis": "region",
+   "roles": {
+    "sparse": "gamelan.kotekan.sparse",
+    "main": "gamelan.kotekan.main",
+    "lift": "gamelan.kotekan.lift",
+    "fill": [
+     "gamelan.kotekan.fill"
+    ]
+   },
+   "arrangement": [
+    {
+     "role": "sparse",
+     "bars": 4
+    },
+    {
+     "role": "main",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "lift",
+     "bars": 8,
+     "fillEvery": 4
+    },
+    {
+     "role": "main",
+     "bars": 8
+    },
+    {
+     "role": "sparse",
+     "bars": 4
+    }
+   ]
+  },
+  {
+   "id": "tl.clave.son.set",
+   "name": "Son clave (3-2)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.clave.son"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.clave.rumba.set",
+   "name": "Rumba clave (3-2)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.clave.rumba"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.clave.bossa.set",
+   "name": "Bossa clave",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.clave.bossa"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.shiko.set",
+   "name": "Shiko bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.shiko"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.soukous.set",
+   "name": "Soukous bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.soukous"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.gahu.set",
+   "name": "Gahu bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.gahu"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.cell.tresillo.set",
+   "name": "Tresillo",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.cell.tresillo"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.cell.cinquillo.set",
+   "name": "Cinquillo",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.cell.cinquillo"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.cell.habanera.set",
+   "name": "Habanera",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.cell.habanera"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.standard.set",
+   "name": "Standard pattern (Bembe bell)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.standard"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.soli.set",
+   "name": "Soli bell (Guinea)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.soli"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.tambu.set",
+   "name": "Tambu bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.tambu"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.bembe2.set",
+   "name": "Bembe-2 bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.bembe2"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.yoruba.set",
+   "name": "Yoruba bell (konkolo)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.yoruba"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.tonada.set",
+   "name": "Tonada bell (Ashanti adowa)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.tonada"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.asaadua.set",
+   "name": "Asaadua bell (Akan)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.asaadua"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.sorsonet.set",
+   "name": "Sorsonet bell (Guinea)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.sorsonet"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.bemba.set",
+   "name": "Bemba clap (N. Zimbabwe)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.bemba"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.bell.ashanti.set",
+   "name": "Ashanti bell",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.bell.ashanti"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.pajdushko.set",
+   "name": "Pajdushko (Bulgaria)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.pajdushko"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.racenitsa.set",
+   "name": "Racenitsa (Bulgaria)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.racenitsa"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.dajchovo.set",
+   "name": "Dajchovo (Bulgaria)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.dajchovo"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.kopanica.set",
+   "name": "Kopanica (Bulgaria)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.kopanica"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.krivo.set",
+   "name": "Krivo Sadovsko",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.krivo"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.bucimis.set",
+   "name": "Bucimis (Bulgaria)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.bucimis"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.kalamatianos.set",
+   "name": "Kalamatianos / Makedonsko",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.kalamatianos"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.aksak.curcuna.set",
+   "name": "Curcuna (Turkey)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.aksak.curcuna"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.tala.tintal.set",
+   "name": "Tintal theka (16)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.tala.tintal"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.tala.keherwa.set",
+   "name": "Keherwa theka (8)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.tala.keherwa"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.tala.dadra.set",
+   "name": "Dadra theka (6)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.tala.dadra"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.tala.rupak.set",
+   "name": "Rupak theka (7)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.tala.rupak"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.tala.jhaptal.set",
+   "name": "Jhaptal theka (10)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.tala.jhaptal"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.gamelan.lancaran.set",
+   "name": "Lancaran colotomy (Java)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.gamelan.lancaran"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.gamelan.ketawang.set",
+   "name": "Ketawang colotomy (Java)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.gamelan.ketawang"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.usa.bodiddley.set",
+   "name": "Bo Diddley beat",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.usa.bodiddley"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.mena.malfuf.set",
+   "name": "Malfuf (Egypt)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.mena.malfuf"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.mena.ayyub.set",
+   "name": "Ayyub / Zar (Egypt)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.mena.ayyub"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.mena.masmoudi.set",
+   "name": "Masmoudi kabir (Egypt)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.mena.masmoudi"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.cuba.cascara.set",
+   "name": "Cascara (3-2)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.cuba.cascara"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.cuba.baqueteo.set",
+   "name": "Danzon baqueteo",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.cuba.baqueteo"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  },
+  {
+   "id": "tl.eire.slipjig.set",
+   "name": "Slip-jig timeline (Ireland)",
+   "family": "timeline",
+   "bpm": 110,
+   "vary": 0.0,
+   "axis": "genre",
+   "roles": {
+    "main": "tl.eire.slipjig"
+   },
+   "arrangement": [
+    {
+     "role": "main",
+     "bars": 8
+    }
+   ]
+  }
+ ]
+}

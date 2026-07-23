@@ -106,7 +106,7 @@
     {
       "slug": "MetaFugue",
       "name": "MetaFugue",
-      "description": "Single-module merge of Fugue and Fugue X on one wider panel. Adds the per-voice steps/range/sleep/probability, S&H mode, sorted min/mid/max CV outputs, and per-step triggers. Ideal for hosts without expander support, such as MetaModule.",
+      "description": "Fugue and Fugue X merged onto one wider panel: three CV/gate voices with per-voice steps/range/sleep/probability, S&H mode, sorted min/mid/max CV outs, and per-step triggers. Ideal for hosts without expander support, like MetaModule.",
       "manualUrl": "https://signalfunctionset.com/projects/fugue/",
       "tags": [
         "Sequencer",
@@ -172,7 +172,7 @@
     {
       "slug": "Shift",
       "name": "Shift",
-      "description": "4-output CV shift register. Per-lane step count, clock divider, step CV, and parallel/cascade mode (parallel = N-step delay line; cascade = tape-loop FIFO fed by the previous lane). Per-lane CV + gate outs, plus a jumble pair (random pick across lanes + accompanying clock).",
+      "description": "4-output CV shift register. Per-lane step count, clock divider, step CV, and parallel/cascade mode (parallel = N-step delay; cascade = FIFO fed by the previous lane). Per-lane CV + gate outs, plus a random jumble pair.",
       "manualUrl": "https://signalfunctionset.com/projects/shift/",
       "tags": [
         "Sample and hold",
@@ -184,7 +184,7 @@
     {
       "slug": "Wave",
       "name": "Wave",
-      "description": "Parametric wavetable voice. Six macro shape controls (Peaks, Bias, Transition, Skew, Width, Fold) sculpt each waveform; eight bookmark slots form a wavetable that WT INDEX scans through with adjustable morph time.",
+      "description": "Parametric wavetable voice. Six macro controls (Peaks, Bias, Transition, Skew, Width, Fold) sculpt the waveform; eight bookmark slots form a wavetable that WT INDEX scans with adjustable morph time.",
       "tags": [
         "Oscillator",
         "Waveshaper",
@@ -195,7 +195,7 @@
     {
       "slug": "Vac",
       "name": "Vac",
-      "description": "Semi-stable A/R envelope with vactrol-like drift. Rise and fall each have a bipolar STAB control: each trigger samples a fresh random factor scaled exponentially by STAB, so cycle-to-cycle timing wanders without ever collapsing. Linear↔exponential CURVE (with CV), latching LOOP, END trigger out.",
+      "description": "Semi-stable A/R envelope with vactrol-like drift. A bipolar STAB control on rise and fall re-randomises the timing each trigger, so it wanders without collapsing. Linear↔exponential curve, latching loop, and an END trigger.",
       "manualUrl": "https://signalfunctionset.com/projects/vac/",
       "tags": [
         "Envelope generator",
@@ -207,7 +207,7 @@
     {
       "slug": "Muse",
       "name": "Muse",
-      "description": "Faithful Triadex Muse port. Four Theme and four Interval sliders each tap one of 40 sources (counters plus a 31-bit XNOR shift register) — Theme bits feed the register, Interval bits address a diatonic scale. External clock, V/oct + gate out, randomize, and selectable scale.",
+      "description": "Faithful Triadex Muse port. Four Theme and four Interval sliders tap 40 sources (counters plus a 31-bit shift register) to spin out long, evolving melodic sequences. External clock, V/oct + gate out, randomize, and selectable scale.",
       "manualUrl": "https://signalfunctionset.com/projects/muse/",
       "tags": [
         "Sequencer",
@@ -217,7 +217,7 @@
     {
       "slug": "Gravity",
       "name": "Gravity",
-      "description": "Gravity-driven chaos engine with six visual modes: double pendulum, orbiting gravity well, elastic billiards, a Pac-Man-style maze, a LOGO turtle, and a spirograph/rose pattern generator. All modes share bipolar X/Y, radius and angle CVs, six sector-distance CVs, and six boundary-ray gates. Speed, chaos, and a mode-dependent gravity control; drag the display to throw or aim.",
+      "description": "Gravity-driven chaos engine with six visual modes (double pendulum, gravity well, billiards, Pac-Man maze, LOGO turtle, spirograph/rose). All share bipolar X/Y, radius and angle CVs, six sector-distance CVs, and six boundary-ray gates. Drag the display to throw or aim.",
       "manualUrl": "https://signalfunctionset.com/projects/gravity/",
       "tags": [
         "Low-frequency oscillator",
@@ -229,7 +229,7 @@
     {
       "slug": "Band",
       "name": "Band",
-      "description": "Harmonic bandpass bank. Four narrow bands each lock to an integer harmonic of a shared 1V/oct fundamental, isolating individual harmonics of a rich low wave. Per-band level and enable with a global harmonic-shift CV, plus mix and polyphonic per-band outputs.",
+      "description": "Harmonic bandpass bank. Four bands each lock to an integer harmonic of a shared 1V/oct fundamental, isolating harmonics of a rich wave. Per-band level and enable, a global harmonic-shift CV, plus mix and per-band outputs.",
       "manualUrl": "https://signalfunctionset.com/projects/band/",
       "tags": [
         "Filter",
@@ -240,7 +240,7 @@
     {
       "slug": "Cycle",
       "name": "Cycle",
-      "description": "Bar-synced quad LFO. Four channels (A-D), each with its own morphable shape and depth, lock to a musical bar via clock + bar inputs (free-running in Hz when unpatched). Global phase spread and stability, per-channel unipolar and bipolar outputs, and full CV.",
+      "description": "Bar-synced quad LFO. Four channels, each with a morphable shape and depth, lock to a musical bar via clock + bar inputs (free-running in Hz when unpatched). Global phase spread and stability, per-channel uni/bipolar outs, full CV.",
       "manualUrl": "https://signalfunctionset.com/projects/cycle/",
       "tags": [
         "Low-frequency oscillator",
@@ -263,7 +263,7 @@
     {
       "slug": "OpEnv",
       "name": "OP ENV",
-      "description": "Standalone DX7 operator envelope. Pick a voice from a DX7 .syx bank to load its carrier envelope, offset each of the eight EG attributes (rates and levels) via trimpot or CV, fire it with a gate, and get a 0-10V envelope.",
+      "description": "Standalone DX7 operator envelope. Loads a voice's carrier EG from a DX7 .syx bank, offsets its eight rate/level attributes via trimpot or CV, and fires it from a gate to a 0-10V output.",
       "manualUrl": "https://signalfunctionset.com/projects/op-env/",
       "tags": [
         "Envelope generator",
@@ -273,7 +273,7 @@
     {
       "slug": "Chance",
       "name": "Chance",
-      "description": "5-stage probabilistic step sequencer. Per-stage voltage slider plus repeat, probability, and harmonic-drift amounts; selectable direction, active length, and gate length; internal or external clock; CV/Gate/EOC outs and a randomize trigger.",
+      "description": "Generative melodic-walk sequencer with 8 seeded patterns. A deterministic core melody plus a per-step branch probability of straying to a neighbour (Markov-weighted), with rest/hold/leap/ratchet shaping and an optional harmony voice. External clock; CV/gate out.",
       "manualUrl": "https://signalfunctionset.com/projects/chance/",
       "tags": [
         "Sequencer",
@@ -305,7 +305,7 @@
     {
       "slug": "Ratio",
       "name": "Ratio",
-      "description": "Quad ratio VCA. One signal and one CV feed four outputs; each output scales the CV by its own bipolar ratio (-1..+1) to set a gain, with per-output slew and mute (button + gate). CV is normalled to +10V so the ratios act as a quad attenuverter when no CV is patched.",
+      "description": "Quad ratio VCA. One signal and one CV feed four outputs, each scaling the CV by its own bipolar ratio with per-output slew and mute. CV is normalled to +10V, so the ratios act as a quad attenuverter when no CV is patched.",
       "tags": [
         "Voltage-controlled amplifier",
         "Quad",
@@ -317,7 +317,7 @@
     {
       "slug": "Arrange",
       "name": "Arrange",
-      "description": "Song-form / arrangement sequencer. A linear chain of 8 phrases (bar-length sections); each phrase has a bar length, root + scale, BPM (linkable — a linked phrase inherits BPM/root/scale from the previous one), a gate out that stays high while it plays, and 4 channel enables. The 4 channels are per-instrument clock buses with clock division and CLOCK / BAR / RESET / EOC outputs each, muted on phrases where the channel is off — instruments drop in and out per phrase. Driven by a bar-rate clock. Master outs: phrase index (1V/phrase), BPM CV (for Meter), root + scale CV. The arrangement brain above Beat / Note / Chance.",
+      "description": "Song-form arrangement sequencer: a linear chain of 8 phrases (bar-length sections), each with its own bar length, root, scale, and BPM. Four per-instrument clock buses (with division and CLOCK/BAR/RESET/EOC outs) drop instruments in and out per phrase. Master BPM/root/scale CV outs drive Meter and Note.",
       "manualUrl": "https://signalfunctionset.com/projects/arrange/",
       "tags": [
         "Sequencer",
@@ -325,6 +325,18 @@
         "Random",
         "Utility"
       ]
+    },
+    {
+      "slug": "Fill",
+      "name": "Fill",
+      "description": "Auto-playing 5-channel drum sequencer. Curated groove banks organised into intensity tiers; one internal pressure value builds each bar and vents as a generated fill, so the groove thickens then releases — musical variation, not random. Per-channel gate/velocity/accent out.",
+      "tags": [
+        "Sequencer",
+        "Drum",
+        "Random",
+        "Clock modulator"
+      ],
+      "hidden": true
     }
   ]
 }
