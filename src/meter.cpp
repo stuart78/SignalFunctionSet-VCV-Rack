@@ -216,6 +216,12 @@ struct Meter : Module {
 	bool resetOnPlay = false;
 	bool bpmCvAbsolute = false;   // BPM CV as absolute 0.01V/BPM (e.g. from Arrange) vs additive offset
 
+	// Set by MeterWidget::step() when the NUM/DEN cable originates from a Fill
+	// module, whose CV is absolute (0.5V/count, 1V/denom index) rather than an
+	// additive offset. Not serialized — re-detected from the cable graph.
+	bool numCvFromFill = false;
+	bool denCvFromFill = false;
+
 	~Meter() {
 		delete (MeterExpanderMessage*)rightExpander.producerMessage;
 		delete (MeterExpanderMessage*)rightExpander.consumerMessage;
@@ -394,13 +400,17 @@ struct Meter : Module {
 		bpmKnob = clamp(bpmKnob, 30.f, 300.f);
 
 		int numKnob = (int)std::round(params[NUMERATOR_PARAM].getValue());
-		if (inputs[NUMERATOR_INPUT].isConnected())
-			numKnob += (int)std::round(inputs[NUMERATOR_INPUT].getVoltage() * 1.5f);
+		if (inputs[NUMERATOR_INPUT].isConnected()) {
+			if (numCvFromFill) numKnob = (int)std::round(inputs[NUMERATOR_INPUT].getVoltage() * 2.f);   // 0.5V/count (Fill)
+			else               numKnob += (int)std::round(inputs[NUMERATOR_INPUT].getVoltage() * 1.5f);
+		}
 		numKnob = clamp(numKnob, 1, 16);
 
 		int denIdx = (int)std::round(params[DENOMINATOR_PARAM].getValue());
-		if (inputs[DENOMINATOR_INPUT].isConnected())
-			denIdx += (int)std::round(inputs[DENOMINATOR_INPUT].getVoltage() * 0.5f);
+		if (inputs[DENOMINATOR_INPUT].isConnected()) {
+			if (denCvFromFill) denIdx = (int)std::round(inputs[DENOMINATOR_INPUT].getVoltage());        // 1V/index (Fill)
+			else               denIdx += (int)std::round(inputs[DENOMINATOR_INPUT].getVoltage() * 0.5f);
+		}
 		denIdx = clamp(denIdx, 0, NUM_DENOMS - 1);
 		int denValue = DENOM_VALUES[denIdx];
 
@@ -1111,6 +1121,32 @@ struct MeterWidget : ModuleWidget {
 		// BAR row (no swing): single output jack in the grid column
 		addOutput(createOutputCentered<PJ301MPort>(
 			mm2px(Vec(81.27f, 111.75f)), module, Meter::BAR_OUTPUT));
+	}
+
+	// Fill sends absolute time-signature CV; everything else is treated as an
+	// additive offset. Detected from the cable graph on the UI thread — the
+	// engine-side events (onPortChange, process) run under the engine lock and
+	// can't safely query cables.
+	// Matched by slug rather than the modelFill pointer so a dev-build Meter
+	// (plugin slug "SignalFunctionSet-dev") still recognizes a stable-build
+	// Fill and vice versa.
+	bool inputComesFromFill(int portId) {
+		for (CableWidget* cw : APP->scene->rack->getCablesOnPort(getInput(portId))) {
+			if (!cw->cable || !cw->cable->outputModule)
+				continue;
+			Model* srcModel = cw->cable->outputModule->model;
+			if (srcModel->slug == "Fill" && srcModel->plugin->slug.rfind("SignalFunctionSet", 0) == 0)
+				return true;
+		}
+		return false;
+	}
+
+	void step() override {
+		ModuleWidget::step();
+		if (Meter* m = dynamic_cast<Meter*>(module)) {
+			m->numCvFromFill = inputComesFromFill(Meter::NUMERATOR_INPUT);
+			m->denCvFromFill = inputComesFromFill(Meter::DENOMINATOR_INPUT);
+		}
 	}
 
 	void appendContextMenu(Menu* menu) override {
