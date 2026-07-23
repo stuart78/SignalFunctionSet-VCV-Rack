@@ -73,9 +73,9 @@ struct ChanceDisplay : OpaqueWidget {
 	Chance* module = nullptr;
 	std::shared_ptr<Font> font;
 	void drawLayer(const DrawArgs& args, int layer) override;
-	void drawScene(const DrawArgs& args, const int* core, const int* play, const bool* rest,
-	               const int* harm, bool harmOn, const int* seq, int seqLen, int curNode,
-	               int maxPos, bool running, int root, int scaleIdx);
+	void drawScene(const DrawArgs& args, const int* core, const int* play, const int* base,
+	               const bool* rest, const int* harm, bool harmOn, const int* seq, int seqLen,
+	               int curNode, int maxPos, bool running, int root, int scaleIdx);
 	void drawReseedIcon(NVGcontext* vg, rack::math::Rect r, bool on);
 	void drawKeyReadout(NVGcontext* vg, int root, int scaleIdx);
 	void drawBank(const DrawArgs& args);
@@ -120,7 +120,7 @@ struct Chance : Module {
 		PATREP_PARAM = PATTERN_PARAM + NUM_NODES,  // 8 per-pattern repeat counts (1-8)
 		KEY_PARAM = PATREP_PARAM + NUM_NODES,
 		ROOT_PARAM, START_PARAM, END_PARAM, GRAVITY_PARAM, DRIFT_PARAM, BRANCH_PARAM,
-		GATE_PARAM, RESTS_PARAM, HOLD_PARAM, OCTAVE_PARAM, REPEAT_PARAM, GLIDE_PARAM,
+		GATE_PARAM, RESTS_PARAM, EVEN_REST_PARAM, OCTAVE_PARAM, REPEAT_PARAM, GLIDE_PARAM,
 		RANDOMIZE_PARAM, RESET_PARAM,
 		HARMONY_PARAM,           // diatonic interval for the second voice
 		PARAMS_LEN
@@ -128,7 +128,7 @@ struct Chance : Module {
 	enum InputId {
 		CLOCK_INPUT, RESET_INPUT, RANDOMIZE_INPUT, ROOT_CV_INPUT,
 		GRAVITY_CV_INPUT, DRIFT_CV_INPUT, BRANCH_CV_INPUT, SCALE_CV_INPUT,
-		RESTS_CV_INPUT, HOLD_CV_INPUT, OCT_CV_INPUT, REPEAT_CV_INPUT, INPUTS_LEN
+		RESTS_CV_INPUT, EVEN_REST_CV_INPUT, OCT_CV_INPUT, REPEAT_CV_INPUT, INPUTS_LEN
 	};
 	enum OutputId { CV_OUTPUT, GATE_OUTPUT, HARMONY_OUTPUT, HARM_GATE_OUTPUT, OUTPUTS_LEN };
 	enum LightId {
@@ -139,6 +139,12 @@ struct Chance : Module {
 
 	uint32_t patternSeed[NUM_NODES] = {};   // per-pattern generative core seed
 	bool patternReseed[NUM_NODES] = {};     // per-pattern: regenerate a new seed on each play
+	// Per-run variation: when true (default), the shaping rolls (rests, holds, octave
+	// leaps, ratchets) re-roll each cycle from a fresh salt, so repeats of a fixed
+	// pattern vary in articulation while the melody stays the same. When false, every
+	// decision comes from patternSeed and repeats replay bit-identically (legacy).
+	bool perRunVary = true;
+	uint32_t cycleSalt = 0;                 // refreshed each cycle when perRunVary
 	int  patternGate[NUM_NODES][NUM_NODES]; // [pattern][step] gate: 0 off, 1 gate, 2 tie
 	int  patShape[NUM_NODES][NUM_NODES] = {}; // cached played contour per pattern (micro-waveform)
 	int  shapeDiv = 0;                       // throttles the patShape refresh
@@ -169,7 +175,8 @@ struct Chance : Module {
 
 	// per node-index (so the display aligns with the columns)
 	int  coreNote[NUM_NODES] = {};   // stable seeded skeleton
-	int  playNote[NUM_NODES] = {};   // what plays this cycle (core or a stray)
+	int  playNote[NUM_NODES] = {};   // what plays this cycle (core or a stray), octave leaps applied
+	int  baseNote[NUM_NODES] = {};   // playNote WITHOUT the octave overlay — the display's base contour
 	int  harmNote[NUM_NODES] = {};   // the complement
 	bool pathRest[NUM_NODES] = {};
 	bool pathTie[NUM_NODES] = {};     // this step is a tie (hold previous note, no retrigger)
@@ -219,8 +226,8 @@ struct Chance : Module {
 		configParam(DRIFT_PARAM, 0.f, 1.f, 0.3f, "Drift (move size)", "%", 0.f, 100.f);
 		configParam(BRANCH_PARAM, 0.f, 1.f, 0.25f, "Branch (stray from core)", "%", 0.f, 100.f);
 		configParam(GATE_PARAM, 0.f, 1.f, 0.5f, "Gate length", "%", 0.f, 100.f);
-		configParam(RESTS_PARAM, 0.f, 1.f, 0.f, "Rests", "%", 0.f, 100.f);
-		configParam(HOLD_PARAM, 0.f, 1.f, 0.f, "Held nodes", "%", 0.f, 100.f);
+		configParam(RESTS_PARAM, 0.f, 1.f, 0.f, "Odd-note rests", "%", 0.f, 100.f);
+		configParam(EVEN_REST_PARAM, 0.f, 1.f, 0.f, "Even-note rests", "%", 0.f, 100.f);
 		configParam(OCTAVE_PARAM, 0.f, 1.f, 0.f, "Octave leaps", "%", 0.f, 100.f);
 		configParam(REPEAT_PARAM, 0.f, 1.f, 0.f, "Ratchet (2-3 bursts within a step)", "%", 0.f, 100.f);
 		configParam(GLIDE_PARAM, 0.f, 1.f, 0.f, "Glide");
@@ -240,8 +247,8 @@ struct Chance : Module {
 		configInput(GRAVITY_CV_INPUT, "Gravity CV");
 		configInput(DRIFT_CV_INPUT, "Drift CV");
 		configInput(BRANCH_CV_INPUT, "Branch CV");
-		configInput(RESTS_CV_INPUT, "Rests CV");
-		configInput(HOLD_CV_INPUT, "Held nodes CV");
+		configInput(RESTS_CV_INPUT, "Odd-note rests CV");
+		configInput(EVEN_REST_CV_INPUT, "Even-note rests CV");
 		configInput(OCT_CV_INPUT, "Octave leaps CV");
 		configInput(REPEAT_CV_INPUT, "Ratchet CV");
 		configOutput(CV_OUTPUT, "CV (1V/oct)");
@@ -307,16 +314,23 @@ struct Chance : Module {
 			pos = chancePickNext(pos, curScale, sz, mp, gDrift, gGrav, hashF(seed, ni, 2));
 			cr[ni] = pos;
 		}
-		int prev = startOnRoot ? 0 : cr[sq[0]];
+		// Mirror computeCycle: chain the walk on the octave-FREE note so the octave
+		// overlay doesn't perturb the contour (prevMel), while ties hold the output (prevOut).
+		int prevMel = startOnRoot ? 0 : cr[sq[0]];
+		int prevOut = prevMel;
 		for (int k = 0; k < len; k++) {
 			int ni = sq[k], core = cr[ni];
-			int stray = chancePickNext(prev, curScale, sz, mp, gDrift, gGrav, hashF(seed, ni, 10));
+			int stray = chancePickNext(prevMel, curScale, sz, mp, gDrift, gGrav, hashF(seed, ni, 10));
 			int play = (hashF(seed, ni, 11) < gBranch) ? stray : core;
 			if (k == 0 && startOnRoot) play = 0;
 			// (ratchet — hashF salt 12 — affects retriggering, not pitch, so it's not applied here)
-			if (hashF(seed, ni, 13) < gOct) play = play + (hashF(seed, ni, 14) < 0.5f ? sz : -sz);
-			if (gateMode(pat, ni) == 2) play = prev;   // tie holds the previous note
-			out[k] = play; prev = play;
+			int o, mel;
+			if (gateMode(pat, ni) == 2) { o = prevOut; mel = prevMel; }   // tie holds the previous note
+			else {
+				mel = play; o = play;
+				if (hashF(seed, ni, 13) < gOct) o = play + (hashF(seed, ni, 14) < 0.5f ? sz : -sz);
+			}
+			out[k] = o; prevMel = mel; prevOut = o;
 		}
 		return len;
 	}
@@ -351,38 +365,64 @@ struct Chance : Module {
 		float gGrav = clamp(params[GRAVITY_PARAM].getValue() + inputs[GRAVITY_CV_INPUT].getVoltage() / 5.f, -1.f, 1.f);
 		float gDrift = clamp(params[DRIFT_PARAM].getValue() + inputs[DRIFT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 		float gBranch = clamp(params[BRANCH_PARAM].getValue() + inputs[BRANCH_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-		float gRests = clamp(params[RESTS_PARAM].getValue() + inputs[RESTS_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
-		float gHold  = clamp(params[HOLD_PARAM].getValue() + inputs[HOLD_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+		// Rests are split by note position: the Odd control governs the 1st/3rd/5th/…
+		// notes of the cycle, the Even control the 2nd/4th/6th/… — for predictable
+		// rhythmic variation (e.g. rest every off-beat).
+		float gRestOdd  = clamp(params[RESTS_PARAM].getValue() + inputs[RESTS_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
+		float gRestEven = clamp(params[EVEN_REST_PARAM].getValue() + inputs[EVEN_REST_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 		float gOct   = clamp(params[OCTAVE_PARAM].getValue() + inputs[OCT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 		float gRep   = clamp(params[REPEAT_PARAM].getValue() + inputs[REPEAT_CV_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 
 		uint32_t sd = patternSeed[walkPat()];
-		int prev = startOnRoot ? 0 : coreNote[seq[0]];
+		// Melody (core + stray/branch) uses `sd` so the pattern keeps its identity.
+		// The shaping rolls use `shSd`: in per-run mode a fresh per-cycle salt is mixed
+		// in so rests/holds/octave-leaps/ratchets vary every cycle; in fixed mode
+		// shSd == sd, so repeats replay bit-identically (legacy behaviour).
+		uint32_t shSd = perRunVary ? (sd ^ cycleSalt) : sd;
+		// Two running "previous note" values. chancePickNext keys off ABSOLUTE position,
+		// so if the octave overlay fed the walk, per-run octave variation would cascade
+		// into different note choices and regenerate the whole melody. So chain the walk
+		// on the octave-FREE melodic note (prevMel — depends only on `sd`, hence fixed
+		// per pattern); ties hold the actual OUTPUT note (prevOut, octave included).
+		// In legacy fixed mode the two track together, so octave feeds the walk as before.
+		int prevMel = startOnRoot ? 0 : coreNote[seq[0]];
+		int prevOut = prevMel;
 		for (int k = 0; k < seqLen; k++) {
 			int ni = seq[k];
 			int core = coreNote[ni];
-			// Markov detour from the previous PLAYED note — voice-leads even when straying.
-			// All decisions are SEEDED (hashF), not live-random, so a pattern is a fixed,
-			// repeatable melody: its repeats replay identically and knob edits are audible.
-			int stray = chancePickNext(prev, curScale, sz, maxPosDeg, gDrift, gGrav, hashF(sd, ni, 10));
-
+			// Melody: Markov detour from the previous melodic note. Seeded from `sd`, so
+			// the note skeleton is the pattern's fixed identity — never varies per run.
+			int stray = chancePickNext(prevMel, curScale, sz, maxPosDeg, gDrift, gGrav, hashF(sd, ni, 10));
 			bool deviate = (hashF(sd, ni, 11) < gBranch);
 			int play = deviate ? stray : core;
 			if (k == 0 && startOnRoot) play = 0;                 // ground each cycle on the root
-			if (hashF(sd, ni, 13) < gOct)
-				play = play + (hashF(sd, ni, 14) < 0.5f ? sz : -sz);
 
 			int gm = gateMode(walkPat(), ni);  // 0 off, 1 gate, 2 tie
-			if (gm == 2) play = prev;        // tie holds the previous note
-			playNote[ni] = play;
-			harmNote[ni] = play + harmonyOffsetFor(ni);   // 2nd voice (for output + display)
+			int out, mel;
+			if (gm == 2) {
+				out = prevOut; mel = prevMel;    // tie: hold previous note, don't advance the walk
+			} else {
+				mel = play;
+				out = play;
+				// Octave leap = articulation overlay (shSd), not part of the melody.
+				if (hashF(shSd, ni, 13) < gOct)
+					out = play + (hashF(shSd, ni, 14) < 0.5f ? sz : -sz);
+				if (!perRunVary) mel = out;      // legacy: octave fed the Markov chain
+			}
+			prevMel = mel; prevOut = out;
+
+			playNote[ni] = out;
+			baseNote[ni] = mel;                          // octave-free contour (for the display)
+			harmNote[ni] = out + harmonyOffsetFor(ni);   // 2nd voice (for output + display)
 			pathTie[ni]  = (gm == 2);
-			pathRest[ni] = (gm == 0) || (hashF(sd, ni, 15) < gRests);
-			pathDur[ni]  = (hashF(sd, ni, 16) < gHold) ? (2 + (int)(hashF(sd, ni, 17) * 3.f)) : 1;
+			// Rest roll uses the Odd/Even control by the note's position in the cycle
+			// (k is 0-based, so k%2==0 is the 1st/3rd/5th… note).
+			float gRest = (k % 2 == 0) ? gRestOdd : gRestEven;
+			pathRest[ni] = (gm == 0) || (hashF(shSd, ni, 15) < gRest);
+			pathDur[ni]  = 1;                            // Hold removed (replaced by Even rests)
 			// Ratchet: the note keeps its own pitch but retriggers 2-3 times inside the step
 			// (a burst), instead of the old "hold the previous note" behaviour.
-			pathRatchet[ni] = (hashF(sd, ni, 12) < gRep) ? (2 + (int)(hashF(sd, ni, 18) * 2.f)) : 1;
-			prev = play;
+			pathRatchet[ni] = (hashF(shSd, ni, 12) < gRep) ? (2 + (int)(hashF(shSd, ni, 18) * 2.f)) : 1;
 		}
 	}
 
@@ -414,6 +454,7 @@ struct Chance : Module {
 	void onClock() {
 		if (!started) {
 			started = true; enterPattern(firstActivePattern()); curStep = 0;
+			if (perRunVary) cycleSalt = random::u32();
 			computeCycle(); fireStep(0); nodeClocksRemaining = pathDur[seq[0]]; return;
 		}
 		if (nodeClocksRemaining > 1) { nodeClocksRemaining--; return; }
@@ -422,6 +463,7 @@ struct Chance : Module {
 			curStep = 0;
 			// advance repeat count, then hop to the next active pattern when done
 			if (++curRepeat > patRepeats(playPat)) enterPattern(nextActivePattern(playPat));
+			if (perRunVary) cycleSalt = random::u32();   // new run → re-roll shaping
 			computeCycle();
 		}
 		fireStep(curStep);
@@ -528,6 +570,7 @@ struct Chance : Module {
 		json_object_set_new(root, "editPat", json_integer(editPat));
 		json_object_set_new(root, "rangeOctaves", json_integer(rangeOctaves));
 		json_object_set_new(root, "startOnRoot", json_boolean(startOnRoot));
+		json_object_set_new(root, "perRunVary", json_boolean(perRunVary));
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
@@ -543,11 +586,12 @@ struct Chance : Module {
 		if (json_t* j = json_object_get(root, "playPat")) playPat = clamp((int)json_integer_value(j), 0, NUM_NODES - 1);
 		if (json_t* j = json_object_get(root, "rangeOctaves")) rangeOctaves = clamp((int)json_integer_value(j), 1, 2);
 		if (json_t* j = json_object_get(root, "startOnRoot")) startOnRoot = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "perRunVary")) perRunVary = json_boolean_value(j);
 	}
 };
 
 // ─── Display impl ────────────────────────────────────────────────────────────
-void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* play,
+void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* play, const int* base,
                               const bool* rest, const int* harm, bool harmOn, const int* seq,
                               int seqLen, int curNode, int maxPos, bool running, int root, int scaleIdx) {
 	NVGcontext* vg = args.vg;
@@ -557,17 +601,24 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 	if (maxPos < 1 || seqLen < 1) return;
 
 	const float top = walkTop(), bot = walkBot(), pad = SH(3);
-	// Auto-fit the vertical range to the notes actually present (core + played + harmony).
-	int lo = play[seq[0]], hi = play[seq[0]];
+	int szOct = sfs::SCALES[clamp(scaleIdx, 0, NUM_SCALES - 1)].size; if (szOct < 1) szOct = 1;
+	// Auto-fit to the BASE contour (core + base melody + base harmony) — NOT the octave
+	// leaps — so the base sequence keeps a stable scale regardless of per-run leaps. `harm`
+	// and `play` carry the octave overlay; strip it (play-base) for the harmony's base.
+	int lo = base[seq[0]], hi = base[seq[0]];
 	for (int k = 0; k < seqLen; k++) {
 		int ni = seq[k];
+		int hb = harm[ni] - (play[ni] - base[ni]);
 		if (core[ni] < lo) lo = core[ni]; if (core[ni] > hi) hi = core[ni];
-		if (play[ni] < lo) lo = play[ni]; if (play[ni] > hi) hi = play[ni];
-		if (harmOn) { if (harm[ni] < lo) lo = harm[ni]; if (harm[ni] > hi) hi = harm[ni]; }
+		if (base[ni] < lo) lo = base[ni]; if (base[ni] > hi) hi = base[ni];
+		if (harmOn) { if (hb < lo) lo = hb; if (hb > hi) hi = hb; }
 	}
 	if (hi <= lo) hi = lo + 1;
+	// Reserve one octave of head/foot room so leap lines (base ± an octave) have space and
+	// never squeeze the base contour.
+	int mapLo = lo - szOct, mapHi = hi + szOct;
 	auto X = [&](int ni) { return colCX(ni); };
-	auto Y = [&](int p) { return bot - pad - (bot - top - 2 * pad) * (float)(p - lo) / (float)(hi - lo); };
+	auto Y = [&](int p) { return bot - pad - (bot - top - 2 * pad) * (float)(p - mapLo) / (float)(mapHi - mapLo); };
 
 	// vertical column gridlines
 	for (int i = 0; i < NUM_NODES; i++) {
@@ -597,7 +648,7 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 	if (harmOn) {
 		nvgStrokeColor(vg, nvgRGBA(0x3f, 0xc9, 0x9a, 0xe0)); nvgStrokeWidth(vg, 2.f);
 		nvgBeginPath(vg);
-		for (int k = 0; k < seqLen; k++) { float x = X(seq[k]), y = Y(harm[seq[k]]); if (k == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y); }
+		for (int k = 0; k < seqLen; k++) { int ni = seq[k]; float x = X(ni), y = Y(harm[ni] - (play[ni] - base[ni])); if (k == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y); }
 		nvgStroke(vg);
 	}
 	// core skeleton (darker blue)
@@ -605,20 +656,32 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 	nvgBeginPath(vg);
 	for (int k = 0; k < seqLen; k++) { float x = X(seq[k]), y = Y(core[seq[k]]); if (k == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y); }
 	nvgStroke(vg);
-	// played path (bright blue)
+	// octave leaps — a thin vertical line from the base contour to the actual (leaped)
+	// pitch, drawn into the reserved head/foot room. The base line stays put; the jump is
+	// shown as an annotation rather than moving the sequence.
+	for (int k = 0; k < seqLen; k++) {
+		int ni = seq[k];
+		if (play[ni] == base[ni]) continue;
+		float x = X(ni), yb = Y(base[ni]), yp = Y(play[ni]);
+		nvgBeginPath(vg); nvgMoveTo(vg, x, yb); nvgLineTo(vg, x, yp);
+		nvgStrokeColor(vg, nvgRGBA(0x00, 0x97, 0xde, 0x99)); nvgStrokeWidth(vg, 1.3f); nvgStroke(vg);
+		nvgBeginPath(vg); nvgCircle(vg, x, yp, SW(2.2));   // small marker at the leaped pitch
+		nvgFillColor(vg, nvgRGB(0x00, 0x97, 0xde)); nvgFill(vg);
+	}
+	// played path (bright blue) — the base contour (octave leaps annotated above)
 	nvgStrokeColor(vg, nvgRGB(0x00, 0x97, 0xde)); nvgStrokeWidth(vg, 2.f);
 	nvgBeginPath(vg);
-	for (int k = 0; k < seqLen; k++) { float x = X(seq[k]), y = Y(play[seq[k]]); if (k == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y); }
+	for (int k = 0; k < seqLen; k++) { float x = X(seq[k]), y = Y(base[seq[k]]); if (k == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y); }
 	nvgStroke(vg);
 	for (int k = 0; k < seqLen; k++) {
 		int ni = seq[k];
 		bool on = running && (ni == curNode);
-		if (rest[ni]) {   // gate off → hollow circle at the note
-			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(play[ni]), SW(4.5));
+		if (rest[ni]) {   // gate off → hollow circle on the base contour
+			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(base[ni]), SW(4.5));
 			nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
 			nvgStrokeColor(vg, on ? nvgRGB(0xec, 0x65, 0x2e) : nvgRGB(0x00, 0x97, 0xde)); nvgStrokeWidth(vg, 1.6f); nvgStroke(vg);
 		} else if (on) {  // current step (gate on) → filled playhead
-			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(play[ni]), SW(5));
+			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(base[ni]), SW(5));
 			nvgFillColor(vg, nvgRGB(0xec, 0x65, 0x2e)); nvgFill(vg);
 		}
 	}
@@ -655,7 +718,7 @@ void ChanceDisplay::drawPreview(const DrawArgs& args) {
 	const bool rest[8] = {false, false, false, false, true, false, false, false};
 	const int harm[8] = {3, 7, 8, 6, 5, 4, 6, 8};   // a weaving 2nd voice
 	const int seq[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-	drawScene(args, core, play, rest, harm, true, seq, 8, 2, 8, true, 0, 1);
+	drawScene(args, core, play, play, rest, harm, true, seq, 8, 2, 8, true, 0, 1);
 	drawKeyReadout(args.vg, 0, 1);
 }
 
@@ -680,7 +743,7 @@ void ChanceDisplay::drawLayer(const DrawArgs& args, int layer) {
 	if (!module) { drawPreview(args); drawBank(args); drawControls(args); return; }
 	Chance* m = dynamic_cast<Chance*>(module);
 	if (!m) { drawPreview(args); drawBank(args); drawControls(args); return; }
-	drawScene(args, m->coreNote, m->playNote, m->pathRest, m->harmNote, m->harmonyEnabled(),
+	drawScene(args, m->coreNote, m->playNote, m->baseNote, m->pathRest, m->harmNote, m->harmonyEnabled(),
 	          m->seq, m->seqLen, m->curNodeIdx, m->maxPosDeg, m->dispRunning, m->curRoot, m->curScale);
 	drawKeyReadout(args.vg, m->curRoot, m->curScale);
 	drawBank(args);
@@ -894,9 +957,9 @@ struct ChanceWidget : ModuleWidget {
 		// three control-row Y bands below the screen.
 		static const float CX[9] = {10.16f, 24.02f, 37.89f, 51.75f, 65.62f, 79.48f, 93.34f, 107.21f, 121.07f};
 
-		// Row A (y=76.31) — trimpots: START END | GRAV DRIFT BRANCH REST HOLD LEAP RATCHET
+		// Row A (y=76.31) — trimpots: START END | GRAV DRIFT BRANCH ODD-REST EVEN-REST LEAP RATCHET
 		const int rowA[9] = {Chance::START_PARAM, Chance::END_PARAM, Chance::GRAVITY_PARAM,
-			Chance::DRIFT_PARAM, Chance::BRANCH_PARAM, Chance::RESTS_PARAM, Chance::HOLD_PARAM,
+			Chance::DRIFT_PARAM, Chance::BRANCH_PARAM, Chance::RESTS_PARAM, Chance::EVEN_REST_PARAM,
 			Chance::OCTAVE_PARAM, Chance::REPEAT_PARAM};
 		for (int i = 0; i < 9; i++) addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[i], 76.31f)), module, rowA[i]));
 
@@ -904,7 +967,7 @@ struct ChanceWidget : ModuleWidget {
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[0], 90.f)), module, Chance::GATE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[1], 90.f)), module, Chance::GLIDE_PARAM));
 		const int rowBcv[7] = {Chance::GRAVITY_CV_INPUT, Chance::DRIFT_CV_INPUT, Chance::BRANCH_CV_INPUT,
-			Chance::RESTS_CV_INPUT, Chance::HOLD_CV_INPUT, Chance::OCT_CV_INPUT, Chance::REPEAT_CV_INPUT};
+			Chance::RESTS_CV_INPUT, Chance::EVEN_REST_CV_INPUT, Chance::OCT_CV_INPUT, Chance::REPEAT_CV_INPUT};
 		for (int i = 0; i < 7; i++) addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[i + 2], 90.f)), module, rowBcv[i]));
 
 		// Row C (y=106.67) — KEY ROOT trims · RND RST buttons · CV GATE outs (dark inset)
@@ -935,6 +998,7 @@ struct ChanceWidget : ModuleWidget {
 		menu->addChild(createMenuLabel("Gate row (focused pattern): click = on/off · shift-click = tie"));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Start each cycle on root", "", &m->startOnRoot));
+		menu->addChild(createBoolPtrMenuItem("Vary shaping each run (rests/holds/octaves/ratchets)", "", &m->perRunVary));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Walk range"));
 		menu->addChild(createCheckMenuItem("±1 octave", "",
