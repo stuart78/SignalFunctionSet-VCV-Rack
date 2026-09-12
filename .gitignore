@@ -27,3 +27,4 @@ __pycache__/
 # stray offline-harness output (see tools/prism-envelope-harness.py)
 /h
 /h.cpp
+hv.cpp

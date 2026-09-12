@@ -417,15 +417,16 @@ A struck membrane, modelled mode by mode. A drum head is a 2D wave equation on a
 - **SIZE and TENSION are not a duplicate pair, and the reason is the whole design.** For an ideal membrane, radius and tension scale every mode by the same factor and leave the *ratios* untouched, so acoustically they're one control. What breaks that scale invariance is bending stiffness, the air cavity, and damping that depends on size. That's why MATERIAL and AIR exist, and it's why a small tight drum and a large slack one at the same pitch are different instruments.
 - **AIR closes the bottom of the shell.** At zero it's an open shell with a resonant head across it, which is a tom or a kick; wound up it bellies into a sealed bowl, which is a kettledrum. A kettledrum is exactly what the harmonic series AIR imposes belongs to. Same knob, same story, twice.
 - **Tooltips report quantities, not percentages.** A drum has a diameter, a head has a pitch, a beater has a weight and a contact time. SIZE reads inches and centimetres, EXCITER reads "hard mallet, 3.4 ms contact".
-- **Separate HEAD and WIRES outputs**, so the snare wires can take their own compressor or reverb, which is what a close-miked snare gets in practice.
+- **Eight instruments, one panel.** Channel N of every cable is instrument N: a poly gate plays the kit, a poly V/OCT tunes each drum, a mono CV moves all eight. The screen's eight tabs are the drums themselves, drawn small and moving when struck, with a level bar under each so the balance of the kit is visible on one baseline. The knobs edit the selected tab. A drum that is not ringing costs nothing.
+- **One poly output**, instrument N on channels 2N-1 and 2N, plus a stereo MIX pair. **PolyKit In**, an expander to the left, exposes every input for every instrument as its own jack, thirteen by eight, for racks whose sources are eight modules rather than one poly cable. A patch saved before there were eight instruments becomes instrument 1 and sounds exactly as it did.
 - **The head is drawn as it moves**, and you play it with the mouse. A taut head pulls its grid out toward the rim and a slack one lets it gather in the middle, which is what tension does to a real head's response.
-- **Ten instruments** in the menu: Tom, Floor tom, Timpani, Kick, Snare, Brush snare, Gong, Steel pan, Frame drum, Tabla. These are what the engine was measured against while it was built, so they're also the shortest route to hearing whether something has broken.
+- **Fourteen instruments** in the menu: Tom, Floor tom, Timpani, Kick, Snare, Brush snare, Gong, Steel pan, Frame drum, Tabla, Closed hat, Open hat, Clap, Bell. The default kit is Fill's eight channels in Fill's order, so a poly cable from Fill needs no mapping. These are what the engine was measured against while it was built, so they're also the shortest route to hearing whether something has broken.
 
 **Controls:** Size, Tension, Material, Air, Decay, Tone, Exciter, Muffle, Couple, Reso, Bend, Weight, Wires, Tight, Level, Hit.
-**Inputs:** Gate, V/Oct, Velocity, Strike X, Strike Y, and CV for all eight voice controls.
-**Outputs:** Head, Wires, Mix.
+**Inputs:** Gate, V/Oct, Velocity, Strike X, Strike Y, and CV for all eight voice controls, all polyphonic (channel N is instrument N).
+**Outputs:** Poly (16 channels, L/R per instrument), Mix L, Mix R.
 
-**Context menu:** Head view (flat or 3D), Instruments.
+**Context menu:** Head view (flat or 3D), Stereo pairs, Reset mic positions, Load into instrument N, Load the default kit.
 
 See [docs/kit-manual.md](docs/kit-manual.md) for the full manual.
 

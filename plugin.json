@@ -431,6 +431,13 @@
       ]
     },
     {
+      "slug": "PolyKitIn",
+      "name": "PolyKit In",
+      "description": "Expander for Kit: every input for every instrument as its own jack, thirteen by eight.",
+      "tags": ["Expander", "Drum", "Utility"],
+      "hidden": true
+    },
+    {
       "slug": "Trace",
       "name": "Trace",
       "description": "A paper loop and four brushes: draw four CVs, or let the patch draw them.",

@@ -49,6 +49,7 @@ extern Model* modelSpool;
 extern Model* modelSlideX;
 extern Model* modelSlice;
 extern Model* modelKit;
+extern Model* modelPolyKitIn;
 extern Model* modelTrace;
 extern Model* modelSigma;
 extern Model* modelTouch;

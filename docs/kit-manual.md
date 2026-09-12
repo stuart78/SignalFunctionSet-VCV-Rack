@@ -12,7 +12,44 @@ One instrument covers tom, timpani, kick, snare, gong, steel pan, frame drum and
 tabla, because those differ in shell depth, head stiffness and air cavity rather
 than in kind.
 
+Kit holds **eight instruments** at once, and channel N of every cable is
+instrument N. The panel's knobs edit whichever instrument is selected on the
+screen; the other seven keep their own settings and play on their own channels.
+
 Kit is 22HP.
+
+## Eight instruments, one panel
+
+The screen has a row of eight tabs along its foot, one per instrument, each a
+small drawing of that drum which moves when it is struck. Click a tab and the
+panel's knobs show that instrument; turn a knob and only that instrument
+changes. A level bar under each tab shows what each drum just did, on one
+baseline, so the balance of the kit is visible at a glance.
+
+A new Kit comes loaded with a default kit that is Fill's eight channels, in
+Fill's order: Kick, Snare, Closed hat, Open hat, Low (floor tom), High (tom),
+Clap, Bell. A poly cable from Fill plays the right drum on every channel with
+nothing to map. Right-click a tab to load any preset into that instrument, or
+to reset its mics; the module's own menu does the same for the selected one,
+and can reload the default kit into all eight.
+
+**Channel N is instrument N.** A polyphonic GATE fires instrument N from channel
+N; a mono gate fires instrument 1 only. VEL, V/OCT, X, Y and the eight CV
+inputs read channel N for instrument N, and a mono cable applies to all eight,
+which is the usual convention for modulation.
+
+A drum that is not ringing costs nothing. The cost of the module follows how
+many drums are sounding, not how many are loaded.
+
+## PolyKit In
+
+If your sources are eight separate modules rather than one polyphonic one,
+place **PolyKit In** immediately to the left of Kit. It is a matrix of jacks:
+thirteen columns, one per Kit input (TRIG, V/OCT, VEL, X, Y and the eight CVs),
+by eight rows, one per instrument. Every cell is a mono jack for that
+instrument's input. A patched jack takes over that channel from Kit's own poly
+cable; an unpatched one leaves the poly cable in charge, so a poly trigger
+from Fill and a single hand-patched tension can coexist. PolyKit In is 33HP.
 
 ## The one thing to know about the parameters
 
@@ -68,23 +105,31 @@ hangs under the thing it modulates, so the pairing needs no label.
 
 Row 4 is the transport row: performance data in and out, nothing else.
 
+All inputs are polyphonic, channel N for instrument N.
+
 | Input | Notes |
 |---|---|
-| GATE | Strikes on a rising edge. |
-| V/OCT | 1V/oct. |
+| GATE | Strikes on a rising edge. Channel N fires instrument N; a mono cable fires instrument 1. |
+| V/OCT | 1V/oct. A mono cable pitches all eight. |
 | VEL | Velocity, 0–10V. |
 | X, Y | Strike position, ±5V, summed with the STRIKE X/Y parameters. |
+| CV row | One CV per voice control, channel N for instrument N. |
 
 ## Outputs
 
 | Output | Notes |
 |---|---|
-| HEAD | The membrane alone. |
-| WIRES | The snare wires alone. |
-| MIX | Both, at LEVEL. |
+| POLY | Sixteen channels: instrument N on channels 2N-1 (left) and 2N (right). With Stereo pairs off, left and right carry the same mono signal. |
+| MIX L, MIX R | All eight summed, in stereo. |
 
-Taking HEAD and WIRES separately is how you put the wires through their own
-compressor or reverb, which is what a close-miked snare gets in practice.
+Head and wires are summed per instrument. Eight instruments in stereo is
+exactly sixteen channels, which is all a cable holds, so the wires no longer
+have a jack of their own; a snare that wants its own compressor takes its own
+pair off the poly out.
+
+A patch saved before Kit had eight instruments still works unchanged: its drum
+becomes instrument 1, a mono gate still fires it, and channel 1 of the poly out
+is still its left.
 
 ## The display
 
@@ -113,10 +158,16 @@ modes are actually sounding.
 ## Context menu
 
 - **Head view**: Flat or 3D.
-- **Instruments**: Tom, Floor tom, Timpani, Kick, Snare, Brush snare, Gong,
-  Steel pan, Frame drum, Tabla. These are the instruments the engine was
+- **Stereo pairs** (on by default): two mics in the air over each head rather
+  than one on it, so the strike position moves the drum in the image. Per
+  instrument, and the mics are dragged on the head of the selected instrument.
+  With it off the mics are not drawn, since they do nothing.
+- **Reset mic positions**: the measured pair, for the selected instrument.
+- **Load into instrument N**: Tom, Floor tom, Timpani, Kick, Snare, Brush snare,
+  Gong, Steel pan, Frame drum, Tabla, Closed hat, Open hat, Clap, Bell. These are the instruments the engine was
   measured against while it was being built, so they are also the shortest route
   to hearing whether something has broken.
+- **Load the default kit into all eight.**
 
 ## Patch ideas
 

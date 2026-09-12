@@ -1,8 +1,11 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
 #include "membrane.hpp"
+#include "polykit-messages.hpp"
 #include "waveguide.hpp"   // softClip
 #include <cmath>
+#include <atomic>
+#include <cstring>
 
 // Kit -- a struck membrane, modelled mode by mode.
 //
@@ -110,8 +113,20 @@ static const KitPreset KIT_PRESETS[] = {
 	{"Steel pan",    0.185f, 0.50f, 0.70f, 0.00f, 0.756f, 0.30f, 0.25f, 1.00f, 0.60f, 0.00f, 0.29f, 0.00f, 0.52f, 0.64f},
 	{"Frame drum",   0.441f, 0.50f, 0.00f, 0.20f, 0.523f, 0.60f, 0.25f, 1.00f, 0.45f, 0.20f, 1.00f, 0.00f, 0.52f, 0.82f},
 	{"Tabla",        0.221f, 0.50f, 0.15f, 0.50f, 0.658f, 0.55f, 0.30f, 1.00f, 0.80f, 0.35f, 1.00f, 0.00f, 0.52f, 0.70f},
+	// The four below exist so the default kit is Fill's eight channels (KICK
+	// SNR CHH OHH LOW HIGH CLAP BELL). A hat is a small stiff plate struck hard
+	// near its edge and choked (closed) or let ring (open); a clap is a short
+	// small drum that is nearly all wires; a bell is the steel pan's material
+	// at a bell's size with a long decay and the highs kept.
+	{"Closed hat",   0.120f, 0.60f, 1.00f, 0.00f, 0.120f, 0.25f, 0.20f, 1.00f, 1.00f, 0.55f, 0.00f, 0.00f, 0.52f, 0.72f},
+	{"Open hat",     0.120f, 0.60f, 1.00f, 0.00f, 0.450f, 0.25f, 0.20f, 1.00f, 1.00f, 0.10f, 0.00f, 0.00f, 0.52f, 0.72f},
+	{"Clap",         0.250f, 0.50f, 0.10f, 0.00f, 0.200f, 0.70f, 0.50f, 1.30f, 0.90f, 0.30f, 0.00f, 1.00f, 0.10f, 0.40f},
+	{"Bell",         0.200f, 0.70f, 1.00f, 0.00f, 0.800f, 0.15f, 0.20f, 1.00f, 1.00f, 0.00f, 0.00f, 0.00f, 0.52f, 0.55f},
 };
 static const int KIT_NPRESET = (int)(sizeof(KIT_PRESETS) / sizeof(KIT_PRESETS[0]));
+// Eight instruments: two poly channels each is the whole of a sixteen-channel
+// cable, which is a good sign the size is right.
+static const int KIT_N = 8;
 
 struct Kit : Module {
 	enum ParamId {
@@ -137,38 +152,43 @@ struct Kit : Module {
 	enum OutputId { OUT_OUTPUT, HEAD_OUTPUT, SNARE_OUTPUT, OUTPUTS_LEN };
 	enum LightId { STRIKE_LIGHT, LIGHTS_LEN };
 
-	sfs::Drum drum;
-	dsp::SchmittTrigger gateTrig, strikeBtn;
-	int ctl = 0;
-	float lastVel = 0.6f;
-	float uiFlash = 0.f;
-	// Set by the display when you play the head with the mouse. The strike is
-	// consumed in process(), never fired from the UI thread.
+	// ── EIGHT INSTRUMENTS, ONE PANEL ────────────────────────────────────────
+	// The panel's knobs are a VIEW onto the selected instrument, the way Beat's
+	// controls edit one pattern: each instrument keeps its own copy of every
+	// knob value, selecting a tab pushes that slot into the knobs, and from then
+	// on the knobs ARE the slot -- copied back every sample, no change detection
+	// to get wrong. Channel N of every cable is instrument N.
+	struct Inst {
+		sfs::Drum drum;
+		float v[PARAMS_LEN] = {0.f};
+		dsp::SchmittTrigger gateTrig;
+		float lastVel = 0.6f, uiFlash = 0.f;
+		float level = 0.f;                   // peak follower, for the meters
+		int   ctl = 0;                       // control-rate countdown
+		int   hold = 0;                      // samples to keep running after a strike
+		// QUIET means "not ringing": the mode bank is skipped entirely, so the
+		// cost of the module tracks how many drums are SOUNDING, not eight.
+		bool  quiet = true;
+		// what the screen draws this instrument from
+		float dispR = 0.55f, dispA = 0.f, dispEnergy = 0.f;
+		float dispSize = 0.45f, dispTens = 0.5f, dispAir = 0.f;
+		float dispExcite = 0.7f, dispWires = 0.f, dispMuffle = 0.f, dispCouple = 0.4f;
+		float dispStiff = 0.3f;
+		float modeVis[sfs::Drum::NM] = {0.f};
+		float micSeen[4] = {0.f, 0.f, 0.f, 0.f};
+	};
+	Inst inst[KIT_N];
+	int edit = 0;                            // the instrument the knobs show
+	std::atomic<int> editReq{-1};            // a tab click, consumed in process()
+	dsp::SchmittTrigger strikeBtn;
+	// A mouse strike is aimed at the instrument being edited.
 	float pendVel = 0.f, pendX = 0.f, pendY = 0.f;
 	bool  pendHit = false;
-	// Mirrors for the display, which must not reach into the audio thread.
-	float dispR = 0.55f, dispA = 0.f, dispEnergy = 0.f;
-	// The screen must draw what the ENGINE is using, not what the knobs say. CV
-	// is summed into locals in process() and never written back to the params,
-	// so a display reading params[] shows the knob and silently ignores every
-	// patched cable -- which is exactly how it behaved.
-	float dispSize = 0.45f, dispTens = 0.5f, dispAir = 0.f;
-	float dispExcite = 0.7f, dispWires = 0.f, dispMuffle = 0.f, dispCouple = 0.4f;
-	float dispStiff = 0.3f;
-	float modeVis[sfs::Drum::NM] = {0.f};
 	int   headView = 1;                  // 0 = flat rings, 1 = 3D surface
-	// Two mics over the head instead of a pickup on it: see membrane.hpp. Every
-	// output goes polyphonic, 2 channels, left on 0 and right on 1 -- which is
-	// what every stereo module in Rack means by a poly cable, and it keeps the
-	// panel exactly as it is rather than growing three more jacks.
-	bool  stereo = false;
-	// The mic geometry belongs to the engine and the display writes to it
-	// directly -- four floats, each written atomically, and the worst a race
-	// can do is leave one control tick reading one new coordinate beside one
-	// old one, which is a position on the head like any other. This is what
-	// NOTICES, so that a drag re-solves the air path (arrival times and the
-	// distance law) instead of leaving it on the geometry of the last strike.
-	float micSeen[4] = {0.f, 0.f, 0.f, 0.f};
+	// STEREO PAIRS. The poly out always carries L and R per instrument; with
+	// this off both channels of a pair are the mono tap, and the mono path is
+	// bit-identical to what Kit was before stereo existed.
+	bool  stereo = true;
 
 	Kit() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -197,7 +217,7 @@ struct Kit : Module {
 		configParam(LEVEL_PARAM, 0.f, 2.f, 1.f, "Level", "x");
 		configButton(STRIKE_PARAM, "Strike");
 
-		configInput(GATE_INPUT, "Gate or trigger");
+		configInput(GATE_INPUT, "Trigger (poly: channel N fires instrument N; a mono cable fires instrument 1; PolyKit In to the left gives each instrument its own jack)");
 		configInput(VEL_INPUT, "Velocity (0-10V)");
 		configInput(VOCT_INPUT, "1V/oct");
 		configInput(STRIKEX_INPUT, "Strike X CV (+/-5V)");
@@ -210,189 +230,349 @@ struct Kit : Module {
 		configInput(DECAY_INPUT, "Decay CV (+/-5V)");
 		configInput(TONE_INPUT, "Tone CV (+/-5V)");
 		configInput(EXCITE_INPUT, "Beater CV (+/-5V)");
-		configOutput(OUT_OUTPUT, "Mix");
-		configOutput(HEAD_OUTPUT, "Head only");
-		configOutput(SNARE_OUTPUT, "Wires only");
+		// OUT_OUTPUT is the POLY out: sixteen channels, instrument N on 2N (L)
+		// and 2N+1 (R). HEAD/SNARE keep their ids -- outputs serialise by index
+		// -- and carry the stereo MIX of all eight. Per-instrument head and wires
+		// are summed, which is the price of eight instruments on one cable.
+		configOutput(OUT_OUTPUT, "Poly: instrument N on channels 2N-1 (L) and 2N (R)");
+		configOutput(HEAD_OUTPUT, "Mix L");
+		configOutput(SNARE_OUTPUT, "Mix R");
+		loadDefaultKit();
 	}
 
-	inline float pv(int p, int in, float lo = 0.f, float hi = 1.f) {
-		float v = params[p].getValue();
-		if (inputs[in].isConnected()) v += inputs[in].getVoltage() * 0.2f * (hi - lo);
+	// ── PolyKit In, the expander to the left ────────────────────────────────
+	// Every per-instrument input has two possible sources: channel c of the
+	// poly cable on Kit's own jack, or that instrument's jack on the expander.
+	// The expander's jack wins WHEN IT IS PATCHED, per jack, so the two can be
+	// mixed: a poly gate from Fill and one instrument's tension from a knob.
+	const PolyKitMessage* xp = nullptr;
+	static int pkCol(int in) {
+		switch (in) {
+			case GATE_INPUT:    return PK_TRIG;   case VOCT_INPUT:    return PK_VOCT;
+			case VEL_INPUT:     return PK_VEL;    case STRIKEX_INPUT: return PK_X;
+			case STRIKEY_INPUT: return PK_Y;      case SIZE_INPUT:    return PK_SIZE;
+			case TENSION_INPUT: return PK_TENS;   case STIFF_INPUT:   return PK_MAT;
+			case AIR_INPUT:     return PK_AIR;    case DECAY_INPUT:   return PK_DECAY;
+			case TONE_INPUT:    return PK_TONE;   case EXCITE_INPUT:  return PK_EXC;
+			case MUFFLE_INPUT:  return PK_MUFFLE;
+		}
+		return -1;
+	}
+	// The voltage instrument c sees at input `in`, and whether anything is
+	// feeding it at all. A mono poly cable reaches every instrument, as
+	// getPolyVoltage has it -- the ordinary Rack convention for modulation.
+	bool xin(int in, int c, float& out) {
+		int col = pkCol(in);
+		if (xp && col >= 0 && xp->on[col][c]) { out = xp->v[col][c]; return true; }
+		if (inputs[in].isConnected()) { out = inputs[in].getPolyVoltage(c); return true; }
+		return false;
+	}
+	// A knob value for instrument c, with that instrument's CV on top.
+	inline float pvc(int c, int p, int in, float lo = 0.f, float hi = 1.f) {
+		float v = inst[c].v[p], cv;
+		if (xin(in, c, cv)) v += cv * 0.2f * (hi - lo);
 		return clamp(v, lo, hi);
 	}
 
+	void pushSlotToParams() {
+		for (int p = 0; p < PARAMS_LEN; p++)
+			if (p != STRIKE_PARAM) params[p].setValue(inst[edit].v[p]);
+	}
+
+	// Control rate, per instrument. The mode layout involves a pow and two sqrts
+	// per mode, so the eight are STAGGERED (see the ctl seeds in loadDefaultKit)
+	// rather than all re-solved in the same sample.
+	void control(int c) {
+		Inst& I = inst[c];
+		sfs::Drum& drum = I.drum;
+		float size = pvc(c, SIZE_PARAM, SIZE_INPUT);
+		float tens = pvc(c, TENSION_PARAM, TENSION_INPUT);
+		// One pitch, from both. Size spans roughly a 22" kick to a 6" splash
+		// and tension is a fifth either way on top of it.
+		float f0 = 34.f * std::pow(11.f, 1.f - size) * std::pow(2.f, (tens - 0.5f) * 1.4f);
+		float vo;
+		if (xin(VOCT_INPUT, c, vo)) f0 *= std::pow(2.f, vo);
+		drum.f0 = clamp(f0, 12.f, 4000.f);
+		// The one place a drum's ABSOLUTE size matters. Everything about the
+		// modes is scale-invariant -- that is the whole argument for SIZE and
+		// TENSION being one control -- but the speed of sound is not a ratio,
+		// so the distance from the strike to each mic is real metres and a
+		// 22-inch kick images far wider than a 6-inch splash. Same expression
+		// the SIZE tooltip prints, halved to a radius.
+		drum.radiusM = 6.f * std::pow(22.f / 6.f, size) * 0.0127f;
+
+		drum.stiff    = pvc(c, STIFF_PARAM, STIFF_INPUT);
+		drum.air      = pvc(c, AIR_PARAM, AIR_INPUT);
+		drum.couple   = I.v[COUPLE_PARAM];
+		drum.resoTune = I.v[RESO_PARAM];
+		// A big drum rings longer than a small one at the same tension, so
+		// decay leans on size as well as on its own knob.
+		float dk = pvc(c, DECAY_PARAM, DECAY_INPUT);
+		drum.decay = 0.08f * std::pow(90.f, dk) * (0.6f + 0.8f * size);
+		drum.tone  = pvc(c, TONE_PARAM, TONE_INPUT) * 1.3f;
+		drum.muffle    = pvc(c, MUFFLE_PARAM, MUFFLE_INPUT);
+		drum.muffleAng = I.v[MUFFLEANG_PARAM] * (float)M_PI;
+		drum.bend      = I.v[BEND_PARAM] * 0.35f;
+		drum.snareAmt  = I.v[SNARE_PARAM];
+		drum.snareThr  = 0.04f + I.v[SNARETHR_PARAM] * 0.5f;
+		drum.snareTight = 0.06f + (1.f - I.v[SNARETHR_PARAM]) * 0.3f;
+
+		float xcv = 0.f, ycv = 0.f;
+		xin(STRIKEX_INPUT, c, xcv); xin(STRIKEY_INPUT, c, ycv);
+		float x = clamp(I.v[STRIKEX_PARAM] + xcv * 0.2f, -1.f, 1.f);
+		float y = clamp(I.v[STRIKEY_PARAM] + ycv * 0.2f, -1.f, 1.f);
+		float r = std::min(1.f, std::sqrt(x * x + y * y));
+		drum.strikeR   = r * 0.97f;
+		drum.strikeAng = std::atan2(y, x);
+		I.dispR = r; I.dispA = drum.strikeAng;
+		I.dispSize = size; I.dispTens = tens; I.dispAir = drum.air;
+		I.dispMuffle = drum.muffle; I.dispCouple = drum.couple;
+		I.dispStiff = drum.stiff;
+		I.dispExcite = pvc(c, EXCITE_PARAM, EXCITE_INPUT);
+		I.dispWires  = clamp(I.v[SNARE_PARAM], 0.f, 1.f);
+		// modes first: updateStrike()'s excitation tilt reads ratio[], which
+		// updateModes() computes. The other order used last frame's layout.
+		drum.updateModes();
+		drum.updateStrike();
+		if (I.micSeen[0] != drum.micR[0]   || I.micSeen[1] != drum.micR[1]
+		 || I.micSeen[2] != drum.micAng[0] || I.micSeen[3] != drum.micAng[1]) {
+			I.micSeen[0] = drum.micR[0];   I.micSeen[1] = drum.micR[1];
+			I.micSeen[2] = drum.micAng[0]; I.micSeen[3] = drum.micAng[1];
+			drum.updateMics();
+		}
+		I.dispEnergy = drum.energy;
+		for (int k = 0; k < sfs::Drum::NM; k++)
+			I.modeVis[k] = I.quiet ? 0.f : std::fabs(drum.lo[k].value()) * drum.outGain;
+	}
+
 	void process(const ProcessArgs& args) override {
-		drum.sr = args.sampleRate;
+		// The expander, if one is standing to the left.
+		xp = nullptr;
+		if (leftExpander.module && leftExpander.module->model == modelPolyKitIn)
+			xp = (const PolyKitMessage*)leftExpander.module->rightExpander.consumerMessage;
 
-		// Control rate. The mode layout involves a pow and two sqrts per mode
-		// and nothing in it needs to be sample-accurate.
-		if (--ctl <= 0) {
-			ctl = 32;
-			float size = pv(SIZE_PARAM, SIZE_INPUT);
-			float tens = pv(TENSION_PARAM, TENSION_INPUT);
-			// One pitch, from both. Size spans roughly a 22" kick to a 6" splash
-			// and tension is a fifth either way on top of it.
-			float f0 = 34.f * std::pow(11.f, 1.f - size) * std::pow(2.f, (tens - 0.5f) * 1.4f);
-			if (inputs[VOCT_INPUT].isConnected())
-				f0 *= std::pow(2.f, inputs[VOCT_INPUT].getVoltage());
-			drum.f0 = clamp(f0, 12.f, 4000.f);
-			// The one place a drum's ABSOLUTE size matters. Everything about the
-			// modes is scale-invariant -- that is the whole argument for SIZE and
-			// TENSION being one control -- but the speed of sound is not a ratio,
-			// so the distance from the strike to each mic is real metres and a
-			// 22-inch kick images far wider than a 6-inch splash. Same expression
-			// the SIZE tooltip prints, halved to a radius.
-			drum.radiusM = 6.f * std::pow(22.f / 6.f, size) * 0.0127f;
+		// A tab click lands here, on the audio thread, so the knobs and the slot
+		// can never disagree about which instrument they are.
+		int er = editReq.exchange(-1);
+		if (er >= 0 && er < KIT_N && er != edit) {
+			edit = er;
+			pushSlotToParams();
+			inst[edit].ctl = 0;
+		}
+		// The knobs ARE the edit slot.
+		for (int p = 0; p < PARAMS_LEN; p++)
+			if (p != STRIKE_PARAM) inst[edit].v[p] = params[p].getValue();
 
-			drum.stiff    = pv(STIFF_PARAM, STIFF_INPUT);
-			drum.air      = pv(AIR_PARAM, AIR_INPUT);
-			drum.couple   = params[COUPLE_PARAM].getValue();
-			drum.resoTune = params[RESO_PARAM].getValue();
-			// A big drum rings longer than a small one at the same tension, so
-			// decay leans on size as well as on its own knob.
-			float dk = pv(DECAY_PARAM, DECAY_INPUT);
-			drum.decay = 0.08f * std::pow(90.f, dk) * (0.6f + 0.8f * size);
-			drum.tone  = pv(TONE_PARAM, TONE_INPUT) * 1.3f;
-			drum.muffle    = pv(MUFFLE_PARAM, MUFFLE_INPUT);
-			drum.muffleAng = params[MUFFLEANG_PARAM].getValue() * (float)M_PI;
-			drum.bend      = params[BEND_PARAM].getValue() * 0.35f;
-			drum.snareAmt  = params[SNARE_PARAM].getValue();
-			drum.snareThr  = 0.04f + params[SNARETHR_PARAM].getValue() * 0.5f;
-			drum.snareTight = 0.06f + (1.f - params[SNARETHR_PARAM].getValue()) * 0.3f;
-
-			float x = clamp(params[STRIKEX_PARAM].getValue()
-			                + inputs[STRIKEX_INPUT].getVoltage() * 0.2f, -1.f, 1.f);
-			float y = clamp(params[STRIKEY_PARAM].getValue()
-			                + inputs[STRIKEY_INPUT].getVoltage() * 0.2f, -1.f, 1.f);
-			float r = std::min(1.f, std::sqrt(x * x + y * y));
-			drum.strikeR   = r * 0.97f;
-			drum.strikeAng = std::atan2(y, x);
-			dispR = r; dispA = drum.strikeAng;
-			dispSize = size; dispTens = tens; dispAir = drum.air;
-			dispMuffle = drum.muffle; dispCouple = drum.couple;
-			dispStiff = drum.stiff;
-			dispExcite = pv(EXCITE_PARAM, EXCITE_INPUT);
-			dispWires  = clamp(params[SNARE_PARAM].getValue(), 0.f, 1.f);
-			// modes first: updateStrike()'s excitation tilt reads ratio[], which
-			// updateModes() computes. The other order used last frame's layout.
-			drum.updateModes();
-			drum.updateStrike();
-			if (micSeen[0] != drum.micR[0]   || micSeen[1] != drum.micR[1]
-			 || micSeen[2] != drum.micAng[0] || micSeen[3] != drum.micAng[1]) {
-				micSeen[0] = drum.micR[0];   micSeen[1] = drum.micR[1];
-				micSeen[2] = drum.micAng[0]; micSeen[3] = drum.micAng[1];
-				drum.updateMics();
+		// ── strikes: the gate per channel, the button and the mouse on the
+		//    instrument being edited ─────────────────────────────────────────
+		bool fire[KIT_N] = {false};
+		float vel[KIT_N];
+		// A MONO gate fires instrument 1 only. getPolyVoltage would fire all
+		// eight from one trigger, which is never what a mono cable into a kit
+		// means; a mono cable into a poly drum module plays the first drum.
+		int gch = inputs[GATE_INPUT].getChannels();
+		for (int c = 0; c < KIT_N; c++) {
+			vel[c] = inst[c].lastVel;
+			float g = 0.f;
+			if (xp && xp->on[PK_TRIG][c]) g = xp->v[PK_TRIG][c];
+			else if (c < gch)              g = inputs[GATE_INPUT].getVoltage(c);
+			if (inst[c].gateTrig.process(g, 0.1f, 1.f)) {
+				float vv;
+				vel[c] = xin(VEL_INPUT, c, vv) ? clamp(vv * 0.1f, 0.02f, 1.f) : 0.7f;
+				fire[c] = true;
 			}
-			dispEnergy = drum.energy;
-			for (int k = 0; k < sfs::Drum::NM; k++)
-				modeVis[k] = std::fabs(drum.lo[k].value()) * drum.outGain;
 		}
-
-		// A strike from the gate, the button, or the display.
-		bool fire = false;
-		float vel = lastVel;
-		if (gateTrig.process(inputs[GATE_INPUT].getVoltage(), 0.1f, 1.f)) {
-			vel = inputs[VEL_INPUT].isConnected()
-			    ? clamp(inputs[VEL_INPUT].getVoltage() * 0.1f, 0.02f, 1.f) : 0.7f;
-			fire = true;
-		}
-		if (strikeBtn.process(params[STRIKE_PARAM].getValue() > 0.5f)) { vel = 0.7f; fire = true; }
+		if (strikeBtn.process(params[STRIKE_PARAM].getValue() > 0.5f)) { vel[edit] = 0.7f; fire[edit] = true; }
 		if (pendHit) {
-			pendHit = false; vel = pendVel;
+			pendHit = false; vel[edit] = pendVel;
 			// A mouse strike sets its own place on the head, and the knobs
 			// follow it, so the panel never disagrees with what you just played.
 			params[STRIKEX_PARAM].setValue(pendX);
 			params[STRIKEY_PARAM].setValue(pendY);
-			ctl = 0;
-			fire = true;
-		}
-		if (fire) {
-			lastVel = vel;
-			float hard = pv(EXCITE_PARAM, EXCITE_INPUT);
-			// Velocity is a real approach speed, so everything downstream --
-			// contact time, brightness, how far the pitch bends -- follows from
-			// the collision rather than from a curve drawn over the top.
-			drum.strike(0.4f + vel * 9.f, hard, params[WEIGHT_PARAM].getValue());
-			uiFlash = 1.f;
+			inst[edit].v[STRIKEX_PARAM] = pendX;
+			inst[edit].v[STRIKEY_PARAM] = pendY;
+			inst[edit].ctl = 0;
+			fire[edit] = true;
 		}
 
-		float head[2], snare[2];
-		drum.process(head, snare, stereo);
-		float lvl = params[LEVEL_PARAM].getValue();
-		int nch = stereo ? 2 : 1;
-		outputs[OUT_OUTPUT].setChannels(nch);
-		outputs[HEAD_OUTPUT].setChannels(nch);
-		outputs[SNARE_OUTPUT].setChannels(nch);
-		for (int c = 0; c < nch; c++) {
-			outputs[OUT_OUTPUT].setVoltage(sfs::softClip((head[c] + snare[c]) * lvl * 5.f), c);
-			outputs[HEAD_OUTPUT].setVoltage(sfs::softClip(head[c] * lvl * 5.f), c);
-			outputs[SNARE_OUTPUT].setVoltage(sfs::softClip(snare[c] * lvl * 5.f), c);
-		}
+		float mixL = 0.f, mixR = 0.f;
+		outputs[OUT_OUTPUT].setChannels(2 * KIT_N);
+		for (int c = 0; c < KIT_N; c++) {
+			Inst& I = inst[c];
+			sfs::Drum& drum = I.drum;
+			drum.sr = args.sampleRate;
+			if (fire[c]) {
+				I.lastVel = vel[c];
+				float hard = pvc(c, EXCITE_PARAM, EXCITE_INPUT);
+				// Velocity is a real approach speed, so everything downstream --
+				// contact time, brightness, how far the pitch bends -- follows
+				// from the collision rather than from a curve drawn over the top.
+				drum.strike(0.4f + vel[c] * 9.f, hard, I.v[WEIGHT_PARAM]);
+				I.uiFlash = 1.f;
+				I.quiet = false;
+				// The mallet has a pre-contact gap and the energy follower is
+				// slow, so a fresh strike is held awake long enough to be heard.
+				I.hold = (int)(args.sampleRate * 0.25f);
+				I.ctl = 0;
+			}
+			if (--I.ctl <= 0) { I.ctl = 32; control(c); }
 
-		uiFlash -= uiFlash * 6.f * args.sampleTime;
-		lights[STRIKE_LIGHT].setBrightness(uiFlash);
+			float lvl = I.v[LEVEL_PARAM];
+			float L = 0.f, R = 0.f;
+			if (!I.quiet) {
+				float head[2] = {0.f, 0.f}, snare[2] = {0.f, 0.f};
+				drum.process(head, snare, stereo);
+				if (!stereo) { head[1] = head[0]; snare[1] = snare[0]; }
+				L = sfs::softClip((head[0] + snare[0]) * lvl * 5.f);
+				R = sfs::softClip((head[1] + snare[1]) * lvl * 5.f);
+				if (I.hold > 0) I.hold--;
+				// -88 dB below a full hit, in the follower's own units (it runs
+				// ahead of outGain and the 5 V scaling).
+				else if (drum.energy < 2e-8f) { I.quiet = true; drum.clear(); }
+			}
+			outputs[OUT_OUTPUT].setVoltage(L, 2 * c);
+			outputs[OUT_OUTPUT].setVoltage(R, 2 * c + 1);
+			mixL += L; mixR += R;
+
+			// A peak follower with a slow fall, so the meters compare what each
+			// drum just did rather than flickering with the waveform.
+			float a = std::max(std::fabs(L), std::fabs(R)) * 0.2f;
+			I.level = (a > I.level) ? a : I.level * (1.f - 6.f * args.sampleTime);
+			I.uiFlash -= I.uiFlash * 6.f * args.sampleTime;
+		}
+		// Eight drums summed can exceed what one could, so the mix is clipped
+		// again after the sum.
+		outputs[HEAD_OUTPUT].setChannels(1);
+		outputs[SNARE_OUTPUT].setChannels(1);
+		outputs[HEAD_OUTPUT].setVoltage(sfs::softClip(mixL));
+		outputs[SNARE_OUTPUT].setVoltage(sfs::softClip(mixR));
+		lights[STRIKE_LIGHT].setBrightness(inst[edit].uiFlash);
 	}
 
-	void loadPreset(int i) {
-		if (i < 0 || i >= KIT_NPRESET) return;
-		const KitPreset& p = KIT_PRESETS[i];
-		params[SIZE_PARAM].setValue(p.size);
-		params[TENSION_PARAM].setValue(p.tension);
-		params[STIFF_PARAM].setValue(p.material);
-		params[AIR_PARAM].setValue(p.air);
-		params[DECAY_PARAM].setValue(p.decay);
-		params[TONE_PARAM].setValue(p.tone);
-		params[COUPLE_PARAM].setValue(p.couple);
-		params[RESO_PARAM].setValue(p.reso);
-		params[EXCITE_PARAM].setValue(p.excite);
-		params[MUFFLE_PARAM].setValue(p.muffle);
-		params[BEND_PARAM].setValue(p.bend);
-		params[SNARE_PARAM].setValue(p.snare);
-		params[SNARETHR_PARAM].setValue(p.snareTune);
+	// A preset into a SLOT, not into the knobs: the knobs follow if it is the
+	// slot they are showing. Presets carry the voice; WEIGHT, the muffle angle
+	// and LEVEL are left as they are.
+	void presetToSlot(int s, const KitPreset& p) {
+		if (s < 0 || s >= KIT_N) return;
+		float* v = inst[s].v;
+		v[SIZE_PARAM] = p.size;      v[TENSION_PARAM] = p.tension;
+		v[STIFF_PARAM] = p.material; v[AIR_PARAM] = p.air;
+		v[DECAY_PARAM] = p.decay;    v[TONE_PARAM] = p.tone;
+		v[COUPLE_PARAM] = p.couple;  v[RESO_PARAM] = p.reso;
+		v[EXCITE_PARAM] = p.excite;  v[MUFFLE_PARAM] = p.muffle;
+		v[BEND_PARAM] = p.bend;      v[SNARE_PARAM] = p.snare;
+		v[SNARETHR_PARAM] = p.snareTune;
 		// Straight up the head: the radius is the tone control, the angle only
 		// matters against the muffle.
-		params[STRIKEX_PARAM].setValue(0.f);
-		params[STRIKEY_PARAM].setValue(p.strikeY);
-		ctl = 0;                       // re-solve the layout on the next sample
+		v[STRIKEX_PARAM] = 0.f;      v[STRIKEY_PARAM] = p.strikeY;
+		if (s == edit) pushSlotToParams();
+		inst[s].ctl = 0;                       // re-solve the layout on the next sample
+	}
+	void loadPreset(int i) {
+		if (i < 0 || i >= KIT_NPRESET) return;
+		presetToSlot(edit, KIT_PRESETS[i]);
+	}
+	static int presetIndex(const char* name) {
+		for (int i = 0; i < KIT_NPRESET; i++)
+			if (std::strcmp(KIT_PRESETS[i].name, name) == 0) return i;
+		return -1;
+	}
+	// The default kit: a slot for every preset the engine was measured against,
+	// in playing order. A new Kit, and an old patch's instruments 2-8.
+	void loadDefaultKit() {
+		// Fill's eight channels, in Fill's order, so a poly cable from Fill's
+		// outs plays the right drum on every channel with nothing to map.
+		static const char* NAMES[KIT_N] = {"Kick", "Snare", "Closed hat", "Open hat",
+		                                   "Floor tom", "Tom", "Clap", "Bell"};
+		for (int s = 0; s < KIT_N; s++) {
+			for (int p = 0; p < PARAMS_LEN; p++)
+				inst[s].v[p] = paramQuantities[p] ? paramQuantities[p]->getDefaultValue() : 0.f;
+			int i = presetIndex(NAMES[s]);
+			presetToSlot(s, KIT_PRESETS[i >= 0 ? i : (s % KIT_NPRESET)]);
+			inst[s].ctl = 4 * s;                 // stagger the control-rate updates
+			resetMics(s);
+		}
+		pushSlotToParams();
 	}
 
 	json_t* dataToJson() override {
 		json_t* r = json_object();
 		json_object_set_new(r, "headView", json_integer(headView));
 		json_object_set_new(r, "stereo", json_boolean(stereo));
-		// Where the pair is standing is part of the patch, not a preference:
-		// two Kits in one rack want their mics in different places.
-		json_t* mp = json_array();
-		for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(drum.micR[c]));
-		for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(drum.micAng[c]));
-		json_object_set_new(r, "mics", mp);
+		json_object_set_new(r, "edit", json_integer(edit));
+		json_t* arr = json_array();
+		for (int s = 0; s < KIT_N; s++) {
+			json_t* o = json_object();
+			json_t* vv = json_array();
+			for (int p = 0; p < PARAMS_LEN; p++) json_array_append_new(vv, json_real(inst[s].v[p]));
+			json_object_set_new(o, "v", vv);
+			// Where the pair is standing is part of the instrument, not a
+			// preference: a kick and a splash want their mics in different places.
+			json_t* mp = json_array();
+			for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(inst[s].drum.micR[c]));
+			for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(inst[s].drum.micAng[c]));
+			json_object_set_new(o, "mics", mp);
+			json_array_append_new(arr, o);
+		}
+		json_object_set_new(r, "inst", arr);
 		return r;
+	}
+	void readMics(json_t* mp, sfs::Drum& d) {
+		if (!mp || json_array_size(mp) != 4) return;
+		for (int c = 0; c < 2; c++)
+			d.micR[c] = clamp((float)json_real_value(json_array_get(mp, c)), 0.10f, 0.92f);
+		for (int c = 0; c < 2; c++)
+			d.micAng[c] = (float)json_real_value(json_array_get(mp, 2 + c));
 	}
 	void dataFromJson(json_t* r) override {
 		if (json_t* j = json_object_get(r, "headView"))
 			headView = clamp((int)json_integer_value(j), 0, 1);
 		if (json_t* j = json_object_get(r, "stereo"))
 			stereo = json_boolean_value(j);
-		if (json_t* mp = json_object_get(r, "mics")) {
-			if (json_array_size(mp) == 4) {
-				for (int c = 0; c < 2; c++)
-					drum.micR[c] = clamp((float)json_real_value(json_array_get(mp, c)),
-					                     0.10f, 0.92f);
-				for (int c = 0; c < 2; c++)
-					drum.micAng[c] = (float)json_real_value(json_array_get(mp, 2 + c));
-			}
+		json_t* arr = json_object_get(r, "inst");
+		if (!arr) {
+			// A PRE-2026-09 PATCH: one drum. Its knobs are already in params
+			// (paramsFromJson runs first), so they become instrument 1, its mics
+			// come with it, and instruments 2-8 stay the default kit. A mono
+			// gate still fires instrument 1, channel 0 of the poly out is still
+			// instrument 1's left, so the patch sounds exactly as it did.
+			edit = 0;
+			for (int p = 0; p < PARAMS_LEN; p++)
+				if (p != STRIKE_PARAM) inst[0].v[p] = params[p].getValue();
+			readMics(json_object_get(r, "mics"), inst[0].drum);
+			return;
 		}
+		for (int s = 0; s < KIT_N && s < (int)json_array_size(arr); s++) {
+			json_t* o = json_array_get(arr, s);
+			json_t* vv = json_object_get(o, "v");
+			if (vv)
+				for (int p = 0; p < PARAMS_LEN && p < (int)json_array_size(vv); p++)
+					inst[s].v[p] = (float)json_real_value(json_array_get(vv, p));
+			readMics(json_object_get(o, "mics"), inst[s].drum);
+			inst[s].ctl = 0;
+		}
+		if (json_t* j = json_object_get(r, "edit"))
+			edit = clamp((int)json_integer_value(j), 0, KIT_N - 1);
+		pushSlotToParams();
 	}
 
 	// The tuned default pair, taken from a fresh engine rather than retyped --
 	// the numbers were measured, and a second copy of them here is a second
 	// thing to forget to update.
-	void resetMics() {
+	void resetMics(int s) {
 		sfs::Drum d;
-		for (int c = 0; c < 2; c++) { drum.micR[c] = d.micR[c]; drum.micAng[c] = d.micAng[c]; }
+		for (int c = 0; c < 2; c++) { inst[s].drum.micR[c] = d.micR[c]; inst[s].drum.micAng[c] = d.micAng[c]; }
 	}
-	void onReset() override { drum.clear(); resetMics(); }
-	void onSampleRateChange() override { drum.sr = APP->engine->getSampleRate(); drum.clear(); }
+	void onReset() override {
+		for (int s = 0; s < KIT_N; s++) inst[s].drum.clear();
+		loadDefaultKit();
+	}
+	void onSampleRateChange() override {
+		for (int s = 0; s < KIT_N; s++) {
+			inst[s].drum.sr = APP->engine->getSampleRate();
+			inst[s].drum.clear();
+		}
+	}
 };
 
 // ── the head ────────────────────────────────────────────────────────────────
@@ -402,6 +582,14 @@ struct KitDisplay : OpaqueWidget {
 	Kit* module = nullptr;
 	std::shared_ptr<Font> font;
 	Vec dragFrom;
+	// THE INSTRUMENT BEING DRAWN. The main view draws the edited one; the tab
+	// strip points this at each of the eight in turn. Null in the browser.
+	const Kit::Inst* S = nullptr;
+	const Kit::Inst* cur() const { return module ? &module->inst[module->edit] : nullptr; }
+	sfs::Drum& md() const { return module->inst[module->edit].drum; }
+	// The tab strip along the foot, and the main view above it.
+	float stripH() const { return mm2px(12.f); }
+	float mainH()  const { return box.size.y - stripH(); }
 
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) return;
@@ -411,7 +599,9 @@ struct KitDisplay : OpaqueWidget {
 		// faults at address 0x8 and takes Rack down the moment Kit is placed.
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
 		nvgScissor(args.vg, RECT_ARGS(Rect(Vec(0, 0), box.size)));
+		S = cur();
 		if (!module) drawPreview(args); else drawLive(args);
+		drawTabs(args);
 		nvgResetScissor(args.vg);
 	}
 
@@ -423,7 +613,7 @@ struct KitDisplay : OpaqueWidget {
 	// sheen. So stiffness moves the fill from warm to blue-steel and pulls the
 	// highlight in. It is a tint and one gradient, deliberately: the mode rings
 	// are drawn on top of this and are the thing you are meant to be reading.
-	float stiffAmt() const { return module ? clamp(module->dispStiff, 0.f, 1.f) : 0.3f; }
+	float stiffAmt() const { return module ? clamp(S->dispStiff, 0.f, 1.f) : 0.3f; }
 
 	void head(const DrawArgs& args, float cx, float cy, float rad) {
 		float st = stiffAmt();
@@ -464,7 +654,7 @@ struct KitDisplay : OpaqueWidget {
 	// reads as a drum head where a heat map reads as a physics demo.
 	// Where the head sits in a wide screen: centred vertically, tucked left, so
 	// the remaining width is a usable panel rather than padding.
-	float headRad() const { return box.size.y * 0.5f - mm2px(1.2f); }
+	float headRad() const { return mainH() * 0.5f - mm2px(1.2f); }
 	// CENTRED. It used to be tucked against the left edge to leave a column for
 	// the spectrum; with the scope moved into a corner there is nothing to make
 	// room for, and a drum head off to one side of a wide screen reads as a
@@ -486,7 +676,7 @@ struct KitDisplay : OpaqueWidget {
 	// a 6-inch splash. The range is kept off zero so a small drum is still a
 	// drum rather than a dot.
 	float sizeScale() const {
-		return 0.52f + 0.48f * (module ? clamp(module->dispSize, 0.f, 1.f) : 0.55f);
+		return 0.52f + 0.48f * (module ? clamp(S->dispSize, 0.f, 1.f) : 0.55f);
 	}
 	// EVERY drum here has two heads and a shell between them -- COUPLE and RESO
 	// only mean anything because it does -- so the shell is always drawn, and its
@@ -508,7 +698,7 @@ struct KitDisplay : OpaqueWidget {
 	static constexpr float SHELL = 0.52f;
 	float shellDepth(float rad) const { return rad * SHELL; }
 	float airAmt() const {
-		return module ? clamp(module->dispAir, 0.f, 1.f) : 0.35f;
+		return module ? clamp(S->dispAir, 0.f, 1.f) : 0.35f;
 	}
 	float head3Rad() const {
 		// Centred on the WHOLE screen, so the room either side has to clear the
@@ -520,7 +710,7 @@ struct KitDisplay : OpaqueWidget {
 		// 0.34 used to stand in for the shell and happened to be close to it;
 		// now that the shell is a named constant the sum says what it means, and
 		// deepening the shell cannot silently push the drum off the bottom.
-		float byH = (box.size.y - mm2px(5.f)) / (0.34f + 2.f * TILT + SHELL);
+		float byH = (mainH() - mm2px(5.f)) / (0.34f + 2.f * TILT + SHELL);
 		return std::min(wAvail * 0.5f, byH) * sizeScale();
 	}
 	// The scope is a CORNER READOUT now, not a column. As a full-height column
@@ -528,10 +718,10 @@ struct KitDisplay : OpaqueWidget {
 	// pushed the head off centre to do it. Small and out of the way it still
 	// answers the one question the head cannot: which partials are sounding.
 	float scopeW() const { return std::min(mm2px(24.f), box.size.x * 0.28f); }
-	float scopeH() const { return std::min(mm2px(9.f), box.size.y * 0.24f); }
+	float scopeH() const { return std::min(mm2px(9.f), mainH() * 0.24f); }
 	void drawScope(const DrawArgs& args) {
 		float x1 = box.size.x - mm2px(2.f), x0 = x1 - scopeW();
-		float y1 = box.size.y - mm2px(2.f), y0 = y1 - scopeH();
+		float y1 = mainH() - mm2px(2.f), y0 = y1 - scopeH();
 		drawSpectrum(args, x0, y0, x1, y1);
 	}
 	// The object is rise + tilted disc + shell, so its centre is not the box's.
@@ -540,35 +730,42 @@ struct KitDisplay : OpaqueWidget {
 	float head3Cy() const {
 		float rad = head3Rad(), hgt = rad * 0.34f;
 		float shell = shellDepth(rad);
-		return box.size.y * 0.5f - (shell - hgt) * 0.5f;
+		return mainH() * 0.5f - (shell - hgt) * 0.5f;
 	}
 	float head3Cx() const { return box.size.x * 0.5f; }
 
-	void drawHead3D(const DrawArgs& args) {
-		const int RINGS = 12, SECT = 36, ARCS = 6;
+	// Parametrised by where and how big, because the same drawing serves the
+	// main view and the eight small ones on the tabs: a tab is not an icon of a
+	// drum, it IS that instrument drawn the same way, at the same tilt, going
+	// through the same animation when it is struck. RINGS/SECT are the detail.
+	static const int RMAX = 12, SMAX = 36;
+	// Stroke weight for the drawing in hand. The main view is 1; a tab is a
+	// third the size and at full weight its rings merged into a solid disc.
+	float lineScale = 1.f;
+	void drawHead3D(const DrawArgs& args, float cx, float cy, float rad, int RINGS, int SECT) {
+		const int ARCS = 6;
+		RINGS = std::min(RINGS, RMAX); SECT = std::min(SECT, SMAX);
 		const sfs::MembraneShapes& sh = sfs::membraneShapes();
-		float rad = head3Rad(), cx = head3Cx();
 		float hgt = rad * 0.34f;
 		// The shell. Tied to AIR, which IS the cavity, so the picture says
 		// something rather than being a constant box.
 		float shell = shellDepth(rad), airv = airAmt();
-		float cy = head3Cy();
-		float sa = module ? module->dispA : 0.f;
+		float sa = module ? S->dispA : 0.f;
 
-		static float ang[sfs::Drum::NM][SECT + 1];
+		static float ang[sfs::Drum::NM][SMAX + 1];
 		for (int k = 0; k < sfs::Drum::NM; k++) {
 			int mm = sfs::MEMBRANE_MODES[k].m;
 			for (int j = 0; j <= SECT; j++)
 				ang[k][j] = std::cos(mm * (2.f * (float)M_PI * (float)j / SECT - sa));
 		}
-		float z[RINGS + 1][SECT + 1];
+		float z[RMAX + 1][SMAX + 1];
 		float zmax = 1e-6f;
 		for (int i = 0; i <= RINGS; i++) {
 			float u = (float)i / RINGS;
 			for (int j = 0; j <= SECT; j++) {
 				float v = 0.f;
 				for (int k = 0; k < sfs::Drum::NM; k++) {
-					float a = module ? module->modeVis[k] : 0.55f * std::exp(-k * 0.30f);
+					float a = module ? S->modeVis[k] : 0.55f * std::exp(-k * 0.30f);
 					if (a < 1e-4f) continue;
 					v += a * sh.at(k, u) * ang[k][j];
 				}
@@ -581,7 +778,7 @@ struct KitDisplay : OpaqueWidget {
 		// A taut head pulls its grid out toward the rim; a slack one lets it
 		// gather in the middle. Same rings, redistributed -- which is what
 		// tension does to a real head's response, and it reads instantly.
-		float tens = module ? clamp(module->dispTens, 0.f, 1.f) : 0.5f;
+		float tens = module ? clamp(S->dispTens, 0.f, 1.f) : 0.5f;
 		float warp = 1.f - 0.55f * (tens - 0.5f);        // <1 pushes rings outward
 		auto PX = [&](int i, int j, float& X, float& Y) {
 			float u = std::pow((float)i / RINGS, warp);
@@ -615,7 +812,7 @@ struct KitDisplay : OpaqueWidget {
 				if (j == 0) nvgMoveTo(args.vg, X, Y); else nvgLineTo(args.vg, X, Y);
 			}
 			nvgStrokeColor(args.vg, nvgRGBAf(0.21f, 0.21f, 0.30f, 0.95f));
-			nvgStrokeWidth(args.vg, 1.2f);
+			nvgStrokeWidth(args.vg, (1.2f) * lineScale);
 			nvgStroke(args.vg);
 			for (int j = 0; j <= SECT; j += 3) {
 				if (shell < 1.f) break;
@@ -625,7 +822,7 @@ struct KitDisplay : OpaqueWidget {
 				nvgBeginPath(args.vg);
 				nvgMoveTo(args.vg, X, Y0); nvgLineTo(args.vg, X, Y0 + shell);
 				nvgStrokeColor(args.vg, nvgRGBAf(0.21f, 0.21f, 0.30f, 0.85f));
-				nvgStrokeWidth(args.vg, 0.9f);
+				nvgStrokeWidth(args.vg, (0.9f) * lineScale);
 				nvgStroke(args.vg);
 			}
 		}
@@ -647,7 +844,7 @@ struct KitDisplay : OpaqueWidget {
 					if (j == 0) nvgMoveTo(args.vg, X, Y); else nvgLineTo(args.vg, X, Y);
 				}
 				nvgStrokeColor(args.vg, nvgRGBAf(0.21f, 0.21f, 0.30f, 0.30f + 0.55f * airv));
-				nvgStrokeWidth(args.vg, 0.8f);
+				nvgStrokeWidth(args.vg, (0.8f) * lineScale);
 				nvgStroke(args.vg);
 			}
 		}
@@ -665,7 +862,7 @@ struct KitDisplay : OpaqueWidget {
 				}
 				float thm = 2.f * (float)M_PI * (float)(j0 + per / 2) / SECT;
 				nvgStrokeColor(args.vg, i == RINGS ? sfs::SCREEN_LINE : col(amp, thm));
-				nvgStrokeWidth(args.vg, i == RINGS ? 1.5f : 0.9f + amp * 1.6f);
+				nvgStrokeWidth(args.vg, (i == RINGS ? 1.5f : 0.9f + amp * 1.6f) * lineScale);
 				nvgStroke(args.vg);
 			}
 		}
@@ -681,16 +878,16 @@ struct KitDisplay : OpaqueWidget {
 			NVGcolor c = col(amp * 0.8f, th);
 			c.a *= 0.65f;
 			nvgStrokeColor(args.vg, c);
-			nvgStrokeWidth(args.vg, 0.7f);
+			nvgStrokeWidth(args.vg, (0.7f) * lineScale);
 			nvgStroke(args.vg);
 		}
 	}
 
 	void drawLive(const DrawArgs& args) {
-		float cy = box.size.y * 0.5f;
+		float cy = mainH() * 0.5f;
 		float rad = headRad(), cx = headCx();
 		if (module && module->headView == 1) {
-			drawHead3D(args);
+			drawHead3D(args, head3Cx(), head3Cy(), head3Rad(), 12, 36);
 			drawScope(args);
 			drawMics(args);
 			drawStrikeMark(args, head3Cx(), head3Cy(), head3Rad());
@@ -706,7 +903,7 @@ struct KitDisplay : OpaqueWidget {
 			float u = (float)i / RINGS;
 			float amp = 0.f;
 			for (int k = 0; k < sfs::Drum::NM; k++)
-				amp += module->modeVis[k] * sh.at(k, u);
+				amp += S->modeVis[k] * sh.at(k, u);
 			amp = clamp(std::fabs(amp) * 0.5f, 0.f, 1.f);
 			if (amp < 0.004f) continue;
 			nvgBeginPath(args.vg);
@@ -717,7 +914,7 @@ struct KitDisplay : OpaqueWidget {
 		}
 
 		// where the muffle sits
-		float mu = module->dispMuffle;
+		float mu = S->dispMuffle;
 		if (mu > 0.01f) {
 			float ma = module->params[Kit::MUFFLEANG_PARAM].getValue() * (float)M_PI;
 			float mr = rad * 0.82f * 0.93f;
@@ -743,11 +940,11 @@ struct KitDisplay : OpaqueWidget {
 		if (!module) return;
 		bool three = module->headView == 1;
 		float tilt = three ? TILT : 0.93f;
-		float sr = module->dispR * (three ? 1.f : 0.97f), sa = module->dispA;
+		float sr = S->dispR * (three ? 1.f : 0.97f), sa = S->dispA;
 		float sx = cx + std::cos(sa) * sr * rad * (three ? 1.f : 0.93f);
 		float sy = cy + std::sin(sa) * sr * rad * tilt;
-		float f = clamp(module->uiFlash, 0.f, 1.f);
-		float hard = clamp(module->dispExcite, 0.f, 1.f);
+		float f = clamp(S->uiFlash, 0.f, 1.f);
+		float hard = clamp(S->dispExcite, 0.f, 1.f);
 		float r = mm2px(2.6f - 1.5f * hard) + f * mm2px(1.8f);
 		// soft beater: a wide halo and no rim. stick: tight, with a hard edge.
 		NVGpaint g = nvgRadialGradient(args.vg, sx, sy, r * (0.15f + 0.70f * hard), r,
@@ -783,7 +980,7 @@ struct KitDisplay : OpaqueWidget {
 	Vec micPos(int c) const {
 		float cx, cy, rad, sq;
 		headFrame(cx, cy, rad, sq);
-		float r = module->drum.micR[c], a2 = module->drum.micAng[c];
+		float r = md().micR[c], a2 = md().micAng[c];
 		return Vec(cx + std::cos(a2) * r * rad, cy + std::sin(a2) * r * rad * sq);
 	}
 	// Which mic is under the cursor, or -1. The grab radius is a little wider
@@ -812,25 +1009,25 @@ struct KitDisplay : OpaqueWidget {
 		// they have no angular shape, so a mic at the middle is a mono mic
 		// wherever the other one is.
 		r = clamp(r, 0.10f, 0.92f);
-		module->drum.micR[c] = r;
-		module->drum.micAng[c] = (r > 1e-4f) ? std::atan2(y, x) : 0.f;
+		md().micR[c] = r;
+		md().micAng[c] = (r > 1e-4f) ? std::atan2(y, x) : 0.f;
 	}
 
 	void drawMics(const DrawArgs& args) {
 		if (!module || !module->stereo) return;
 		float cx, cy, rad, sq;
 		headFrame(cx, cy, rad, sq);
-		float sr = module->dispR, sa = module->dispA;
+		float sr = S->dispR, sa = S->dispA;
 		float sx = cx + std::cos(sa) * sr * rad, sy = cy + std::sin(sa) * sr * rad * sq;
 		// Which is nearer, in the same three dimensions the engine uses -- the
 		// mics are above the head, so the flat picture cannot answer it.
 		float d[2];
 		for (int c = 0; c < 2; c++) {
-			float dx = module->drum.micR[c] * std::cos(module->drum.micAng[c])
+			float dx = md().micR[c] * std::cos(md().micAng[c])
 			         - sr * std::cos(sa);
-			float dy = module->drum.micR[c] * std::sin(module->drum.micAng[c])
+			float dy = md().micR[c] * std::sin(md().micAng[c])
 			         - sr * std::sin(sa);
-			d[c] = std::sqrt(dx * dx + dy * dy + module->drum.micH * module->drum.micH);
+			d[c] = std::sqrt(dx * dx + dy * dy + md().micH * md().micH);
 		}
 		for (int c = 0; c < 2; c++) {
 			Vec m = micPos(c);
@@ -895,7 +1092,7 @@ struct KitDisplay : OpaqueWidget {
 		// the wires as rails. The drum is the subject; the snare is a detail on
 		// it, and a detail that outweighs its subject is just an error with
 		// good intentions.
-		float w = module ? clamp(module->dispWires, 0.f, 1.f) : 0.85f;
+		float w = module ? clamp(S->dispWires, 0.f, 1.f) : 0.85f;
 		if (w < 0.005f) return;
 		// They arrive one at a time so the knob's whole travel does something:
 		// the centre wire from the moment WIRES leaves zero, the top at a third,
@@ -924,7 +1121,7 @@ struct KitDisplay : OpaqueWidget {
 		// wires stop moving exactly when the drum stops sounding.
 		float e = 0.f;
 		if (module)
-			for (int k = 0; k < sfs::Drum::NM; k++) e = std::max(e, module->modeVis[k]);
+			for (int k = 0; k < sfs::Drum::NM; k++) e = std::max(e, S->modeVis[k]);
 		float vib = clamp(e * 2.2f, 0.f, 1.f) * mm2px(0.55f);
 		wirePh += 0.9f;                       // per frame; a rattle, not a sway
 		for (int i = 0; i < 3; i++) {
@@ -951,7 +1148,7 @@ struct KitDisplay : OpaqueWidget {
 				}
 			}
 			nvgStrokeColor(args.vg, nvgRGBf(0.42f, 0.44f, 0.52f));
-			nvgStrokeWidth(args.vg, 0.6f);
+			nvgStrokeWidth(args.vg, (0.6f) * lineScale);
 			nvgStroke(args.vg);
 		}
 	}
@@ -962,9 +1159,9 @@ struct KitDisplay : OpaqueWidget {
 		nvgFillColor(args.vg, sfs::SCREEN_DIM);
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
 		nvgText(args.vg, mm2px(1.4f), mm2px(1.2f),
-		        string::f("%.0f Hz", module->drum.f0).c_str(), NULL);
+		        string::f("%d   %.0f Hz", module->edit + 1, md().f0).c_str(), NULL);
 		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP);
-		float pct = module->dispR * 100.f;
+		float pct = S->dispR * 100.f;
 		nvgText(args.vg, box.size.x - mm2px(1.4f), mm2px(1.2f),
 		        string::f("%.0f%% out", pct).c_str(), NULL);
 		nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_BOTTOM);
@@ -975,15 +1172,15 @@ struct KitDisplay : OpaqueWidget {
 		// dragging is worth more than an instruction you have already followed.
 		int live = (micDrag >= 0) ? micDrag : (module->stereo ? micHover : -1);
 		if (live >= 0) {
-			float a2 = module->drum.micAng[live] * 180.f / (float)M_PI;
+			float a2 = md().micAng[live] * 180.f / (float)M_PI;
 			while (a2 < 0.f) a2 += 360.f;
 			nvgFillColor(args.vg, sfs::SCREEN_DIM);
-			nvgText(args.vg, cx, box.size.y - mm2px(1.f),
+			nvgText(args.vg, cx, mainH() - mm2px(1.f),
 			        string::f("%s MIC   %.0f%% OUT   %.0f DEG", live == 0 ? "LEFT" : "RIGHT",
-			                  module->drum.micR[live] * 100.f, a2).c_str(), NULL);
+			                  md().micR[live] * 100.f, a2).c_str(), NULL);
 		} else {
 			nvgFillColor(args.vg, sfs::SCREEN_PMID);
-			nvgText(args.vg, cx, box.size.y - mm2px(1.f),
+			nvgText(args.vg, cx, mainH() - mm2px(1.f),
 			        module->stereo ? "CLICK THE HEAD TO PLAY   DRAG L AND R TO MOVE THE MICS"
 			                       : "CLICK THE HEAD TO PLAY", NULL);
 		}
@@ -998,7 +1195,7 @@ struct KitDisplay : OpaqueWidget {
 		float h = y1 - y0;
 		float w = (x1 - x0) / (float)sfs::Drum::NM;
 		for (int k = 0; k < sfs::Drum::NM; k++) {
-			float a = module ? clamp(module->modeVis[k] * 2.2f, 0.f, 1.f)
+			float a = module ? clamp(S->modeVis[k] * 2.2f, 0.f, 1.f)
 			                 : 0.9f * std::exp(-k * 0.12f);
 			float bh = 1.f + a * h;
 			nvgBeginPath(args.vg);
@@ -1014,13 +1211,85 @@ struct KitDisplay : OpaqueWidget {
 	// already copes with module == NULL by standing in a plausible mode mix, so
 	// the preview is the same code rather than a second drawing to keep in step.
 	void drawPreview(const DrawArgs& args) {
-		drawHead3D(args);
+		drawHead3D(args, head3Cx(), head3Cy(), head3Rad(), 12, 36);
 		drawScope(args);
 		nvgBeginPath(args.vg);
 		nvgCircle(args.vg, head3Cx() + head3Rad() * 0.42f,
 		          head3Cy() - head3Rad() * 0.30f * TILT, mm2px(1.6f));
 		nvgFillColor(args.vg, nvgRGBAf(0.93f, 0.40f, 0.18f, 0.9f));
 		nvgFill(args.vg);
+	}
+
+	// ── THE TABS: eight small drums, each the instrument itself ─────────────
+	// A row rather than a grid, so the eight level bars share one baseline and
+	// read as a comparison; the selected tab is underlined in the panel's
+	// orange. Each drum is drawn by the same code as the big one, from that
+	// instrument's own mode amplitudes, so striking instrument 5 makes tab 5
+	// ring while the main view keeps showing the one you are editing.
+	float tabW() const { return box.size.x / (float)KIT_N; }
+	void drawTabs(const DrawArgs& args) {
+		float y0 = mainH(), h = stripH(), w = tabW();
+		// a rule between the main view and the strip
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, 0, y0, box.size.x, 1.f);
+		nvgFillColor(args.vg, sfs::SCREEN_PURP);
+		nvgFill(args.vg);
+		const float footH = mm2px(2.4f);                // number + level bar
+		const float drumH = h - footH - mm2px(0.8f);
+		// The object is 0.34 + 2*TILT + SHELL radii tall; what fits is the
+		// smaller of that and the cell's width.
+		float radMax = std::min(drumH / (0.34f + 2.f * TILT + SHELL), w * 0.5f - mm2px(0.8f));
+		const Kit::Inst* saved = S;
+		for (int c = 0; c < KIT_N; c++) {
+			S = module ? &module->inst[c] : nullptr;
+			float x0 = c * w, cx = x0 + w * 0.5f;
+			bool sel = module && module->edit == c;
+			float rad = radMax * sizeScale();
+			float hgt = rad * 0.34f, shell = shellDepth(rad);
+			// centre the OBJECT (rise + disc + shell) in the drum area
+			float cy = y0 + mm2px(0.8f) + drumH * 0.5f - (shell - hgt) * 0.5f;
+			lineScale = 0.45f;
+			drawHead3D(args, cx, cy, rad, 8, 24);
+			lineScale = 1.f;
+			// the number, top-left of the cell
+			if (font && font->handle >= 0) {
+				sfs::screenFont(args.vg, font, sfs::TYPE_SCREEN_SMALL);
+				nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+				nvgFillColor(args.vg, sel ? sfs::SCREEN_HOT : sfs::SCREEN_DIM);
+				nvgText(args.vg, x0 + mm2px(1.f), y0 + mm2px(0.9f),
+				        string::f("%d", c + 1).c_str(), NULL);
+			}
+			// the level bar along the foot: a dim track, and the level over it.
+			// sqrt so a quiet drum still shows; a linear bar is empty at -20 dB.
+			float bx0 = x0 + mm2px(1.f), bx1 = x0 + w - mm2px(1.f);
+			float by = y0 + h - mm2px(1.4f);
+			nvgBeginPath(args.vg);
+			nvgRect(args.vg, bx0, by, bx1 - bx0, mm2px(0.7f));
+			nvgFillColor(args.vg, sfs::SCREEN_PURP);
+			nvgFill(args.vg);
+			float lv = module ? std::sqrt(clamp(module->inst[c].level, 0.f, 1.f)) : 0.f;
+			if (lv > 0.005f) {
+				nvgBeginPath(args.vg);
+				nvgRect(args.vg, bx0, by, (bx1 - bx0) * lv, mm2px(0.7f));
+				nvgFillColor(args.vg, lv > 0.92f ? sfs::SCREEN_HOT : sfs::SCREEN_BLUE);
+				nvgFill(args.vg);
+			}
+			// the selection: an underline in the plugin's orange
+			if (sel) {
+				nvgBeginPath(args.vg);
+				nvgRect(args.vg, x0 + mm2px(0.6f), y0 + h - mm2px(0.5f), w - mm2px(1.2f), mm2px(0.5f));
+				nvgFillColor(args.vg, sfs::SCREEN_HOT);
+				nvgFill(args.vg);
+			}
+			// cell divider
+			if (c > 0) {
+				nvgBeginPath(args.vg);
+				nvgRect(args.vg, x0, y0 + mm2px(1.f), 0.6f, h - mm2px(2.f));
+				nvgFillColor(args.vg, nvgTransRGBA(sfs::SCREEN_PURP, 140));
+				nvgFill(args.vg);
+			}
+		}
+		S = saved;
 	}
 
 	// THE 3D VIEW HAS ITS OWN GEOMETRY, and every part of this widget that maps
@@ -1035,7 +1304,7 @@ struct KitDisplay : OpaqueWidget {
 		if (module && module->headView == 1) {
 			cx = head3Cx(); cy = head3Cy(); rad = head3Rad(); sq = TILT;
 		} else {
-			cx = headCx(); cy = box.size.y * 0.5f; rad = headRad() * 0.93f; sq = 1.f;
+			cx = headCx(); cy = mainH() * 0.5f; rad = headRad() * 0.93f; sq = 1.f;
 		}
 	}
 
@@ -1054,6 +1323,13 @@ struct KitDisplay : OpaqueWidget {
 
 	void onButton(const ButtonEvent& e) override {
 		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			// A press in the tab strip selects that instrument -- on the audio
+			// thread, via editReq, so the knobs and the slot switch together.
+			if (module && e.pos.y >= mainH()) {
+				module->editReq = clamp((int)(e.pos.x / tabW()), 0, KIT_N - 1);
+				e.consume(this);
+				return;
+			}
 			// A mic under the cursor is grabbed rather than struck. Tested
 			// FIRST, and it has to be: the head is a play surface everywhere,
 			// so anything drawn on it that you can also move must claim the
@@ -1067,6 +1343,26 @@ struct KitDisplay : OpaqueWidget {
 			e.consume(this);
 			return;
 		}
+		// A RIGHT-CLICK ON A TAB is that tab's menu, whichever tab is selected:
+		// load a preset into it, or put its mics back. The module's own menu
+		// only ever speaks for the selected instrument.
+		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_RIGHT
+		    && module && e.pos.y >= mainH()) {
+			int tab = clamp((int)(e.pos.x / tabW()), 0, KIT_N - 1);
+			Kit* m = module;
+			Menu* menu = createMenu();
+			menu->addChild(createMenuLabel(string::f("Instrument %d", tab + 1)));
+			for (int i = 0; i < KIT_NPRESET; i++) {
+				int idx = i;
+				menu->addChild(createMenuItem(KIT_PRESETS[i].name, "",
+					[=]() { m->presetToSlot(tab, KIT_PRESETS[idx]); }));
+			}
+			menu->addChild(new MenuSeparator);
+			menu->addChild(createMenuItem("Reset mic positions", "",
+			                              [=]() { m->resetMics(tab); }));
+			e.consume(this);
+			return;
+		}
 		OpaqueWidget::onButton(e);
 	}
 	// Dragging across the head keeps striking, which is how you get a roll out
@@ -1077,7 +1373,7 @@ struct KitDisplay : OpaqueWidget {
 				placeMic(micDrag, e.pos);
 			} else {
 				Vec d = e.pos.minus(dragFrom);
-				if (std::sqrt(d.x * d.x + d.y * d.y) > mm2px(2.2f)) {
+				if (e.pos.y < mainH() && std::sqrt(d.x * d.x + d.y * d.y) > mm2px(2.2f)) {
 					hit(e.pos, 0.45f);
 					dragFrom = e.pos;
 				}
@@ -1111,18 +1407,21 @@ struct KitWidget : ModuleWidget {
 		// change broke something.
 		menu->addChild(createIndexPtrSubmenuItem("Head view",
 			{"Flat", "3D"}, &m->headView));
-		menu->addChild(createBoolPtrMenuItem("Stereo (2-channel poly outputs)", "",
+		menu->addChild(createBoolPtrMenuItem("Stereo pairs (L/R per instrument on the poly out)", "",
 		                                     &m->stereo));
 		menu->addChild(createMenuItem("Reset mic positions", "",
-		                              [=]() { m->resetMics(); },
+		                              [=]() { m->resetMics(m->edit); },
 		                              !m->stereo));
-		menu->addChild(createSubmenuItem("Instruments", "", [=](Menu* sub) {
-			for (int i = 0; i < KIT_NPRESET; i++) {
-				int idx = i;
-				sub->addChild(createMenuItem(KIT_PRESETS[i].name, "",
-				                             [=]() { m->loadPreset(idx); }));
-			}
-		}));
+		menu->addChild(createSubmenuItem(string::f("Load into instrument %d", m->edit + 1), "",
+			[=](Menu* sub) {
+				for (int i = 0; i < KIT_NPRESET; i++) {
+					int idx = i;
+					sub->addChild(createMenuItem(KIT_PRESETS[i].name, "",
+					                             [=]() { m->loadPreset(idx); }));
+				}
+			}));
+		menu->addChild(createMenuItem("Load the default kit into all eight", "",
+		                              [=]() { m->loadDefaultKit(); }));
 	}
 
 	KitWidget(Kit* module) {
@@ -1202,8 +1501,10 @@ struct KitWidget : ModuleWidget {
 		for (int i = 0; i < 5; i++) {
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(KX[i], Y_PERF)), module, perf[i].id));
 		}
-		const J outs[3] = {{Kit::HEAD_OUTPUT, "HEAD"}, {Kit::SNARE_OUTPUT, "WIRES"},
-		                   {Kit::OUT_OUTPUT, "MIX"}};
+		// POLY, MIX L, MIX R. The ids are the old HEAD/WIRES/MIX slots (outputs
+		// serialise by index); the art's labels need redrawing to match.
+		const J outs[3] = {{Kit::OUT_OUTPUT, "POLY"}, {Kit::HEAD_OUTPUT, "MIX L"},
+		                   {Kit::SNARE_OUTPUT, "MIX R"}};
 		for (int i = 0; i < 3; i++) {
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(KX[5 + i], Y_PERF)),
 			                                           module, outs[i].id));

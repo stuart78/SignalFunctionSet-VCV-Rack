@@ -506,6 +506,7 @@ MODULES = {
     "helix":   ("Helix",   "src/helix.cpp",   "res/helix.svg",   {}),
     "brigade": ("Brigade", "src/brigade.cpp", "res/brigade.svg", {}),
     "spool":   ("Spool",   "src/spool.cpp",   "res/spool.svg",   {}),
+    "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
 }
 
@@ -521,7 +522,7 @@ NO_SCREEN_SLAB = {"wheel"}
 # list in 2026-09 -- opmorph twice picked up a stray #1a1a32 rect from a run
 # aimed at another panel, which is exactly the failure this set exists to stop.
 FINISHED = {"crystal", "chime", "loom", "slide", "slidex", "fill", "gravity", "key",
-            "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool"}
+            "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin"}
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
