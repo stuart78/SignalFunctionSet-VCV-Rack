@@ -8,12 +8,28 @@
   </g>
   <g id="Reticules" data-name="Reticules">
     <rect x="40.0039" y="140.0079" width="760.0394" height="480" rx="12" fill="#1a1a32"/>
-    <circle cx="189.4488" cy="1111.4174" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
-    <circle cx="329.5276" cy="1111.4174" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
-    <circle cx="469.4882" cy="1111.4174" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
-    <circle cx="609.4488" cy="1111.4174" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
-    <circle cx="569.5276" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
-    <circle cx="709.4882" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="289.4882" cy="769.3701" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="429.4488" cy="769.3701" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="569.4095" cy="769.3701" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="709.3701" cy="769.3701" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="289.4882" cy="909.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="429.4488" cy="909.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="569.4095" cy="909.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="709.3701" cy="909.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="289.4882" cy="1049.2914" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="429.4488" cy="1049.2914" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="569.4095" cy="1049.2914" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="709.3701" cy="1049.2914" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="289.4882" cy="1209.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="429.4488" cy="1209.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="569.4095" cy="1209.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="709.3701" cy="1209.3307" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="66.4961" cy="1430.1969" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="189.4488" cy="1430.1969" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="311.4567" cy="1430.1969" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="434.4095" cy="1430.1969" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="569.4095" cy="1430.1969" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="709.3701" cy="1430.1969" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
   </g>
   <g id="Labels (mock)" data-name="Labels (mock)">
 

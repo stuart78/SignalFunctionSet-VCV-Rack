@@ -56,7 +56,9 @@ ROUND = ("Knob", "Rogan", "Trimpot", "PJ301MPort", "VCVButton", "VCVLightBezel",
 
 def component(call):
     """Component class from create*Centered<X<Y<Z>>>(...) — outermost wins."""
-    m = re.search(r"create\w*?Centered<\s*([A-Za-z0-9_]+)", call)
+    # `\s*` on both sides of the `<`: key.cpp writes `createInputCentered <PJ301MPort>`
+    # and without it every one of Key's channel controls was silently skipped.
+    m = re.search(r"create\w*?Centered\s*<\s*([A-Za-z0-9_]+)", call)
     return m.group(1) if m else None
 
 
@@ -314,7 +316,7 @@ def collect(body, env, extra_defs):
 
     loops = loop_ranges(body, env, extra_defs)
 
-    for call in re.finditer(r"(add(?:Param|Input|Output|Child))\((.*?)\);", body, re.S):
+    for call in re.finditer(r"(add(?:Param|Input|Output|Child))\s*\((.*?)\);", body, re.S):
         text = call.group(2)
         pos = vec_args(text)
         comp = component(text)

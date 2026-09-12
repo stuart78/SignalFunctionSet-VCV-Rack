@@ -24,14 +24,16 @@ outputs drive all of them, and any of their outputs drive Key.
 
 ## Channels
 
-Four identical channels, side by side. Each has:
+Four channels, side by side, and each one is a scale: **MAIN** quantizes to the
+full scale, **SUB 1**, **SUB 2** and **SUB 3** to the three sub-scales. There is
+nothing to select; the column you patch into is the scale you get. Each has:
 
 | Control / jack | What it does |
 |---|---|
-| **IN** | Pitch in, 1V/oct, polyphonic to 16 channels. |
-| **SUB** | Which scale this channel quantizes to: the full scale (**M**), or sub-scale **1**, **2** or **3**. |
-| **OFF** | An offset, applied after quantizing. |
-| **OUT** | Quantized pitch out, same channel count as the input. |
+| **CV IN** | Pitch in, 1V/oct, polyphonic to 16 channels. Normals from the channel to its left. |
+| **TRIG IN** | Sample-and-hold trigger, polyphonic: trigger channel N resamples voice N. Normals from the left. |
+| **OFFSET** | An offset, applied after quantizing. |
+| **CV OUT** | Quantized pitch out, same channel count as the input. |
 
 ### OFFSET moves in scale degrees
 
@@ -152,11 +154,24 @@ and the period.
 
 ## Inputs and outputs
 
-**Inputs:** ROOT, SCALE, TRIG, and per channel IN (polyphonic).
+**Inputs:** ROOT, SCALE, and per channel IN and TRIG (both polyphonic).
 **Outputs:** per channel OUT (polyphonic), plus ROOT and SCALE.
 
-**TRIG** turns Key into a sample-and-hold: patched, the outputs update only on a
-trigger, so pitches change on your clock rather than the moment the input moves.
+**TRIG** turns a channel into a sample-and-hold: patched, that channel's output
+updates only on a trigger, so pitches change on your clock rather than the
+moment the input moves. It is polyphonic, and trigger channel N resamples
+voice N of that channel's IN, so a poly CV and a poly trigger give each voice
+its own timing. A mono trigger resamples every voice. A trigger cable with
+fewer channels than the CV repeats its last channel rather than leaving the
+extra voices frozen.
+
+**IN and TRIG both normal from left to right.** One cable in IN 1 feeds all
+four channels, and a new cable anywhere breaks the chain from that point: a
+cable in IN 3 gives channels 3 and 4 the new source while 1 and 2 keep the
+first. TRIG works the same way. Between them, one pitch and one clock into
+channel 1 gives four channels sampling the same line at the same moment, with
+four sub-scales and four offsets; a second clock into TRIG 3 gives channels 3
+and 4 their own timing.
 
 ## Context menu
 
@@ -197,5 +212,9 @@ are actually getting rather than what a keyboard would pretend you were.
 flat 5th to sub-scale 3, and put the bass on it. The rest of the patch stays
 diatonic; the bass gets one note that does not belong.
 
-**A quantizer that follows the song.** TRIG from Meter's quarter note: pitches
-change on the beat, not when the CV happens to move.
+**A quantizer that follows the song.** Meter's quarter note into TRIG 1: pitches
+on every channel change on the beat, not when the CV happens to move.
+
+**Four voices from one line.** One CV into IN 1, Meter's eighth note into TRIG 1,
+and different OFFSETs on each channel: four staggered sample-and-holds of one
+melody, each a different interval away, all in the key.

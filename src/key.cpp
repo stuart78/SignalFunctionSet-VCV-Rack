@@ -53,8 +53,6 @@ static const char* KEY_NOTES[12] =
 // the sub-scale rows are numbered 1-3 in the design, so the short form matches
 // the rows; the long form is what the parameter tooltip says.
 static const char* KEY_SUBNAME[KEY_NSUB + 1]  = {"M", "1", "2", "3"};
-static const char* KEY_SUBLONG[KEY_NSUB + 1]  = {"Full scale", "Sub-scale 1",
-                                                 "Sub-scale 2", "Sub-scale 3"};
 
 enum KeyRound { KR_NEAREST, KR_DOWN, KR_UP, KR_COUNT };
 
@@ -205,12 +203,20 @@ struct Key : Module {
 	enum ParamId {
 		ROOT_PARAM, SCALE_PARAM,
 		ENUMS(OFFSET_PARAM, KEY_NCH),
+		// SUB_PARAM is RETIRED IN PLACE (2026-09): with a polyphonic IN per
+		// channel there is nothing to choose -- channel 1 IS the main scale and
+		// channels 2-4 ARE sub-scales 1-3. The slots stay because params
+		// serialise by index.
 		ENUMS(SUB_PARAM, KEY_NCH),
 		PARAMS_LEN
 	};
 	enum InputId {
+		// TRIG_INPUT is RETIRED IN PLACE (2026-09): the single global trigger
+		// became four per-channel ones. The slot stays because inputs serialise
+		// by index, and removing it would repatch IN 1..4 in every saved patch.
 		ROOT_INPUT, SCALE_INPUT, TRIG_INPUT,
 		ENUMS(IN_INPUT, KEY_NCH),
+		ENUMS(TRIG_CH_INPUT, KEY_NCH),   // appended, never inserted
 		INPUTS_LEN
 	};
 	enum OutputId {
@@ -274,7 +280,10 @@ struct Key : Module {
 	// ONE TRIGGER PER CHANNEL. A mono cable still drives all four, because
 	// getPolyVoltage() hands channel 0 to every reader, so every existing patch
 	// behaves exactly as it did. A polyphonic cable addresses them separately.
-	dsp::SchmittTrigger trigIn[KEY_NCH];
+	// One Schmitt PER VOICE, not per channel: a poly trigger's channel p samples
+	// voice p, and a single edge detector shared across sixteen voices would be
+	// consumed by whichever voice looked first.
+	dsp::SchmittTrigger trigIn[KEY_NCH][KEY_MAXPOLY];
 	float shownVolts[KEY_NCH] = {};
 	bool  shownActive[KEY_NCH] = {};
 
@@ -295,9 +304,6 @@ struct Key : Module {
 			configParam<KeyOffsetQuantity>(OFFSET_PARAM + c, -12.f, 12.f, 0.f,
 			            string::f("Channel %d offset", c + 1));
 			getParamQuantity(OFFSET_PARAM + c)->snapEnabled = true;
-			configSwitch(SUB_PARAM + c, 0.f, (float)KEY_NSUB, 0.f,
-			             string::f("Channel %d scale", c + 1),
-			             {KEY_SUBLONG[0], KEY_SUBLONG[1], KEY_SUBLONG[2], KEY_SUBLONG[3]});
 			configInput(IN_INPUT + c, string::f(
 				"Channel %d pitch (1V/oct, poly; normals from the channel to its left)", c + 1));
 			configOutput(OUT_OUTPUT + c, string::f("Channel %d quantized pitch", c + 1));
@@ -310,7 +316,10 @@ struct Key : Module {
 
 		configInput(ROOT_INPUT,  "Root CV (1V/oct, semitone-quantized)");
 		configInput(SCALE_INPUT, "Scale CV (1V per scale)");
-		configInput(TRIG_INPUT,  "Sample & hold trigger (poly: channel N triggers Key channel N, last channel repeated) — when patched, notes update only on a trigger");
+		for (int c = 0; c < KEY_NCH; c++)
+			configInput(TRIG_CH_INPUT + c, string::f(
+				"Channel %d sample & hold trigger (poly: trigger channel N resamples voice N; "
+				"normals from the channel to its left) — when patched, notes update only on a trigger", c + 1));
 		configOutput(ROOT_OUTPUT,  "Root CV (1V/oct) — drives any module's ROOT input");
 		configOutput(SCALE_OUTPUT, "Scale CV (1V per scale on channel 0; the full scale, "
 		                           "including microtonal and Scala, on the further channels)");
@@ -453,8 +462,13 @@ struct Key : Module {
 		keyGen++;
 	}
 
+	// Channel c's scale is FIXED: 0 is the main scale, 1..3 are the sub-scales.
+	// The panel says so (MAIN / SUB 1 / SUB 2 / SUB 3), and everything that used
+	// to read the retired SUB_PARAM reads this instead, so the mapping lives in
+	// exactly one place.
+	static int subFor(int c) { return c; }
 	const KeyScale& scaleFor(int c) {
-		int s = (int)std::round(params[SUB_PARAM + c].getValue());
+		int s = subFor(c);
 		return (s >= 1 && s <= KEY_NSUB) ? sub[s - 1] : parent;
 	}
 
@@ -489,7 +503,6 @@ struct Key : Module {
 			rebuild();
 		}
 
-		bool trigPatched = inputs[TRIG_INPUT].isConnected();
 		float hystSemis = hysteresisCents / 100.f;
 
 		// ── the ins normal left to right ───────────────────────────────────────
@@ -500,30 +513,34 @@ struct Key : Module {
 		// different moments, four sub-scales and four offsets off the same line.
 		// Without it, three of the four channels had no signal to sample and the
 		// per-channel trigger looked dead when it was working perfectly.
-		int src[KEY_NCH];
+		// The TRIG row normals the same way, and for the same reason: one clock
+		// into TRIG 1 samples all four channels, a second into TRIG 3 gives 3-4
+		// their own timing.
+		int src[KEY_NCH], tsrc[KEY_NCH];
 		{
-			int last = -1;
+			int last = -1, tlast = -1;
 			for (int c = 0; c < KEY_NCH; c++) {
 				if (inputs[IN_INPUT + c].isConnected()) last = c;
+				if (inputs[TRIG_CH_INPUT + c].isConnected()) tlast = c;
 				src[c] = last;                      // -1 until the first cable
+				tsrc[c] = tlast;
 			}
 		}
-		// A trigger cable narrower than four channels REPEATS ITS LAST CHANNEL
-		// rather than reading zeros off the end. getPolyVoltage only does that
-		// for a mono cable; on a 2-channel cable it reads voltages[2] and [3],
-		// which the engine holds at 0 V, so channels 3 and 4 would never see an
-		// edge again and would sit frozen on whatever they sampled first --
-		// silently, and for ever.
-		int trigCh = std::max(1, inputs[TRIG_INPUT].getChannels());
 
 		for (int c = 0; c < KEY_NCH; c++) {
 			// Each channel samples on its own trigger. The Schmitt has to be
 			// per channel as well as the voltage: one shared trigger would be
 			// consumed by whichever channel looked at it first, and the other
 			// three would never see the edge.
-			bool sampleNow = !trigPatched
-				|| trigIn[c].process(inputs[TRIG_INPUT].getVoltage(std::min(c, trigCh - 1)),
-				                     0.1f, 1.f);
+			// Trigger channel p resamples voice p. A MONO trigger resamples every
+			// voice, and a cable narrower than the CV REPEATS ITS LAST CHANNEL
+			// rather than reading zeros off its end -- getPolyVoltage only
+			// repeats for a mono cable, so a 2-channel trigger against a
+			// 4-voice CV would leave voices 3 and 4 frozen on their first
+			// sample, silently and for ever.
+			bool trigPatched = (tsrc[c] >= 0);
+			Input& tr4 = inputs[TRIG_CH_INPUT + (trigPatched ? tsrc[c] : c)];
+			int trigCh = std::max(1, tr4.getChannels());
 			const KeyScale& sc = scaleFor(c);
 			// Polyphony comes from whichever cable is feeding this channel, so a
 			// normalled channel is as polyphonic as the source it is reading.
@@ -537,10 +554,12 @@ struct Key : Module {
 			int off = (int)std::round(params[OFFSET_PARAM + c].getValue());
 			// A sub-scale change must invalidate held notes exactly as a key
 			// change does, or a channel keeps a note its new scale does not have.
-			int gen = keyGen * 8 + (int)std::round(params[SUB_PARAM + c].getValue());
+			int gen = keyGen * 8 + subFor(c);
 
 			for (int p = 0; p < nch; p++) {
 				float in = (src[c] >= 0) ? in4.getVoltage(p) : 0.f;
+				bool sampleNow = !trigPatched
+					|| trigIn[c][p].process(tr4.getVoltage(std::min(p, trigCh - 1)), 0.1f, 1.f);
 
 				if (sampleNow || !hasHeld[c][p] || lastGen[c][p] != gen) {
 					float semis = in * 12.f - (float)rootNote;
@@ -986,7 +1005,7 @@ struct KeyDisplay : OpaqueWidget {
 		int  litDeg[KEY_NSUB] = {-1, -1, -1};
 		int  litPc[KEY_NSUB]  = {-1, -1, -1};
 		for (int c = 0; c < KEY_NCH; c++) {
-			int s = (int)std::round(m->params[Key::SUB_PARAM + c].getValue());
+			int s = Key::subFor(c);
 			if (s < 1 || s > KEY_NSUB) continue;
 			used[s - 1] = true;
 			if (!m->shownActive[c]) continue;
@@ -1025,7 +1044,7 @@ struct KeyDisplay : OpaqueWidget {
 		std::string note[KEY_NCH];
 		bool act[KEY_NCH];
 		for (int c = 0; c < KEY_NCH; c++) {
-			int sIdx = (int)std::round(m->params[Key::SUB_PARAM + c].getValue());
+			int sIdx = Key::subFor(c);
 			sl[c] = KEY_SUBNAME[clamp(sIdx, 0, KEY_NSUB)];
 			act[c] = m->shownActive[c];
 			if (act[c]) {
@@ -1074,6 +1093,26 @@ struct KeyDisplay : OpaqueWidget {
 // Panel — 14HP.
 // =============================================================================
 
+// FILE-SCOPE, NOT LOCAL TO THE CONSTRUCTOR, because tools/panel_reticules.py and
+// the Figma template export read the layout out of the source and resolve
+// only file-scope statics -- as function locals these were invisible to both,
+// and the designer's export only ever carried the six bottom-row reticules.
+namespace keylayout {
+// EVERY NUMBER HERE IS READ OUT OF res/key.svg (the 2026-09 export), not
+// chosen: the designer's guide circles are the control centres.
+//
+// Four channel columns headed MAIN / SUB 1 / SUB 2 / SUB 3, with the row labels
+// down the left, which is why the columns start at 24.5 rather than the edge.
+static const float col[KEY_NCH] = {24.51f, 36.36f, 48.21f, 60.06f};
+static const float yIn = 65.14f, yTrig = 76.99f, yOff = 88.84f, yOut = 102.39f;
+// The key row is PIVOTED: each pot sits BESIDE its jack rather than above it,
+// so ROOT and SCALE each take two slots, and the two outputs share a plate on
+// the channel columns' last two positions.
+static const float yKey = 121.09f;
+static const float kRoot = 5.63f, kRootIn = 16.04f, kScale = 26.37f, kScaleIn = 36.78f;
+static const float kRootOut = 48.21f, kScaleOut = 60.06f;
+}
+
 struct KeyWidget : ModuleWidget {
 	KeyWidget(Key* module) {
 		setModule(module);
@@ -1088,14 +1127,7 @@ struct KeyWidget : ModuleWidget {
 		// on the hp() grid: the four channel columns sit on an 11.855mm pitch,
 		// which is 2.334HP, and the rows are distributed down the panel rather
 		// than grid-snapped.
-		const float col[KEY_NCH] = {16.04f, 27.90f, 39.75f, 51.60f};
-		const float yIn = 58.50f, ySub = 70.40f, yOff = 82.30f, yOut = 94.10f;
-		// The bottom row is on its OWN spacing, not the channel columns': the key
-		// is not a fifth channel, and the art puts ROOT / SCALE / TRIG together on
-		// the left with the two outputs on their own plate to the right.
-		const float yPot = 110.60f, yJack = 121.00f;
-		const float kRoot = 6.90f, kScale = 18.75f, kTrig = 30.61f;
-		const float kRootOut = 48.22f, kScaleOut = 60.07f;
+		using namespace keylayout;
 
 		KeyDisplay* disp = new KeyDisplay();
 		disp->module = module;
@@ -1104,20 +1136,19 @@ struct KeyWidget : ModuleWidget {
 		addChild(disp);
 
 		for (int c = 0; c < KEY_NCH; c++) {
-			addInput (createInputCentered <PJ301MPort>(mm2px(Vec(col[c], yIn)),  module, Key::IN_INPUT + c));
-			addParam (createParamCentered <Trimpot>   (mm2px(Vec(col[c], ySub)), module, Key::SUB_PARAM + c));
+			addInput (createInputCentered <PJ301MPort>(mm2px(Vec(col[c], yIn)),   module, Key::IN_INPUT + c));
+			addInput (createInputCentered <PJ301MPort>(mm2px(Vec(col[c], yTrig)), module, Key::TRIG_CH_INPUT + c));
 			addParam (createParamCentered <Trimpot>   (mm2px(Vec(col[c], yOff)), module, Key::OFFSET_PARAM + c));
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(col[c], yOut)), module, Key::OUT_OUTPUT + c));
 		}
 
 		// ── the key, in and out ────────────────────────────────────────────────
-		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kRoot,  yPot)),  module, Key::ROOT_PARAM));
-		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kRoot,  yJack)), module, Key::ROOT_INPUT));
-		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kScale, yPot)),  module, Key::SCALE_PARAM));
-		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kScale, yJack)), module, Key::SCALE_INPUT));
-		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kTrig,  yJack)), module, Key::TRIG_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kRootOut,  yJack)), module, Key::ROOT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kScaleOut, yJack)), module, Key::SCALE_OUTPUT));
+		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kRoot,    yKey)), module, Key::ROOT_PARAM));
+		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kRootIn,  yKey)), module, Key::ROOT_INPUT));
+		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kScale,   yKey)), module, Key::SCALE_PARAM));
+		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kScaleIn, yKey)), module, Key::SCALE_INPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kRootOut,  yKey)), module, Key::ROOT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kScaleOut, yKey)), module, Key::SCALE_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
