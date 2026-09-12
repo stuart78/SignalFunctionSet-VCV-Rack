@@ -150,7 +150,9 @@ lossy summary; Pelog resolves to Phrygian.
 
 Patch SCALE OUT into another Key and the whole key crosses intact, non-octave
 period and all. Fourteen degrees maximum, being sixteen channels less the index
-and the period.
+and the period. A Scala scale with more degrees than that still quantizes
+in full on Key's own outputs; only what SCALE OUT can pass to other modules is
+capped, and the context menu says how many degrees will not travel.
 
 ## Inputs and outputs
 

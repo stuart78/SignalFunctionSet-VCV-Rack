@@ -37,7 +37,12 @@
 static const int KEY_NCH     = 4;      // channels
 static const int KEY_MAXPOLY = 16;
 static const int KEY_NSUB    = 3;      // sub-scales
-static const int KEY_MAXDEG  = 64;     // Scala scales run well past twelve
+// 256, NOT 64. Scala scales run well past twelve, and past sixty-four: a 79-note
+// MOS of 159-tET came in and was cut at degree 64, so the strip showed lines
+// over three quarters of the octave and one dead region from there to the
+// period. The Scala archive holds scales in the hundreds; 256 covers it
+// without making the mask arithmetic exotic.
+static const int KEY_MAXDEG  = 256;
 // The sub-scale rows reach as far as the SCALE does. This was 24, which was
 // invisible on every canonical scale (the longest is twelve) and silently
 // truncated a Scala file: a 53-degree scale quantized correctly, because the
@@ -242,7 +247,19 @@ struct Key : Module {
 	// 64 bits, because KEY_MAXDEG is 64. As a uint32_t it could not represent a
 	// degree past 31 whatever KEY_EDITDEG said, so raising the cap alone would
 	// have moved the truncation rather than removed it.
-	uint64_t subMask[KEY_NSUB] = {0, 0, 0};    // over parent DEGREE indices
+	// A bit per DEGREE INDEX, in enough 64-bit words for KEY_MAXDEG. It was a
+	// single uint64_t, which could not represent a degree past 63 whatever the
+	// degree cap said -- the same trap as the uint32_t before it, one size up.
+	struct DegMask {
+		static const int NW = (KEY_MAXDEG + 63) / 64;
+		uint64_t w[NW] = {};
+		bool has(int d) const { return d >= 0 && d < KEY_MAXDEG && ((w[d >> 6] >> (d & 63)) & 1ull); }
+		void flip(int d)      { if (d >= 0 && d < KEY_MAXDEG) w[d >> 6] ^= (1ull << (d & 63)); }
+		void set(int d)       { if (d >= 0 && d < KEY_MAXDEG) w[d >> 6] |= (1ull << (d & 63)); }
+		void clear()          { for (int i = 0; i < NW; i++) w[i] = 0; }
+		void fill()           { for (int i = 0; i < NW; i++) w[i] = ~0ull; }
+	};
+	DegMask subMask[KEY_NSUB];
 	uint16_t subChrom[KEY_NSUB] = {0, 0, 0};   // free mode: SEMITONES from the root
 	int   keyGen = 0;                    // bumped whenever anything about the key moves
 
@@ -331,9 +348,10 @@ struct Key : Module {
 	// Seeded with three roles you actually reach for, expressed as degrees so
 	// they stay themselves through any change of scale.
 	void defaultSubs() {
-		subMask[0] = (1ull << 0) | (1ull << 2) | (1ull << 4);              // triad
-		subMask[1] = (1ull << 0) | (1ull << 3) | (1ull << 4);              // root, 4th, 5th
-		subMask[2] = (1ull << 0) | (1ull << 2) | (1ull << 4) | (1ull << 6);  // seventh chord
+		for (int k = 0; k < KEY_NSUB; k++) subMask[k].clear();
+		for (int d : {0, 2, 4})    subMask[0].set(d);     // triad
+		for (int d : {0, 3, 4})    subMask[1].set(d);     // root, 4th, 5th
+		for (int d : {0, 2, 4, 6}) subMask[2].set(d);     // seventh chord
 	}
 
 	void onReset() override {
@@ -444,7 +462,7 @@ struct Key : Module {
 			sub[k] = KeyScale();
 			sub[k].period = parent.period;
 			for (int d = 0; d < parent.n && d < KEY_EDITDEG; d++)
-				if (subMask[k] & (1ull << d)) sub[k].iv[sub[k].n++] = parent.iv[d];
+				if (subMask[k].has(d)) sub[k].iv[sub[k].n++] = parent.iv[d];
 			if (freeSub && chromaticKey()) {
 				for (int s = 0; s < 12 && sub[k].n < KEY_MAXDEG; s++) {
 					if (!((subChrom[k] >> s) & 1)) continue;
@@ -627,7 +645,14 @@ struct Key : Module {
 		json_t* sm = json_array();
 		// json_integer is int64, so a 64-bit mask round-trips bit-exactly even
 		// when the top bit is set and it reads back as negative.
-		for (int k = 0; k < KEY_NSUB; k++) json_array_append_new(sm, json_integer((json_int_t)subMask[k]));
+		// One array of words per sub-scale. Older patches stored one integer per
+		// sub-scale; dataFromJson reads both.
+		for (int k = 0; k < KEY_NSUB; k++) {
+			json_t* words = json_array();
+			for (int i = 0; i < DegMask::NW; i++)
+				json_array_append_new(words, json_integer((json_int_t)subMask[k].w[i]));
+			json_array_append_new(sm, words);
+		}
 		json_object_set_new(root, "subMask", sm);
 		json_t* sc = json_array();
 		for (int k = 0; k < KEY_NSUB; k++) json_array_append_new(sc, json_integer(subChrom[k]));
@@ -661,7 +686,15 @@ struct Key : Module {
 				subChrom[k] = (uint16_t)json_integer_value(json_array_get(sc, k));
 		if (json_t* sm = json_object_get(root, "subMask"))
 			for (int k = 0; k < KEY_NSUB && k < (int)json_array_size(sm); k++)
-				subMask[k] = (uint64_t)json_integer_value(json_array_get(sm, k));
+				{
+					json_t* e = json_array_get(sm, k);
+					subMask[k].clear();
+					if (json_is_integer(e))                          // pre-256 patch: one word
+						subMask[k].w[0] = (uint64_t)json_integer_value(e);
+					else if (json_is_array(e))
+						for (int i = 0; i < DegMask::NW && i < (int)json_array_size(e); i++)
+							subMask[k].w[i] = (uint64_t)json_integer_value(json_array_get(e, i));
+				}
 
 		if (json_t* j = json_object_get(root, "scalaLoaded")) scalaLoaded = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "scalaPath")) scalaPath = json_string_value(j);
@@ -671,6 +704,20 @@ struct Key : Module {
 			scala.n = 0;
 			for (int k = 0; k < (int)json_array_size(iv) && scala.n < KEY_MAXDEG; k++)
 				scala.iv[scala.n++] = (float)json_number_value(json_array_get(iv, k));
+		}
+		// THE FILE WINS WHEN IT IS STILL THERE. The saved copy exists so a patch
+		// still sounds right after the .scl has moved; it is not the authority.
+		// A patch saved while the degree cap was 64 carries a 79-note scale cut
+		// to 64, and reading that back as-is kept the truncation alive across
+		// the fix -- the strip still stopped at three quarters of the octave
+		// on a build that parsed the whole file. Re-parse when the path
+		// resolves; fall back to the copy when it does not.
+		if (scalaLoaded && !scalaPath.empty()) {
+			KeyScale fresh; std::string nm;
+			if (keyLoadScala(scalaPath, fresh, nm)) {
+				scala = fresh;
+				if (!nm.empty()) scalaName = nm;
+			}
 		}
 		rebuild();
 	}
@@ -714,16 +761,40 @@ struct KeyDisplay : OpaqueWidget {
 	// Sub-row cell centres. On a chromatic key they sit under their own note on
 	// the keyboard; otherwise the scale has no chromatic to align to, so the row
 	// is just its own degrees, spread across the same span.
+	// IN THE STRIP STATE A CELL SITS UNDER ITS DEGREE LINE. The strip above is
+	// linear in pitch, so a scale whose steps are uneven -- any just scale, and
+	// Fokker's 53 is one -- has its lines unevenly spaced; cells spread evenly
+	// by INDEX sat under the wrong lines from the second degree on, and the
+	// row read as a different scale from the one above it. Same formula as
+	// drawStrip's, so they cannot drift apart.
 	float subCellU(int i, int n, bool chromatic) const {
 		if (chromatic) return keyU(i);
 		if (n <= 1) return (MARGIN + RIGHT) * 0.5f;
-		float span = RIGHT - MARGIN - 2.f * SUB_R;
+		if (module && i < module->parent.n && module->parent.period > 0.01f)
+			return MARGIN + (RIGHT - MARGIN) * module->parent.iv[i] / module->parent.period;
+		float span = RIGHT - MARGIN - 2.f * SUB_R;                // the browser preview
 		return MARGIN + SUB_R + span * (float)i / (float)(n - 1);
 	}
+	// Half-WIDTH of a strip cell: narrow enough that the closest pair of
+	// degrees in the scale do not touch, since the spacing is now the scale's
+	// own and not an even division. Floored so a comma-sized step still leaves
+	// something to see and to hit.
 	float subCellR(int n, bool chromatic) const {
 		if (chromatic || n <= 12) return SUB_R;
-		float pitch = (RIGHT - MARGIN) / (float)n;          // keep them from touching
-		return std::min(SUB_R, pitch * 0.42f);
+		float gap = (RIGHT - MARGIN) / (float)n;
+		if (module && module->parent.n >= 2 && module->parent.period > 0.01f) {
+			float span = RIGHT - MARGIN, per = module->parent.period;
+			gap = span * (per - module->parent.iv[module->parent.n - 1]) / per;   // last to the period
+			for (int d = 1; d < module->parent.n && d < n; d++)
+				gap = std::min(gap, span * (module->parent.iv[d] - module->parent.iv[d - 1]) / per);
+		}
+		return std::max(1.5f, std::min(SUB_R, gap * 0.42f));
+	}
+	// Half-HEIGHT: a dot on the keyboard, a bar in the strip. A 53-cell row of
+	// six-unit dots was a row of targets nobody could hit; a bar most of the
+	// row's height is the same width and four times the target.
+	float subCellHalfH(bool chromatic) const {
+		return chromatic ? SUB_R : SUB_DY * 0.36f;
 	}
 
 	// How many cells a sub row shows, and whether they are chromatic.
@@ -746,9 +817,10 @@ struct KeyDisplay : OpaqueWidget {
 		row = cell = -1;
 		int n = subCellCount(chromatic);
 		float r = X(subCellR(n, chromatic));
+		float hh = X(subCellHalfH(chromatic));
 		for (int k = 0; k < KEY_NSUB; k++) {
 			float cy = X(SUB_Y0 + SUB_DY * (float)k);
-			if (std::fabs(p.y - cy) > r * 1.15f) continue;
+			if (std::fabs(p.y - cy) > hh * 1.15f) continue;
 			for (int i = 0; i < n; i++) {
 				float cx = X(subCellU(i, n, chromatic));
 				if (std::fabs(p.x - cx) <= r * 1.15f) { row = k; cell = i; return; }
@@ -769,7 +841,7 @@ struct KeyDisplay : OpaqueWidget {
 		if (row >= 0) {
 			e.consume(this);
 			if (!chromatic) {                        // cell IS the degree index
-				module->subMask[row] ^= (1ull << cell);
+				module->subMask[row].flip(cell);
 				module->rebuild();
 				return;
 			}
@@ -781,7 +853,7 @@ struct KeyDisplay : OpaqueWidget {
 			int deg = -1;
 			for (int d = 0; d < module->parent.n && d < KEY_EDITDEG; d++)
 				if (std::fabs(module->parent.iv[d] - (float)sfr) < 0.02f) deg = d;
-			if (deg >= 0) module->subMask[row] ^= (1ull << deg);
+			if (deg >= 0) module->subMask[row].flip(deg);
 			else if (module->freeSub) module->subChrom[row] ^= (uint16_t)(1u << sfr);
 			else return;                              // out of key, and not allowed
 			module->rebuild();
@@ -919,7 +991,16 @@ struct KeyDisplay : OpaqueWidget {
 				           : on[f]       ? (used[k] ? sfs::SCREEN_BLUE : sfs::SCREEN_DEEP)
 				           : inParent[f] ? sfs::SCREEN_PURP
 				                         : nvgRGB(0x23, 0x23, 0x3C);
-				dot(args, subCellU(i, n, chromatic), cy, r, c);
+				if (chromatic) {
+					dot(args, subCellU(i, n, chromatic), cy, r, c);
+				} else {
+					// a bar under its degree line, the height of most of the row
+					float hh = subCellHalfH(chromatic), u = subCellU(i, n, chromatic);
+					nvgBeginPath(args.vg);
+					nvgRoundedRect(args.vg, X(u - r), X(cy - hh), X(2.f * r), X(2.f * hh), X(r));
+					nvgFillColor(args.vg, c);
+					nvgFill(args.vg);
+				}
 				if (outside[f]) {
 					nvgBeginPath(args.vg);
 					nvgCircle(args.vg, X(subCellU(i, n, chromatic)), X(cy), X(r) - 1.f);
@@ -1022,7 +1103,7 @@ struct KeyDisplay : OpaqueWidget {
 			for (int i = 0; i < n; i++) {
 				int f = k * KEY_EDITDEG + i;
 				if (!chromatic) {
-					on[f]   = (m->subMask[k] >> i) & 1;
+					on[f]   = m->subMask[k].has(i);
 					inP[f]  = true;                      // every cell IS a degree here
 					litC[f] = subLive[k] && litDeg[k] == i;
 					continue;
@@ -1032,7 +1113,7 @@ struct KeyDisplay : OpaqueWidget {
 				for (int d = 0; d < m->parent.n && d < KEY_EDITDEG; d++)
 					if (std::fabs(m->parent.iv[d] - (float)sfr) < 0.02f) deg = d;
 				inP[f]  = (deg >= 0);
-				on[f]   = (deg >= 0) ? (((m->subMask[k] >> deg) & 1) != 0)
+				on[f]   = (deg >= 0) ? m->subMask[k].has(deg)
 				                     : (m->freeSub && ((m->subChrom[k] >> sfr) & 1) != 0);
 				outC[f] = on[f] && deg < 0;
 				litC[f] = subLive[k] && litPc[k] == i;
@@ -1047,11 +1128,24 @@ struct KeyDisplay : OpaqueWidget {
 			int sIdx = Key::subFor(c);
 			sl[c] = KEY_SUBNAME[clamp(sIdx, 0, KEY_NSUB)];
 			act[c] = m->shownActive[c];
-			if (act[c]) {
+			if (!act[c]) note[c] = "–";
+			else if (chromatic) {
 				int s = (int)std::lround(m->shownVolts[c] * 12.f);
 				note[c] = std::string(KEY_NOTES[((s % 12) + 12) % 12])
 				        + std::to_string(4 + (int)std::floor(s / 12.f));
-			} else note[c] = "–";
+			} else {
+				// A 12-tone note name is the wrong answer on a scale that is not
+				// twelve-tone: on Fokker's 53 the readout said A#5 for a degree
+				// no keyboard has. In the strip state the note is named the way
+				// the rows are: its DEGREE of the main scale, one-based, and
+				// the repeat it is in, numbered like an octave (4 at 0 V).
+				float semis = m->shownVolts[c] * 12.f - (float)m->rootNote;
+				float per = std::max(m->parent.period, 0.01f);
+				int rep = (int)std::floor(semis / per);
+				int deg = degreeIndexOf(m->parent, semis);
+				note[c] = (deg >= 0 ? std::to_string(deg + 1) : std::string("?"))
+				        + " (" + std::to_string(4 + rep) + ")";
+			}
 		}
 		footer(args, sl, note, act);
 	}
@@ -1243,7 +1337,11 @@ struct KeyWidget : ModuleWidget {
 			m->rebuild();
 		}));
 		menu->addChild(createMenuItem("Sub-scales: every degree", "", [=]() {
-			for (int k = 0; k < KEY_NSUB; k++) m->subMask[k] = 0xFFFFFFFFu;
+			// ~0ull, NOT 0xFFFFFFFFu: the mask is 64 bits since Scala scales
+			// went past 32 degrees, and the 32-bit fill left degrees 32-52 of a
+			// 53-note scale OUT of every sub-scale -- "every degree" dropped
+			// the top 40% of the octave. Reported on Fokker's 53.
+			for (int k = 0; k < KEY_NSUB; k++) m->subMask[k].fill();
 			m->rebuild();
 		}));
 	}
