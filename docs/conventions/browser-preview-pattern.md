@@ -78,3 +78,49 @@ The screenshot tool writes one PNG per registered module. The PNG should show th
 **Any new module with a custom `drawLayer` widget gets a `drawPreview` from day one.** Treat it as a required part of the display widget contract, alongside lazy font loading and the `layer != 1` check.
 
 Modules without displays (just panel knobs/jacks, no NanoVG widget) don't need this — Rack's screenshot of the panel SVG is sufficient.
+
+## The better pattern: draw a real instance
+
+A `drawPreview()` is a second drawing of the same screen, and a second drawing
+drifts. Sigma's stand-in was still drawing bars an hour after the live view had
+become an area; Chime's passed a `preview` flag into its column drawer that
+also meant "dim", so every tube in the thumbnail was dark; Trace's was four
+sines of one width on a module whose whole point is that the width varies.
+
+`src/preview.hpp` replaces the stand-in with the module itself. Build an
+instance outside the engine, give it something to react to, run it, and let
+the live path draw it:
+
+```cpp
+#include "preview.hpp"
+
+static Chime* chimePreview() {
+    static Chime* pm = nullptr;          // built once, kept for the plugin's life
+    if (pm) return pm;
+    pm = new Chime();
+    int64_t f = 0;
+    sfs::previewRun(*pm, 2.5f, f);       // two and a half seconds of the default patch
+    return pm;
+}
+
+void ChimeDisplay::draw(const DrawArgs& args) {
+    ...
+    if (!module) { module = chimePreview(); draw(args); module = nullptr; return; }
+    // the live path, unchanged
+}
+```
+
+Inputs are patched by setting `Port::channels` directly (`sfs::previewConnect`),
+since `setChannels()` is a no-op on a port the engine has not connected; Sigma
+holds a gate at 10 V, Kit fires its eight instruments a seventh of a second
+apart, Trace publishes mouse samples through `uiPublish()` so the ink is laid by
+the real brush. Nothing touches `APP->engine`: the instance is private to the
+UI thread, never registered, and deliberately never freed (it would otherwise
+be destroyed at unload, after the window it might reference).
+
+Two things to check before adopting it for a module: that `process()` does not
+reach for `APP->engine` (Kit's `onSampleRateChange()` does, so the preview
+never calls it and the sample rate arrives through `ProcessArgs`), and that the
+warm-up is short enough not to stall the browser the first time the thumbnail
+is drawn. A few hundred thousand samples of a light module is fine; a second of
+a sixteen-voice additive synth is fine; a minute of anything is not.

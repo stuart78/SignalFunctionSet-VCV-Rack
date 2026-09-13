@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
+#include "preview.hpp"
 #include <algorithm>
 #include <cmath>
 #include <string>
@@ -1580,6 +1581,22 @@ static const NVGcolor SG_TABCOL[SG_NTAB] = {
 	nvgRGB(0xD8, 0xB4, 0x3A),   // RATE   yellow
 };
 
+// The browser thumbnail is a Sigma SOUNDING: the CS-80 preset with a note held
+// for 0.4 s, which is the moment its swell has thirteen of sixteen partials
+// speaking (measured across the presets: the bells and bars show four or
+// five, the pads take longer to arrive), over the LEVEL curve that shaped them.
+static Sigma* sigmaPreview() {
+	static Sigma* pm = nullptr;
+	if (pm) return pm;
+	pm = new Sigma();
+	pm->loadPreset(14);   // CS-80
+	sfs::previewConnect(pm->inputs[Sigma::GATE_INPUT], 1);
+	pm->inputs[Sigma::GATE_INPUT].setVoltage(10.f);
+	int64_t f = 0;
+	sfs::previewRun(*pm, 0.4f, f);
+	return pm;
+}
+
 struct SigmaDisplay : OpaqueWidget {
 	Sigma* module = nullptr;
 	std::shared_ptr<Font> font;
@@ -1623,7 +1640,6 @@ struct SigmaDisplay : OpaqueWidget {
 	}
 
 	void drawLayer(const DrawArgs& args, int layer) override;
-	void drawPreview(const DrawArgs& args, float s);
 	void onButton(const ButtonEvent& e) override;
 	void onDoubleClick(const DoubleClickEvent& e) override;
 	Vec lastPress;
@@ -1877,6 +1893,8 @@ void SigmaDisplay::step() {
 
 void SigmaDisplay::drawLayer(const DrawArgs& args, int layer) {
 	if (layer != 1) { OpaqueWidget::drawLayer(args, layer); return; }
+	// The thumbnail is a real instance drawn by this same function.
+	if (!module) { module = sigmaPreview(); drawLayer(args, layer); module = nullptr; return; }
 	NVGcontext* vg = args.vg;
 	float s = box.size.x / SG_DESIGN_W;
 	if (!font || font->handle < 0) font = sfs::screenFontFace();
@@ -1885,7 +1903,6 @@ void SigmaDisplay::drawLayer(const DrawArgs& args, int layer) {
 	nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, mm2px(1.f));
 	nvgFillColor(vg, sfs::SCREEN_BG);
 	nvgFill(vg);
-	if (!module) { drawPreview(args, s); OpaqueWidget::drawLayer(args, layer); return; }
 
 	nvgSave(vg);
 	nvgScissor(vg, 0, 0, box.size.x, box.size.y);
@@ -2133,137 +2150,6 @@ void SigmaDisplay::drawLayer(const DrawArgs& args, int layer) {
 
 	nvgRestore(vg);
 	OpaqueWidget::drawLayer(args, layer);
-}
-
-void SigmaDisplay::drawPreview(const DrawArgs& args, float s) {
-	NVGcontext* vg = args.vg;
-	if (!font || font->handle < 0) font = sfs::screenFontFace();
-	float tw = splitX() / (float)SG_NTAB;
-	for (int t = 0; t < SG_NTAB; t++) {
-		nvgBeginPath(vg);
-		nvgRect(vg, (t * tw + 1.f) * s, 1.f * s, (tw - 2.f) * s, (tabsH() - 3.f) * s);
-		nvgFillColor(vg, t == 0 ? nvgTransRGBA(SG_TABCOL[0], 110) : sfs::SCREEN_PURP);
-		nvgFill(vg);
-		if (font && font->handle >= 0) {
-			sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
-			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-			nvgFillColor(vg, t == 0 ? SG_TABCOL[0] : sfs::SCREEN_DIM);
-			nvgText(vg, (t * tw + tw * 0.5f) * s, (tabsH() * 0.5f) * s, SG_TABNAME[t], NULL);
-		}
-	}
-	float y0 = specY(), h = specH(), colW = splitX() / (float)np();
-	// The same AREA the live view draws. Two copies of a drawing is how a
-	// browser thumbnail comes to show a module that no longer exists -- this one
-	// was still bars for an hour after the live one stopped being.
-	{
-		auto amp = [&](int i) {
-			float a = 1.f / (1.f + 0.5f * i) * (0.75f + 0.25f * std::sin(i * 1.9f));
-			return std::sqrt(clamp(a, 0.f, 1.f)) * h;
-		};
-		nvgBeginPath(vg);
-		nvgMoveTo(vg, (colW * 0.5f) * s, (y0 + h) * s);
-		for (int i = 0; i < np(); i++)
-			nvgLineTo(vg, (i * colW + colW * 0.5f) * s, (y0 + h - amp(i)) * s);
-		nvgLineTo(vg, ((np() - 1) * colW + colW * 0.5f) * s, (y0 + h) * s);
-		nvgClosePath(vg);
-		nvgFillColor(vg, nvgRGBA(0x0D, 0x59, 0x86, 0xCC));
-		nvgFill(vg);
-		nvgBeginPath(vg);
-		for (int i = 0; i < np(); i++) {
-			float xx = (i * colW + colW * 0.5f) * s, yy = (y0 + h - amp(i)) * s;
-			if (i == 0) nvgMoveTo(vg, xx, yy); else nvgLineTo(vg, xx, yy);
-		}
-		nvgStrokeColor(vg, nvgRGBA(0x2A, 0x8F, 0xC8, 0xFF));
-		nvgStrokeWidth(vg, 1.2f * s);
-		nvgStroke(vg);
-	}
-	for (int t = 0; t < SG_NTAB; t++) {
-		nvgBeginPath(vg);
-		for (int i = 0; i < np(); i++) {
-			float v = (t == 2) ? 0.15f * std::sin(i * 0.8f)
-			                   : 1.f / (1.f + (0.15f + 0.1f * t) * i);
-			bool bip = SG_TABBIP[t];
-			float yy = bip ? (y0 + h * 0.5f - v * h * 0.5f) : (y0 + h - v * h);
-			float xx = i * colW + colW * 0.5f;
-			if (i == 0) nvgMoveTo(vg, xx * s, yy * s); else nvgLineTo(vg, xx * s, yy * s);
-		}
-		nvgStrokeColor(vg, nvgTransRGBA(SG_TABCOL[t], t == 0 ? 255 : 70));
-		nvgStrokeWidth(vg, t == 0 ? 2.f : 1.f);
-		nvgStroke(vg);
-	}
-	// no divider here either
-
-	if (font && font->handle >= 0) {
-		static const char* BN[2] = {"PAN", "MOD"};
-		sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
-		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		nvgFillColor(vg, sfs::SCREEN_DIM);
-		for (int i = 0; i < 2; i++)
-			nvgText(vg, rx() * s, (blkY(i) + 5.f) * s, BN[i], NULL);
-	}
-	{
-		float by = blkY(0) + 9.f, bh = blkH(0) - 12.f, rowH = bh / np();
-		nvgBeginPath(vg);
-		nvgRect(vg, (rx() + rw() * 0.5f - 0.5f) * s, by * s, 1.f * s, bh * s);
-		nvgFillColor(vg, sfs::SCREEN_PMID);
-		nvgFill(vg);
-		for (int i = 0; i < np(); i++) {
-			float pan = 0.7f * std::sin(i * 0.9f);
-			nvgBeginPath(vg);
-			nvgCircle(vg, (rx() + rw() * (0.5f + pan * 0.5f)) * s,
-			          (by + (i + 0.5f) * rowH) * s, 2.f * s);
-			nvgFillColor(vg, nvgTransRGBA(SG_TABCOL[0], 190));
-			nvgFill(vg);
-		}
-	}
-	{
-		// The same LATTICE the live view rules. Kept in step by hand, which is
-		// the standing hazard of having two copies of one drawing.
-		float by = blkY(1) + 9.f, bh = blkH(1) - 12.f, lw = 14.f;
-		float fx = rx() + lw, fw = rw() - lw;
-		float cw = fw / (float)SG_MOD_N, ch = bh / (float)SG_MODSRC;
-		nvgBeginPath(vg);
-		nvgRect(vg, fx * s, by * s, fw * s, bh * s);
-		nvgFillColor(vg, sfs::SCREEN_PURP);
-		nvgFill(vg);
-		for (int r = 0; r < SG_MODSRC; r++) {
-			nvgBeginPath(vg);
-			nvgRect(vg, fx * s, (by + r * ch + ch * 0.5f - 0.5f) * s, fw * s, 1.f * s);
-			nvgFillColor(vg, sfs::SCREEN_PMID);
-			nvgFill(vg);
-		}
-		nvgFillColor(vg, sfs::SCREEN_BG);
-		for (int c = 0; c <= SG_MOD_N; c++) {
-			nvgBeginPath(vg);
-			nvgRect(vg, (fx + c * cw - 0.5f) * s, by * s, 1.f * s, bh * s);
-			nvgFill(vg);
-		}
-		for (int r = 1; r < SG_MODSRC; r++) {
-			nvgBeginPath(vg);
-			nvgRect(vg, fx * s, (by + r * ch - 0.5f) * s, fw * s, 1.f * s);
-			nvgFill(vg);
-		}
-		for (int r = 0; r < SG_MODSRC; r++)
-			for (int c = 0; c < SG_MOD_N; c++) {
-				nvgBeginPath(vg);
-				nvgCircle(vg, (fx + c * cw + cw * 0.5f) * s,
-				          (by + r * ch + ch * 0.5f) * s, 2.f * s);
-				nvgFillColor(vg, sfs::SCREEN_PMID);
-				nvgFill(vg);
-			}
-		if (font && font->handle >= 0) {
-			sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
-			nvgFillColor(vg, sfs::SCREEN_DIM);
-			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-			for (int c = 0; c < SG_MOD_N; c++)
-				nvgText(vg, (fx + c * cw + cw * 0.5f) * s, (by - 4.f) * s,
-				        SG_MODNAME[c], NULL);
-			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-			for (int r = 0; r < SG_MODSRC; r++)
-				nvgText(vg, (rx() + 1.f) * s, (by + r * ch + ch * 0.5f) * s,
-				        SG_SRCNAME[r], NULL);
-		}
-	}
 }
 
 // =============================================================================

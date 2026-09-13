@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
+#include "preview.hpp"
 #include "dr_wav.h"        // implementation lives in phase.cpp; headers only here
 #include "pitchtrack.hpp"  // the detector Band proved, shared
 #include <osdialog.h>
@@ -145,7 +146,7 @@ struct Spool : Module {
 	Tape tape[SP_N];
 
 	dsp::SchmittTrigger gateTrig[SP_N][SP_POLY], resetTrig[SP_N];
-	dsp::BooleanTrigger recBtn[SP_N];
+	dsp::BooleanTrigger recBtn[SP_N] = {};
 	float wowPh = 0.f, wowPh2 = 0.f, flutPh = 0.f, flutPh2 = 0.f;
 	int detCounter = 0;
 	float sagEnv = 0.f;
@@ -844,6 +845,84 @@ struct Spool : Module {
 	}
 };
 
+// The browser thumbnail is a Spool with four tapes in it and three of them
+// playing: material synthesised here (a pluck, a pad, a row of hits, breath)
+// because the thumbnail has no file to load, then real gates through the real
+// process, so the heads, bookmarks and the detected pitches are the module's.
+static Spool* spoolPreview() {
+	static Spool* pm = nullptr;
+	if (pm) return pm;
+	pm = new Spool();
+	const float sr = sfs::PREVIEW_SR;
+	struct Src { const char* name; float hz; float dur; int kind; };
+	static const Src SRC[SP_N] = {
+		{"pluck", 65.41f, 4.0f, 0}, {"pad", 130.81f, 5.0f, 1},
+		{"hits",  0.f,    3.2f, 2}, {"air", 0.f,     4.5f, 3},
+	};
+	uint32_t rng = 0x9E3779B9u;
+	auto noise = [&]() { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return (float)rng / 2147483648.f - 1.f; };
+	for (int i = 0; i < SP_N; i++) {
+		Spool::Tape& t = pm->tape[i];
+		const Src& S = SRC[i];
+		int n = std::min((int)(S.dur * sr), pm->maxLen(sr));
+		float lp = 0.f;
+		for (int k = 0; k < n; k++) {
+			float tt = (float)k / sr, v = 0.f;
+			switch (S.kind) {
+				case 0: {   // a plucked low note, struck twice
+					float u = std::fmod(tt, 2.0f), e = std::exp(-u * 2.2f);
+					for (int h = 1; h <= 6; h++)
+						v += std::sin(6.2831853f * S.hz * h * u) * e * std::exp(-u * h * 1.5f) / h;
+					v *= 0.9f; break;
+				}
+				case 1: {   // a chord that swells in and breathes
+					static const float R[3] = {1.f, 1.2599f, 1.4983f};
+					float e = std::min(tt * 0.7f, 1.f) * (0.7f + 0.3f * std::sin(6.2831853f * 0.35f * tt));
+					for (int c = 0; c < 3; c++)
+						v += (std::sin(6.2831853f * S.hz * R[c] * tt) + 0.3f * std::sin(6.2831853f * S.hz * R[c] * 2.01f * tt)) * e;
+					v *= 0.28f; break;
+				}
+				case 2: {   // six hits, alternating heavy and light
+					float per = 0.5f, u = std::fmod(tt, per); int idx = (int)(tt / per);
+					float e = std::exp(-u * 14.f) * ((idx & 1) ? 0.45f : 1.f);
+					v = (std::sin(6.2831853f * (55.f + 120.f * std::exp(-u * 30.f)) * u) + 0.5f * noise() * std::exp(-u * 40.f)) * e;
+					break;
+				}
+				default: {  // breath: lowpassed noise under a slow swell
+					lp += (noise() - lp) * 0.08f;
+					v = lp * 2.5f * (0.55f + 0.45f * std::sin(6.2831853f * 0.6f * tt));
+					break;
+				}
+			}
+			t.buf[k] = clamp(v, -1.f, 1.f);
+		}
+		t.len = n; t.pos = 0.0; t.name = S.name; t.rev++;
+		pm->buildMini(t);
+		t.detHz = S.hz; t.detOk = S.hz > 0.f;   // what the tracker finds on a clean tone
+	}
+	int64_t f = 0;
+	// A: one note held. B: a three-note chord on one tape. C: two hits, the
+	// second still ringing. D: loaded and standing, bookmark at the start.
+	sfs::previewConnect(pm->inputs[Spool::GATE_INPUT + 0], 1);
+	sfs::previewConnect(pm->inputs[Spool::GATE_INPUT + 1], 3);
+	sfs::previewConnect(pm->inputs[Spool::VOCT_INPUT + 1], 3);
+	sfs::previewConnect(pm->inputs[Spool::GATE_INPUT + 2], 1);
+	pm->inputs[Spool::VOCT_INPUT + 1].setVoltage(0.f, 0);
+	pm->inputs[Spool::VOCT_INPUT + 1].setVoltage(4.f / 12.f, 1);
+	pm->inputs[Spool::VOCT_INPUT + 1].setVoltage(7.f / 12.f, 2);
+	sfs::previewRun(*pm, 0.2f, f);
+	pm->inputs[Spool::GATE_INPUT + 0].setVoltage(10.f, 0);
+	for (int c = 0; c < 3; c++) pm->inputs[Spool::GATE_INPUT + 1].setVoltage(10.f, c);
+	sfs::previewRun(*pm, 0.8f, f);
+	pm->inputs[Spool::GATE_INPUT + 2].setVoltage(10.f, 0);
+	sfs::previewRun(*pm, 0.02f, f);
+	pm->inputs[Spool::GATE_INPUT + 2].setVoltage(0.f, 0);
+	sfs::previewRun(*pm, 0.33f, f);
+	pm->inputs[Spool::GATE_INPUT + 2].setVoltage(10.f, 0);
+	sfs::previewRun(*pm, 0.15f, f);
+	return pm;
+}
+
 // =============================================================================
 // Display -- four lanes, one per tape, each showing where its tape is standing.
 // =============================================================================
@@ -868,6 +947,7 @@ struct SpoolDisplay : Widget {
 	}
 
 	void draw(const DrawArgs& args) override {
+		if (!module) { module = spoolPreview(); draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
 		nvgBeginPath(vg);
@@ -1154,6 +1234,12 @@ struct SpoolWidget : ModuleWidget {
 			{"Where the tape stopped", "At the beginning (as a Mellotron does)"},
 			[=]() { return (int)std::round(m->params[Spool::REWIND_PARAM].getValue()); },
 			[=](int v) { m->params[Spool::REWIND_PARAM].setValue((float)clamp(v, 0, 1)); }));
+		// The pitch-detection choice had a param and no way to reach it: no
+		// trimpot on the panel and no menu entry, so it was "once" for everyone.
+		menu->addChild(createIndexSubmenuItem("Pitch detection",
+			{"Once, when the tape is loaded", "Continuous (tracks, and flattens vibrato)"},
+			[=]() { return (int)std::round(m->params[Spool::DETECT_PARAM].getValue()); },
+			[=](int v) { m->params[Spool::DETECT_PARAM].setValue((float)clamp(v, 0, 1)); }));
 	}
 };
 

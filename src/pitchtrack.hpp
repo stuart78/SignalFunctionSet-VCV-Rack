@@ -49,6 +49,11 @@ struct PitchTracker {
 			win[i] = 0.5f - 0.5f * std::cos(2.f * (float)M_PI * (float)i / (float)(FFT_N - 1));
 	}
 	~PitchTracker() { delete fft; }
+	// Owns the FFT plan, so a copy would double-free it. Nothing copies one
+	// (Spool's Tape and Helix hold theirs by value and never assign), and the
+	// deleted pair says so where cppcheck can see it.
+	PitchTracker(const PitchTracker&) = delete;
+	PitchTracker& operator=(const PitchTracker&) = delete;
 
 	// Call every sample. Returns true on the frames where a new estimate landed.
 	void push(float x) {

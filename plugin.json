@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.19.1",
+  "version": "2.20.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -433,9 +433,22 @@
     {
       "slug": "PolyKitIn",
       "name": "PolyKit In",
-      "description": "Expander for Kit: every input for every instrument as its own jack, thirteen by eight.",
-      "tags": ["Expander", "Drum", "Utility"],
-      "hidden": true
+      "description": "Expander for Kit: every input of every instrument as its own jack, 13 by 8.",
+      "tags": [
+        "Expander",
+        "Drum",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "Field",
+      "name": "Field",
+      "description": "Nineteen related random voltages: one smooth random field read at nineteen points.",
+      "tags": [
+        "Random",
+        "Polyphonic",
+        "Utility"
+      ]
     },
     {
       "slug": "Trace",
@@ -507,10 +520,9 @@
       "description": "Four short tapes played by gates; the tape never rewinds when you stop.",
       "tags": [
         "Sampler",
-        "Sequencer",
-        "Effect"
-      ],
-      "hidden": true
+        "Polyphonic",
+        "Recording"
+      ]
     }
   ]
 }

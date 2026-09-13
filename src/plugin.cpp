@@ -48,6 +48,7 @@ void init(Plugin* p) {
 	p->addModel(modelSlice);
 	p->addModel(modelKit);
 	p->addModel(modelPolyKitIn);
+	p->addModel(modelField);
 	p->addModel(modelTrace);
 	p->addModel(modelSigma);
 	p->addModel(modelTouch);

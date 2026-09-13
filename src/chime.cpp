@@ -27,6 +27,7 @@
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "panel-style.hpp"
+#include "preview.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -382,6 +383,19 @@ static const NVGcolor CHORANGE    = nvgRGB(0xEC, 0x65, 0x2E);
 static const NVGcolor CHTEXT      = nvgRGB(0xE8, 0xE8, 0xF0);
 static const NVGcolor CHTEXT_DIM  = nvgRGB(0x8A, 0x8A, 0xA5);
 
+// The browser thumbnail is a Chime that has been RUNNING: two and a half
+// seconds of the default patch, every tube swinging and one or two blooming,
+// drawn by the same code as the live view. The stand-in it replaces dimmed
+// every tube, because the flag that said "preview" also said "dark".
+static Chime* chimePreview() {
+	static Chime* pm = nullptr;
+	if (pm) return pm;
+	pm = new Chime();
+	int64_t f = 0;
+	sfs::previewRun(*pm, 2.5f, f);
+	return pm;
+}
+
 struct ChimeDisplay : Widget {
 	Chime* module = nullptr;
 	std::shared_ptr<Font> font;
@@ -506,7 +520,7 @@ struct ChimeDisplay : Widget {
 		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 3.f);
 		nvgFillColor(vg, CHBG); nvgFill(vg);
 		float colW = w / CHIME_NCH;
-		if (!module) { drawPreview(vg, colW, h); return; }
+		if (!module) { module = chimePreview(); draw(args); module = nullptr; return; }
 		int sci = module->curScale(); int root = module->curRoot();
 		for (int c = 0; c < CHIME_NCH; c++) {
 			int deg = clamp((int)std::round(module->params[Chime::DEGREE_PARAM + c].getValue()), 0, CHIME_NDEG - 1);
@@ -515,19 +529,6 @@ struct ChimeDisplay : Widget {
 			           module->dispLevel[c], noteLabel(semis), false,
 			           module->params[Chime::WEIGHT_PARAM + c].getValue(),
 			           module->barFlash[c], noteSize(semis));
-		}
-	}
-
-	// browser thumbnail: staggered tube angles, one at resonance
-	void drawPreview(NVGcontext* vg, float colW, float h) {
-		static const float t[CHIME_NCH] = {-0.9f, -0.55f, -0.2f, 0.05f, 0.35f, 0.6f, 0.85f, -0.4f};
-		static const char* lbl[CHIME_NCH] = {"C3", "D3", "E3", "G3", "A3", "C4", "E4", "G4"};
-		static const int   sem[CHIME_NCH] = {0, 2, 4, 7, 9, 12, 16, 19};
-		static const float wt[CHIME_NCH] = {1.f, 0.8f, 1.f, 0.6f, 1.f, 0.45f, 0.9f, 0.7f};
-		for (int c = 0; c < CHIME_NCH; c++) {
-			float win = 1.f - std::fabs(t[c]); win *= win;
-			drawColumn(vg, c * colW, colW, h, t[c], win, lbl[c], true, wt[c],
-			           0.f, noteSize(sem[c]));
 		}
 	}
 
@@ -585,11 +586,12 @@ struct ChimeKeyReadout : Widget {
 		if (!font || font->handle < 0) return;
 		static const char* NN[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 		std::string txt = "— —";
-		if (module) {
-			int sci = clamp(module->curScale(), 0, sfs::NUM_SCALES - 1);
-			txt = std::string(NN[module->curRoot()]) + "  " + sfs::SCALES[sci].shortName;
+		Chime* m = module ? module : chimePreview();
+		if (m) {
+			int sci = clamp(m->curScale(), 0, sfs::NUM_SCALES - 1);
+			txt = std::string(NN[m->curRoot()]) + "  " + sfs::SCALES[sci].shortName;
 			for (char& ch : txt) ch = (char)std::toupper((unsigned char)ch);
-			if (module->curOct) txt += string::f("   OCT %+d", module->curOct);
+			if (m->curOct) txt += string::f("   OCT %+d", m->curOct);
 		}
 		nvgFontFaceId(args.vg, font->handle);
 		nvgFontSize(args.vg, 9.f);

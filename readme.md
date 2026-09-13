@@ -19,12 +19,14 @@ Modules grouped by function:
 - [Intone](#intone): CHANT/FOF formant synthesis voice
 - [Phase](#phase): Dual sample looper with sleep/rotate phase drift
 - [Play](#play): Polyphonic multisample player (SFZ / DecentSampler)
+- [Spool](#spool): Four short tapes played by gates, and the tape never rewinds
 - [Loom](#loom): Eight-string waveguide resonator you strum with the mouse
 - [Slide](#slide): Electric lap steel, a steel bar across eight strings
   - [SLIDE XP (Expander)](#slide-xp-expander): the eight strings on eight jacks
 - [Chime](#chime): Eight-note drone machine with rotating resonator tubes
 - [Sigma](#sigma): Additive voice, up to 64 partials, after the Crumar GDS
 - [Kit](#kit): Struck membrane modelled mode by mode
+  - [PolyKit In (Expander)](#polykit-in-expander): every input of every instrument as its own jack
 - [Wheel](#wheel): Hurdy-gurdy drone instrument, one wheel bowing six strings
 
 **Filters & Resonators**
@@ -53,6 +55,7 @@ Modules grouped by function:
 - [Cycle](#cycle): Bar-synced quad LFO with morphing shapes
 - [Gravity](#gravity): Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
 - [Trace](#trace): A paper loop and four brushes, for CV you draw
+- [Field](#field): Nineteen related random voltages from one smooth random field
 
 **Envelopes**
 - [Swell](#swell): Ping-driven additive A/D envelope
@@ -296,6 +299,27 @@ A polyphonic multisample player. Loads an `.sfz` or DecentSampler `.dspreset` in
 
 See [docs/play-manual.md](docs/play-manual.md) for the full manual.
 
+#### Spool
+
+<img src="screenshots/Spool.png" alt="Spool panel" height="320"> 
+
+Four short tapes, one transport, and no rewind. After the Mellotron, and departing from it in the one place that matters: a Mellotron springs its tape back the moment the key comes up, so every press starts from the same instant. Here the tape stays where it stopped. Press again and it carries on from there, so a repeated stab walks through the loop, and the phrase you get out is a function of how you played rather than of where the file happens to begin.
+
+**Features:**
+- **Four tapes, five seconds each**, loaded from WAV or recorded in through their own jacks. A recording is saved into the patch's own storage folder, so what you played into it is there when you reopen the patch.
+- **Eight playheads per tape.** A polyphonic GATE plays chords on one tape, one head per channel, each at the pitch its own V/OCT channel gave it. Every head starts at the tape's bookmark, which follows the newest note while its gate is held and stops where that note stopped.
+- **Pitch is varispeed, not transposition.** V/OCT changes how fast the tape runs, so pitch and loop length move together, as they do on any machine with a capstan. ABS switches V/OCT to a note: the tape is measured for pitch and retuned to what was asked for, relative to ROOT.
+- **One transport.** ATTACK, RELEASE, RAMP, SAT, WOW and FLUTTER are shared, because there is one capstan: four independent wobbles sound like four machines. RAMP is the motor getting up to speed, so it scales the playback rate and glides a note in and out rather than fading it. Motor sag, in the menu, makes a chord go flat the way more pinch rollers on one capstan do.
+- **What stops the tape isn't what stops the sound.** The gate stops the tape; the envelope stops the sound, so a long release plays out rather than freezing.
+
+**Controls:** Per tape, Level and Rec; shared Root, Abs, Attack, Release, Ramp, Sat, Wow, Flutter.
+**Inputs:** Per tape, Gate (poly), V/Oct (poly) and Rec In; Root, Reset (poly, one channel per tape), and CV for Attack, Release and Ramp.
+**Outputs:** Tapes A to D, Mix L, Mix R.
+
+**Context menu:** Load tape 1 to 4, Rewind all tapes, Motor sag, New note starts (where the tape stopped, or at the beginning), Pitch detection (once or continuous).
+
+See [docs/spool-manual.md](docs/spool-manual.md) for the full manual.
+
 #### Loom
 
 <img src="screenshots/Loom.png" alt="Loom panel" height="320"> 
@@ -429,6 +453,21 @@ A struck membrane, modelled mode by mode. A drum head is a 2D wave equation on a
 **Context menu:** Head view (flat or 3D), Stereo pairs, Reset mic positions, Load into instrument N, Load the default kit.
 
 See [docs/kit-manual.md](docs/kit-manual.md) for the full manual.
+
+#### PolyKit In (Expander)
+
+<img src="screenshots/PolyKitIn.png" alt="PolyKit In panel" height="320"> 
+
+An expander for Kit that sits immediately to its left and gives every one of the eight instruments its own set of input jacks: thirteen columns, one per Kit input, by eight rows, one per instrument. Where a polyphonic cable into Kit says "channel N is instrument N", PolyKit In says it with a patch cable per drum.
+
+**Features:**
+- **Every jack is optional, and the expander's jack wins when it's patched.** Per jack: an instrument whose tension is patched here reads it from here, and every other input of that instrument still comes from channel N of Kit's own poly cable. A poly trigger from Fill and one hand-patched envelope coexist.
+- **The columns are Kit's inputs in Kit's order**: TRIG, V/OCT, VEL, X, Y, SIZE, TENSION, MATERIAL, AIR, DECAY, TONE, EXCITER, MUFFLE. The rows are instruments 1 to 8.
+
+**Inputs:** 104 mono jacks, 13 by 8.
+**Outputs:** None; it speaks to the Kit on its right over the expander bus.
+
+See [docs/polykitin-manual.md](docs/polykitin-manual.md) for the full manual.
 
 #### Wheel
 
@@ -994,6 +1033,27 @@ A paper loop and four brushes. You draw four CVs onto moving paper, or let the p
 > **The brush can't be down while the paper runs backwards.** That's stated as a rule about state rather than "a direction change lifts the brush", because the state version already answers what happens if you press the mouse while reversed, where an edge rule has to answer that separately and gets it wrong. A brush writing onto paper moving the other way retraces over what it just laid down, so the stroke eats itself.
 
 See [docs/trace-manual.md](docs/trace-manual.md) for the full manual.
+
+#### Field
+
+<img src="screenshots/Field.png" alt="Field panel" height="320"> 
+
+Nineteen random voltages that are one thing. The jacks sit on a hexagonal grid, and under the grid is one smooth random field, a surface in x, y and time, that each jack reads at its own position. Every control is a statement about the field, and the relation between the jacks falls out of geometry: neighbours agree because they sample nearby points of the same surface, and how nearby is what COHERENCE means.
+
+**Features:**
+- **Nineteen sample-and-holds only at COHERENCE zero.** Turn it up and the grid becomes weather: a pattern that spans several jacks and, with FLOW and DIR, travels across the plate, so the jacks fire in a spatial order rather than as unrelated sources.
+- **The jacks are the display.** There's no screen: the plate behind the jacks is tiled with hexagonal cells coloured by the field, from the same functions the outputs read, so what you see under a jack is what comes out of it. Eight palettes in the menu.
+- **Eleven animations**, chosen by ANIM or a volt per mode: Flow, Zoom, Spin and Random move the noise field; Life is a cellular automaton on the tiling; Rain and Wave are a damped wave equation on the cell graph, driven by drops or by crests launched from the edge facing DIR; React is Gray-Scott reaction-diffusion, Cyclic the rock-paper-scissors automaton that winds itself into spirals, Sand the Bak-Tang-Wiesenfeld sandpile, Worley a moving mosaic of drifting seeds.
+- **BIAS tilts the amplitude by radius**, centre hot and rim quiet or the reverse, which is what the rings are for.
+- **TRIG** turns it into a bank of sample-and-holds: a mono trigger holds all nineteen, a polyphonic one holds jack N from channel N.
+
+**Controls:** Amplitude, Offset, Coherence, Rate, Flow, Direction, Bias, Smooth, Anim.
+**Inputs:** CV for every control, and Trig (poly).
+**Outputs:** Nineteen jacks, and Poly (jacks 1 to 16).
+
+**Context menu:** Colour.
+
+See [docs/field-manual.md](docs/field-manual.md) for the full manual.
 
 ### Envelopes
 

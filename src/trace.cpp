@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
+#include "preview.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -1052,6 +1053,75 @@ typedef TTrLaneLight<3> TrLaneLight3;
 // The window IS the loop, with NOW centred and the paper scrolling under it, so
 // you always see everything and the seam travels across the screen the way a
 // real paper loop's join does.
+// ── the browser thumbnail: a paper that has been DRAWN ON ─────────────────
+// Four hands, each a different gesture, laid through the real brush path so
+// the ink is the ink the module would have laid: retraced plateaus pool, a
+// scribble stays thin, a step is a thick vertical stroke. The stand-in it
+// replaces was four sines of one width.
+template <class F>
+static void traceStroke(Trace& m, int64_t& f, int lane, double seconds, F fn) {
+	m.brushLane = lane;
+	const int hop = 800;                     // a mouse sample every 60th of a second
+	int n = (int)(seconds * sfs::PREVIEW_SR);
+	rack::engine::Module::ProcessArgs a = sfs::previewArgs();
+	for (int i = 0; i < n; i++) {
+		if (i % hop == 0) {
+			Trace::UiBrush b;
+			b.val = fn((double)i / sfs::PREVIEW_SR);
+			b.off = 0.f;
+			b.down = true;
+			m.uiPublish(b);
+		}
+		a.frame = f++;
+		m.process(a);
+	}
+	Trace::UiBrush up;
+	m.uiPublish(up);
+	sfs::previewRun(m, 0.2f, f);             // let the exit taper finish
+}
+
+static Trace* tracePreview() {
+	static Trace* pm = nullptr;
+	if (pm) return pm;
+	pm = new Trace();
+	pm->params[Trace::SPREAD_PARAM].setValue(0.3f);
+	int64_t f = 0;
+	sfs::previewRun(*pm, 0.01f, f);
+	const double lap = 4.0;                  // one revolution at the default length
+	// lane 1: plateaus retraced three times, the transitions nudged each lap
+	// so only the sustains accumulate
+	traceStroke(*pm, f, 0, 3.0 * lap, [&](double t) {
+		int k = (int)(t / lap);
+		double u = (t - k * lap) / lap + 0.02 * k;
+		if (u < 0.32) return 3.2f;
+		if (u < 0.46) return 3.2f - (float)((u - 0.32) / 0.14) * 6.0f;
+		if (u < 0.72) return -2.8f;
+		if (u < 0.88) return -2.8f + (float)((u - 0.72) / 0.16) * 4.3f;
+		return 1.5f;
+	});
+	// lane 2: one pass of a quick scribble, lifted before the lap is out
+	traceStroke(*pm, f, 1, 0.68 * lap, [&](double t) {
+		return (float)(2.6 * std::sin(6.2831853 * 1.9 * t + 0.4)
+		             * (0.45 + 0.55 * std::sin(6.2831853 * 0.31 * t)));
+	});
+	// lane 3: a stepped hand, the same steps twice over
+	traceStroke(*pm, f, 2, 2.0 * lap, [&](double t) {
+		static const float lv[7] = {-1.5f, 2.4f, 0.6f, -3.6f, 3.9f, 1.1f, -0.4f};
+		static const double dur[7] = {0.55, 0.4, 0.75, 0.35, 0.6, 0.5, 0.85};
+		double u = std::fmod(t, lap), acc = 0.0;
+		for (int i = 0; i < 7; i++) { acc += dur[i]; if (u < acc) return lv[i]; }
+		return lv[6];
+	});
+	// lane 4: a slow rise with a wobble, and only its first half retraced
+	traceStroke(*pm, f, 3, 1.5 * lap, [&](double t) {
+		double u = std::fmod(t, lap) / lap;
+		return (float)(-3.8 + 7.2 * u + 0.5 * std::sin(6.2831853 * 3.0 * u));
+	});
+	sfs::previewRun(*pm, 1.3f, f);
+	pm->brushLane = 0;
+	return pm;
+}
+
 struct TraceDisplay : OpaqueWidget {
 	Trace* module = nullptr;
 	std::shared_ptr<Font> font;
@@ -1072,7 +1142,6 @@ struct TraceDisplay : OpaqueWidget {
 	float stripY(int i) const { return paneY() + paneH() + 4.f + i * stripH(); }
 
 	void drawLayer(const DrawArgs& args, int layer) override;
-	void drawPreview(const DrawArgs& args, float s);
 	void onButton(const ButtonEvent& e) override;
 	void onDragMove(const DragMoveEvent& e) override;
 	void onDragEnd(const DragEndEvent& e) override;
@@ -1148,6 +1217,8 @@ void TraceDisplay::apply(Vec p) {
 
 void TraceDisplay::drawLayer(const DrawArgs& args, int layer) {
 	if (layer != 1) { OpaqueWidget::drawLayer(args, layer); return; }
+	// The thumbnail is a real instance drawn by this same function.
+	if (!module) { module = tracePreview(); drawLayer(args, layer); module = nullptr; return; }
 	NVGcontext* vg = args.vg;
 	float s = box.size.x / TR_DESIGN_W;
 	if (!font || font->handle < 0) font = sfs::screenFontFace();
@@ -1157,7 +1228,6 @@ void TraceDisplay::drawLayer(const DrawArgs& args, int layer) {
 	nvgFillColor(vg, sfs::SCREEN_BG);
 	nvgFill(vg);
 
-	if (!module) { drawPreview(args, s); OpaqueWidget::drawLayer(args, layer); return; }
 
 	nvgSave(vg);
 	nvgScissor(vg, 0, 0, box.size.x, box.size.y);
@@ -1433,103 +1503,6 @@ void TraceDisplay::drawLayer(const DrawArgs& args, int layer) {
 
 	nvgRestore(vg);
 	OpaqueWidget::drawLayer(args, layer);
-}
-
-void TraceDisplay::drawPreview(const DrawArgs& args, float s) {
-	NVGcontext* vg = args.vg;
-	float px0 = TR_GX0, pxW = TR_GW;
-	float py = paneY(), ph = paneH();
-	if (!font || font->handle < 0) font = sfs::screenFontFace();
-
-	nvgBeginPath(vg);
-	nvgRect(vg, px0 * s, py * s, pxW * s, ph * s);
-	nvgStrokeColor(vg, nvgRGB(0x40, 0x40, 0x60));
-	nvgStrokeWidth(vg, 1.f);
-	nvgStroke(vg);
-
-	if (font && font->handle >= 0) {
-		sfs::screenFont(vg, font, sfs::TYPE_SCREEN);
-		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		nvgFillColor(vg, sfs::SCREEN_DIM);
-		nvgText(vg, 4.f * s, hdrH() * 0.5f * s, "LEN  4.0s", NULL);
-		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-		nvgFillColor(vg, sfs::SCREEN_TEXT);
-		nvgText(vg, TR_DESIGN_W * 0.5f * s, hdrH() * 0.5f * s, "1.00x", NULL);
-		nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
-		nvgFillColor(vg, sfs::SCREEN_DIM);
-		nvgText(vg, (TR_DESIGN_W - 4.f) * s, hdrH() * 0.5f * s, "BRUSH 1", NULL);
-	}
-
-	// Offset along the normal, exactly as the live ribbon does, or the
-	// thumbnail advertises a stroke that pinches on its steep sections.
-	const int cols = 120;
-	float cx[cols + 1], cy[cols + 1], hw[cols + 1];
-	for (int i = 0; i < TR_LANES; i++) {
-		for (int k = 0; k <= cols; k++) {
-			float fx = (float)k / cols, a = fx * 6.2831853f;
-			float v = std::sin(a * (1 + i) + i * 1.1f) * (0.32f - i * 0.04f);
-			float ink = 0.25f + 0.35f * (0.5f + 0.5f * std::sin(a * 2.f + i));
-			cx[k] = px0 + fx * pxW;
-			cy[k] = py + ph * (0.5f - v);
-			hw[k] = 0.6f + ink * 3.4f * TR_INKW[2];   // preview: Normal
-		}
-		nvgBeginPath(vg);
-		for (int pass = 0; pass < 2; pass++) {
-			for (int k = 0; k <= cols; k++) {
-				int kk = pass ? (cols - k) : k;
-				int ka = std::max(kk - 1, 0), kb = std::min(kk + 1, cols);
-				float dx = cx[kb] - cx[ka], dy = cy[kb] - cy[ka];
-				float len = std::sqrt(dx * dx + dy * dy);
-				float nx = 0.f, ny = -1.f;
-				if (len > 1e-5f) { nx = -dy / len; ny = dx / len; }
-				float sgn = pass ? -1.f : 1.f;
-				float ox = cx[kk] + nx * hw[kk] * sgn;
-				float oy = cy[kk] + ny * hw[kk] * sgn;
-				if (pass == 0 && k == 0) nvgMoveTo(vg, ox * s, oy * s);
-				else nvgLineTo(vg, ox * s, oy * s);
-			}
-		}
-		nvgClosePath(vg);
-		nvgFillColor(vg, nvgTransRGBA(TR_LANECOL[i], TR_LANE_ALPHA));
-		nvgFill(vg);
-	}
-
-	nvgBeginPath(vg);
-	nvgMoveTo(vg, (px0 + pxW * 0.5f) * s, (py - 2.f) * s);
-	nvgLineTo(vg, (px0 + pxW * 0.5f) * s, (py + ph + 2.f) * s);
-	nvgStrokeColor(vg, sfs::SCREEN_HOT);
-	nvgStrokeWidth(vg, 1.5f);
-	nvgStroke(vg);
-
-	for (int i = 0; i < TR_LANES; i++) {
-		float y = stripY(i), h = stripH() - 2.f;
-		nvgBeginPath(vg);
-		nvgRect(vg, px0 * s, (y + h * 0.35f) * s, pxW * s, h * 0.3f * s);
-		nvgFillColor(vg, sfs::SCREEN_PURP);
-		nvgFill(vg);
-		float hx = px0 + (0.5f + i * 0.13f) * pxW;
-		nvgBeginPath(vg);
-		nvgRect(vg, (hx - 1.5f) * s, y * s, 3.f * s, h * s);
-		nvgFillColor(vg, TR_LANECOL[i]);
-		nvgFill(vg);
-	}
-	// the read heads, matching the live display
-	for (int i = 0; i < TR_LANES; i++) {
-		float x = px0 + (0.5f + i * 0.13f) * pxW;
-		nvgBeginPath(vg);
-		nvgMoveTo(vg, x * s, py * s);
-		nvgLineTo(vg, x * s, (py + ph) * s);
-		nvgStrokeColor(vg, nvgTransRGBA(TR_LANECOL[i], 110));
-		nvgStrokeWidth(vg, 1.f);
-		nvgStroke(vg);
-		nvgBeginPath(vg);
-		nvgMoveTo(vg, x * s, (py + ph) * s);
-		nvgLineTo(vg, (x - 2.5f) * s, (py + ph + 3.5f) * s);
-		nvgLineTo(vg, (x + 2.5f) * s, (py + ph + 3.5f) * s);
-		nvgClosePath(vg);
-		nvgFillColor(vg, TR_LANECOL[i]);
-		nvgFill(vg);
-	}
 }
 
 // =============================================================================

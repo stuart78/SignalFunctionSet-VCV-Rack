@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
+#include "preview.hpp"
 #include "membrane.hpp"
 #include "polykit-messages.hpp"
 #include "waveguide.hpp"   // softClip
@@ -578,6 +579,27 @@ struct Kit : Module {
 // ── the head ────────────────────────────────────────────────────────────────
 // A drum seen from above. It is not a picture of the module's settings, it is
 // the drum: click it to play it, and where you click is where it is struck.
+// The browser thumbnail is the default kit, STRUCK: eight triggers on the
+// poly gate 90 ms apart, the kick last, so the main view is a ringing head and
+// the eight tabs are eight drums at eight moments of their decay with a level
+// bar under each. Drawn by the live code, from a real Kit.
+static Kit* kitPreview() {
+	static Kit* pm = nullptr;
+	if (pm) return pm;
+	pm = new Kit();
+	sfs::previewConnect(pm->inputs[Kit::GATE_INPUT], KIT_N);
+	int64_t f = 0;
+	static const int order[KIT_N] = {7, 5, 3, 6, 2, 4, 1, 0};
+	for (int k = 0; k < KIT_N; k++) {
+		int c = order[k];
+		pm->inputs[Kit::GATE_INPUT].setVoltage(10.f, c);
+		sfs::previewRun(*pm, 0.005f, f);
+		pm->inputs[Kit::GATE_INPUT].setVoltage(0.f, c);
+		sfs::previewRun(*pm, (k == KIT_N - 1) ? 0.06f : 0.09f, f);
+	}
+	return pm;
+}
+
 struct KitDisplay : OpaqueWidget {
 	Kit* module = nullptr;
 	std::shared_ptr<Font> font;
@@ -599,9 +621,13 @@ struct KitDisplay : OpaqueWidget {
 		// faults at address 0x8 and takes Rack down the moment Kit is placed.
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
 		nvgScissor(args.vg, RECT_ARGS(Rect(Vec(0, 0), box.size)));
+		Kit* live = module;
+		if (!module) module = kitPreview();
 		S = cur();
-		if (!module) drawPreview(args); else drawLive(args);
+		drawLive(args);
 		drawTabs(args);
+		module = live;
+		if (!live) S = nullptr;
 		nvgResetScissor(args.vg);
 	}
 
@@ -1205,19 +1231,6 @@ struct KitDisplay : OpaqueWidget {
 			             : sfs::SCREEN_PURP);
 			nvgFill(args.vg);
 		}
-	}
-
-	// The browser thumbnail shows the DEFAULT view, which is 3D. drawHead3D
-	// already copes with module == NULL by standing in a plausible mode mix, so
-	// the preview is the same code rather than a second drawing to keep in step.
-	void drawPreview(const DrawArgs& args) {
-		drawHead3D(args, head3Cx(), head3Cy(), head3Rad(), 12, 36);
-		drawScope(args);
-		nvgBeginPath(args.vg);
-		nvgCircle(args.vg, head3Cx() + head3Rad() * 0.42f,
-		          head3Cy() - head3Rad() * 0.30f * TILT, mm2px(1.6f));
-		nvgFillColor(args.vg, nvgRGBAf(0.93f, 0.40f, 0.18f, 0.9f));
-		nvgFill(args.vg);
 	}
 
 	// ── THE TABS: eight small drums, each the instrument itself ─────────────
