@@ -60,6 +60,15 @@ bass, then move ROOT and SCALE around: all three keep doing their job.
 
 An empty sub-scale falls back to the parent rather than going silent.
 
+A mask covers up to **256 degrees**, so a Scala scale of any practical size
+(a 53-note Fokker block, a 79-note MOS of 159-tET) gets a full set of
+sub-scale cells. The cap was 24, then 64, and each time a real file hit it the
+top of the octave silently fell out of every sub-scale; it will not do that
+again. Three menu items work on the masks directly: **Sub-scales: every
+degree** fills all three with the whole scale, **Reset sub-scales** clears
+them, and **Revert keyboard to the selected scale** drops a custom mask forked
+on the keyboard.
+
 ### Letting a sub-scale leave the key
 
 The context menu has **Sub-scales may leave the key**, off by default. Turned
@@ -97,11 +106,17 @@ the band of input pitches that lands on it actually is. A keyboard can only
 round that; the strip shows it.
 
 In this state the sub-scale rows show one cell per degree, since there is no
-chromatic to align to.
+chromatic to align to, and **each cell sits at the same pitch-linear position
+as its degree line above**, so on a just scale the cells are unevenly spaced
+and correctly so. The cells are tall bars, most of the row's height, because
+a 79-degree scale makes them narrow and a narrow target needs height.
 
 Both states carry the same header (root and scale name) and the same footer:
-four cells, one per channel, showing which scale it is using and what note it is
-currently putting out.
+four cells, one per channel, showing which scale it is using and what it is
+currently putting out. On the keyboard that is a note name. On the strip it is
+the **degree and the repeat**, written `31 (5)` for the thirty-first degree in
+the fifth period, because naming a just or microtonal pitch by the nearest
+12-tone note would be printing a lie.
 
 ### Editing
 
@@ -129,7 +144,12 @@ Load a `.scl` file from the context menu. It occupies SCALE index 19, leaving
 - **The period need not be an octave.** Bohlen-Pierce arrives as 13 degrees
   repeating at 19.02 semitones, a 3/1, and Key quantizes to it correctly.
 - The parsed scale is saved into the patch alongside the path, so it survives
-  the file being moved or the patch being opened on another machine.
+  the file being moved or the patch being opened on another machine. When the
+  file can still be found it is read again on load and wins; the saved copy is
+  the fallback, not the source.
+- The menu reports the loaded file's degree count and period, and, when the
+  scale has more degrees than the scale bus can carry, how many will not
+  travel to other modules. Key itself quantizes to all of them.
 
 ## The scale bus
 
@@ -184,6 +204,9 @@ and 4 their own timing.
 | **Rounding** | Nearest / Down / Up. Which way a pitch between two degrees goes. |
 | **Sub-scales may leave the key** | See above. Off by default. |
 | **Hysteresis** | 12 cents by default. How far a pitch has to move before the output will change. |
+| **Revert keyboard to the selected scale** | Drops a custom mask forked on the keyboard. |
+| **Reset sub-scales** | Clears all three masks; each falls back to the parent. |
+| **Sub-scales: every degree** | Fills all three masks with the whole scale, the starting point for taking degrees away. |
 
 ### Hysteresis
 

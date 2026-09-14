@@ -58,6 +58,34 @@ Unproven by ear: whether ENV SPREAD's negative half (highs first, fundamental
 building underneath) is musical or merely a delay, and whether the SOFT/LEVEL
 velocity morph earns a second full spectrum's worth of editing.
 
+### Flock: a murmuration as a microtonal granular voice
+Design written 2026-09, nothing built: see `docs/flock-design.md`. Persistent
+birds under Boids rules with topological neighbours, grains as their calls,
+height is pitch and the horizontal plane is the stage, a ROTATE that walks
+the listener round the flock with the screenless display being that view.
+The built-in delay is information travelling through the flock at a finite
+speed plus a per-bird disposition (LAG). STARTLE is a hawk.
+
+### Tide (working name): public data as a modulation source
+Banked 2026-09. A player for real-world time series, where the patch's clock
+sets how fast the world goes by: SPAN is real time per bar (a day, a year, a
+century), so patched to Meter's clock and bar the data lands on the grid, and
+free-running it is a slow LFO shaped by something that happened. Eight series
+lanes with a CV out each plus poly, a gate per lane on an event or a threshold
+crossing (sunrise, a quake, pressure past a value, the tide turning). Fetches
+are user actions from the menu on a worker thread (Rack's `network::` is
+libcurl, already used by Fill's importer), cached under the Rack user
+directory and saved into the patch, so playback is offline and identical
+every time; live mode is "position zero is now, refresh on demand". Each
+series is normalised to its own span with the true units on screen. Sources
+as a table: Open-Meteo weather (no key), USGS quakes (events), NOAA space
+weather and tides, sunspots, Mauna Loa CO2, and local astronomy computed with
+no network, which is also the out-of-the-box behaviour. Stays inside the
+Library's ethics rules: nothing fetched without a click, the URL stated in
+the menu. Considered first as a Field animation and moved out, because Field
+is one surface at nineteen points and this is time series with timestamps.
+Alternative names: Almanac, Feed, Atlas.
+
 ### Comb filter
 A comb as an instrument rather than a utility: the delay-line half of what
 Loom's strings already do, exposed on its own so it can colour any source.
@@ -105,6 +133,19 @@ core rather than each growing their own.
   on what little the loop leaves them. Separately, below about 24 Hz every
   exciter breaks down, which is the subsonic end of the tuning range rather than
   an exciter fault.
+- **Kit**: the Closed hat, Open hat, Clap and Bell presets are provisional and
+  sound wrong for measured reasons (`tools/kit-voice-harness.py`): the mallet's
+  1 ms contact floor, the membrane output tilt, no burst mechanism, a 600 Hz
+  ceiling on f0. The plan is two stages, both keyed so every membrane preset
+  stays bit-identical: contact stiffness and output tilt following MATERIAL
+  plus a shorter plate decay floor, then per-instrument strike count, noise
+  band and octave. Choke groups (a closed hat cutting an open one) are the
+  other missing kit behaviour; instruments are separate objects now, so a
+  per-instrument "choked by" that runs the choked drum's decay down over a few
+  milliseconds is cheap.
+- **Key**: the scale bus carries 14 degrees (16 channels less the index and
+  the period), so a Scala scale past that quantizes in full on Key but reaches
+  other modules truncated; the menu says how many degrees will not travel.
 - **Nightly workflow**: its actions still emit Node 20 deprecation warnings.
 - **Crystal**: retired enum entries still appear in the parameter list for
   MIDI-map and automation; `surfaceDist()` is now unused.

@@ -41,6 +41,27 @@ which is the usual convention for modulation.
 A drum that is not ringing costs nothing. The cost of the module follows how
 many drums are sounding, not how many are loaded.
 
+### Striking a drum that is still ringing
+
+A new trigger neither stops the old hit nor starts a second voice. It is one
+drum, and the mallet lands on a head that is still moving: the strike re-arms
+the mallet and re-latches the mic delays, and never clears the mode bank. The
+new hit's energy adds to whatever is still ringing, exactly as on a real drum,
+which is why a fast roll on a ringing tom sounds different from the first hit
+and why two hits close together can sum louder than one.
+
+That is per instrument. Hitting instrument 3 does nothing to instrument 2's
+ring. There are no choke groups yet (a closed hat cutting an open one); that
+is planned alongside the voice work below.
+
+### Mics per instrument
+
+Every instrument has its own mic pair, saved with the patch. The screen shows
+the mics of the selected instrument, and dragging them moves only that
+instrument's pair. *Reset mic positions* on a tab's right-click menu restores
+that instrument's measured pair; the module menu does the same for the
+selected one.
+
 ## PolyKit In
 
 If your sources are eight separate modules rather than one polyphonic one,
@@ -164,10 +185,37 @@ modes are actually sounding.
   With it off the mics are not drawn, since they do nothing.
 - **Reset mic positions**: the measured pair, for the selected instrument.
 - **Load into instrument N**: Tom, Floor tom, Timpani, Kick, Snare, Brush snare,
-  Gong, Steel pan, Frame drum, Tabla, Closed hat, Open hat, Clap, Bell. These are the instruments the engine was
-  measured against while it was being built, so they are also the shortest route
-  to hearing whether something has broken.
+  Gong, Steel pan, Frame drum, Tabla, Closed hat, Open hat, Clap, Bell. The
+  first ten are the instruments the engine was measured against while it was
+  being built, so they are also the shortest route to hearing whether something
+  has broken. The last four are provisional; see below.
 - **Load the default kit into all eight.**
+
+Right-clicking a tab gives the same menu for that tab's instrument: every
+preset, and *Reset mic positions*.
+
+## Known gap: Closed hat, Open hat, Clap, Bell
+
+These four presets exist so that the default kit lines up with Fill's eight
+channels, and they do not yet sound right. Measured through the real engine
+(`tools/kit-voice-harness.py`), the reasons are not preset settings:
+
+- **Everything is trapped below 2 kHz, and the mallet is the wall.** The
+  hardest EXCITER still gives a 1 ms contact, which cannot excite a plate's
+  high modes; a stick tip on a cymbal is a tenth of that. Raising the contact
+  stiffness a hundredfold takes the closed hat's centroid from 1.7 to 10 kHz.
+- **The output tilt is a membrane's.** The pickup rolls off high partials
+  twice over, which is right for a drum and puts every partial of a plate
+  15 dB under its fundamental, which is why the bell reads as one tone.
+- **A clap is not a drum**: it is three or four hits a few milliseconds apart
+  through a hand-cavity resonance, and nothing here makes bursts.
+- **The bell cannot get high enough**: the fundamental tops out near 600 Hz,
+  and the plate's partial ratios are a cowbell's rather than a bell's.
+
+The plan, not yet built: contact stiffness and output tilt keyed to MATERIAL
+so every membrane stays bit-identical, a shorter decay floor for plates, and
+per-instrument strike count, noise band and octave so a clap and a bell can be
+described at all. Until then, treat those four as placeholders.
 
 ## Patch ideas
 
