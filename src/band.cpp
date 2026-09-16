@@ -475,8 +475,12 @@ struct BandWidget : ModuleWidget {
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(53.70f, yG)), module, Band::TUNE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(66.04f, yG)), module, Band::WIDTH_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(81.28f, yG)), module, Band::WIDTH_INPUT));  // W-CV
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(95.67f, yG)), module, Band::MIX_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(109.22f, yG)), module, Band::POLY_OUTPUT));
+		// The art labels the plate POLY then MIX, left to right, and the jacks
+		// were placed the other way round, so a cable in the jack marked MIX
+		// carried the poly bus (reported by a user, 2026-09). The enum order
+		// stays; only the positions swap.
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(95.67f, yG)), module, Band::POLY_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(109.22f, yG)), module, Band::MIX_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
