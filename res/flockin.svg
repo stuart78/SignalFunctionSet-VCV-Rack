@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20.32mm" height="128.5mm" viewBox="0 0 20.32 128.5">
+<rect width="20.32" height="128.5" fill="#f0f0f0"/>
+  <g id="PanelArt">
+  </g>
+  <g id="Reticules" style="display:none">
+    <circle cx="5.08" cy="26.00" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="15.24" cy="26.00" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="5.08" cy="52.00" r="2.99" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="15.24" cy="52.00" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="5.08" cy="76.00" r="2.99" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="15.24" cy="76.00" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="5.08" cy="100.00" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="15.24" cy="100.00" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+  </g>
+</svg>

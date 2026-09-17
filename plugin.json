@@ -523,6 +523,28 @@
         "Polyphonic",
         "Recording"
       ]
+    },
+    {
+      "slug": "Flock",
+      "name": "Flock",
+      "description": "A murmuration as a microtonal granular voice: flocking birds, grains as their calls.",
+      "tags": [
+        "Granular",
+        "Synth voice",
+        "Polyphonic"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "FlockIn",
+      "name": "Flock In",
+      "description": "Expander for Flock: live audio in, and the birds sing grains of it.",
+      "tags": [
+        "Expander",
+        "Granular",
+        "Sampler"
+      ],
+      "hidden": true
     }
   ]
 }

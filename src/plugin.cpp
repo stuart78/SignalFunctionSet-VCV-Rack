@@ -52,6 +52,8 @@ void init(Plugin* p) {
 	p->addModel(modelTrace);
 	p->addModel(modelSigma);
 	p->addModel(modelTouch);
+	p->addModel(modelFlock);
+	p->addModel(modelFlockIn);
 	p->addModel(modelWheel);
 
 	// Add modules here

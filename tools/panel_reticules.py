@@ -470,6 +470,8 @@ PLATES = {
     # Left off it, its label was drawn in the on-plate white and vanished
     # into the light panel.
     "helix": [(41.0, 103.5, 39.0, 13.0)],
+    # the five outputs at the foot, right of the startle button
+    "flock": [(40.64, 114.5, 50.8, 13.0)],
     "brigade": [(41.0, 103.5, 39.0, 13.0)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
     # each tape keeps its own column, and a plate over that row would cover four
@@ -506,6 +508,8 @@ MODULES = {
     "helix":   ("Helix",   "src/helix.cpp",   "res/helix.svg",   {}),
     "brigade": ("Brigade", "src/brigade.cpp", "res/brigade.svg", {}),
     "spool":   ("Spool",   "src/spool.cpp",   "res/spool.svg",   {}),
+    "flock":   ("Flock",   "src/flock.cpp",   "res/flock.svg",   {}),
+    "flockin": ("FlockIn", "src/flockin.cpp", "res/flockin.svg", {}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
@@ -515,7 +519,7 @@ MODULES = {
 # than a target for it. Splicing generated reticules into these would draw
 # circles straight over the design. Named explicitly on the command line they
 # still run, so the guard is against the bare sweep, not against intent.
-NO_SCREEN_SLAB = {"wheel"}
+NO_SCREEN_SLAB = {"wheel", "flock"}
 
 # Panels whose ART is now the specification: the designer has drawn them, their
 # screens and plates are flattened into the export, and regenerating over one

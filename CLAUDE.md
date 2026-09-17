@@ -236,6 +236,8 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/kit.cpp` — Kit (`src/membrane.hpp` = the modal membrane, measurable without Rack; `tools/kit-stereo-harness.py` = offline stereo-image harness; `tools/kit-voice-harness.py` = renders every preset and measures decay and spectrum)
 - `src/polykitin.cpp` — PolyKit In (`src/polykit-messages.hpp` = PolyKit In → Kit bus)
 - `src/spool.cpp` — Spool
+- `src/flock.cpp` — Flock (hidden, first pass; design in `docs/flock-design.md`, `tools/flock-harness.cpp` = compiles the real module against libRack and measures cohesion, propagation, startle, levels and cost)
+- `src/flockin.cpp` — Flock In (hidden; `src/flock-messages.hpp` = Flock In → Flock bus, one audio sample and three controls; the ring buffer lives in Flock)
 - `src/field.cpp` — Field
 - `src/preview.hpp` — browser thumbnails drawn from a real, warmed-up module instance (Sigma, Chime, Kit, Trace)
 - `src/trace.cpp` — Trace
