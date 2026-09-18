@@ -66,43 +66,32 @@ struct FlockIn : Module {
 	}
 };
 
-// 4HP: two columns, the audio pair at the top, then each control beside its jack.
-static const float FI_XL = 5.08f, FI_XR = 15.24f, FI_XM = 10.16f;
-static const float FI_Y_IN = 26.f, FI_Y_ENV = 52.f, FI_Y_REACH = 76.f, FI_Y_FREEZE = 100.f;
+// 4HP, the designer's Figma export (2026-09): one column, each control over
+// its jack, the audio pair at the foot. The art carries its own outlined
+// labels, so there is NO sfs::PanelLabels here -- adding one doubles them.
+static const float FI_X = 10.16f, FI_XL = 5.04f, FI_XR = 15.19f;
+static const float FI_Y_ENV = 40.59f, FI_Y_ENV_CV = 52.27f;
+static const float FI_Y_REACH = 66.83f, FI_Y_REACH_CV = 78.51f;
+static const float FI_Y_FREEZE = 93.07f, FI_Y_FREEZE_CV = 104.76f;
+static const float FI_Y_IN = 120.67f;
 
 struct FlockInWidget : ModuleWidget {
 	FlockInWidget(FlockIn* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/flockin.svg")));
 
-		sfs::PanelLabels* lbl = new sfs::PanelLabels();
-		lbl->box.size = box.size;
-		addChild(lbl);
-		lbl->title(2.2f, 8.f, "FLOCK");
-		lbl->note(FI_XM, 13.f, "IN");
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_X, FI_Y_ENV)), module, FlockIn::ENV_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_ENV_CV)), module, FlockIn::ENV_INPUT));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XL, FI_Y_IN)), module, FlockIn::L_INPUT));
-		lbl->jack(FI_XL, FI_Y_IN, "L");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_IN)), module, FlockIn::R_INPUT));
-		lbl->jack(FI_XR, FI_Y_IN, "R");
-
-		// labels sit over the pair, not the pot: centred on the pot they ran
-		// off the left edge of a four-HP panel
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_XL, FI_Y_ENV)), module, FlockIn::ENV_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_ENV)), module, FlockIn::ENV_INPUT));
-		lbl->link(FI_XL, FI_Y_ENV, FI_XR, FI_Y_ENV);
-		lbl->add(FI_XM, FI_Y_ENV - 5.4f, "ENV");
-
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_XL, FI_Y_REACH)), module, FlockIn::REACH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_REACH)), module, FlockIn::REACH_INPUT));
-		lbl->link(FI_XL, FI_Y_REACH, FI_XR, FI_Y_REACH);
-		lbl->add(FI_XM, FI_Y_REACH - 5.4f, "REACH");
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_X, FI_Y_REACH)), module, FlockIn::REACH_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_REACH_CV)), module, FlockIn::REACH_INPUT));
 
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
-			mm2px(Vec(FI_XL, FI_Y_FREEZE)), module, FlockIn::FREEZE_PARAM, FlockIn::FREEZE_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_FREEZE)), module, FlockIn::FREEZE_INPUT));
-		lbl->link(FI_XL, FI_Y_FREEZE, FI_XR, FI_Y_FREEZE);
-		lbl->add(FI_XM, FI_Y_FREEZE - 5.4f, "FREEZE");
+			mm2px(Vec(FI_X, FI_Y_FREEZE)), module, FlockIn::FREEZE_PARAM, FlockIn::FREEZE_LIGHT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_FREEZE_CV)), module, FlockIn::FREEZE_INPUT));
+
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XL, FI_Y_IN)), module, FlockIn::L_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_IN)), module, FlockIn::R_INPUT));
 	}
 };
 

@@ -56,6 +56,8 @@ Modules grouped by function:
 - [Gravity](#gravity): Six-mode chaos & motion engine (pendulum / orbits / billiards / Pac-Man / turtle / patterns)
 - [Trace](#trace): A paper loop and four brushes, for CV you draw
 - [Field](#field): Nineteen related random voltages from one smooth random field
+- [Flock](#flock): A murmuration as a microtonal granular voice
+  - [Flock In (Expander)](#flock-in-expander): the birds sing grains of live audio
 
 **Envelopes**
 - [Swell](#swell): Ping-driven additive A/D envelope
@@ -308,7 +310,8 @@ Four short tapes, one transport, and no rewind. After the Mellotron, and departi
 **Features:**
 - **Four tapes, five seconds each**, loaded from WAV or recorded in through their own jacks. A recording is saved into the patch's own storage folder, so what you played into it is there when you reopen the patch.
 - **Eight playheads per tape.** A polyphonic GATE plays chords on one tape, one head per channel, each at the pitch its own V/OCT channel gave it. Every head starts at the tape's bookmark, which follows the newest note while its gate is held and stops where that note stopped.
-- **Pitch is varispeed, not transposition.** V/OCT changes how fast the tape runs, so pitch and loop length move together, as they do on any machine with a capstan. ABS switches V/OCT to a note: the tape is measured for pitch and retuned to what was asked for, relative to ROOT.
+- **Pitch is varispeed, not transposition.** V/OCT changes how fast the tape runs, so pitch and loop length move together, as they do on any machine with a capstan. ABS switches V/OCT to a note: the tape is measured for pitch and retuned to what was asked for, relative to ROOT. A menu mode, *Pitch only*, time-stretches instead: the loop keeps its length and only the pitch moves, with the two read heads kept a whole number of the tape's own periods apart so the handover between them does not warble.
+
 - **One transport.** ATTACK, RELEASE, RAMP, SAT, WOW and FLUTTER are shared, because there is one capstan: four independent wobbles sound like four machines. RAMP is the motor getting up to speed, so it scales the playback rate and glides a note in and out rather than fading it. Motor sag, in the menu, makes a chord go flat the way more pinch rollers on one capstan do.
 - **What stops the tape isn't what stops the sound.** The gate stops the tape; the envelope stops the sound, so a long release plays out rather than freezing.
 
@@ -316,7 +319,7 @@ Four short tapes, one transport, and no rewind. After the Mellotron, and departi
 **Inputs:** Per tape, Gate (poly), V/Oct (poly) and Rec In; Root, Reset (poly, one channel per tape), and CV for Attack, Release and Ramp.
 **Outputs:** Tapes A to D, Mix L, Mix R.
 
-**Context menu:** Load tape 1 to 4, Rewind all tapes, Motor sag, New note starts (where the tape stopped, or at the beginning), Pitch detection (once or continuous).
+**Context menu:** Load tape 1 to 4, Rewind all tapes, Motor sag, New note starts (where the tape stopped, or at the beginning), V/OCT changes (speed, or pitch only), Pitch detection (once or continuous).
 
 See [docs/spool-manual.md](docs/spool-manual.md) for the full manual.
 
@@ -1055,6 +1058,40 @@ Nineteen random voltages that are one thing. The jacks sit on a hexagonal grid, 
 **Context menu:** Colour.
 
 See [docs/field-manual.md](docs/field-manual.md) for the full manual.
+
+#### Flock
+
+<img src="screenshots/Flock.png" alt="Flock panel" height="320"> 
+
+A murmuration as a voice. Up to a thousand birds fly as a real flock, each steering by its seven nearest neighbours, and every call a bird makes is a grain. Height in the flock is pitch, so V/OCT is the roost the flock leans toward and a new note travels through the flock bird to bird rather than arriving all at once. The stereo image is the flock heard from a pair of listeners at its edge.
+
+**Features:**
+- **Persistent birds, not scheduled grains.** The flock keeps its shape between notes; LATITUDE says how many semitones that shape is worth, STRUCT gathers it at just intervals, and QUANT snaps each call toward a grid from the menu, so the same flock is microtonal or a chord.
+- **LAG is a delay made of birds.** A pitch change reaches the front of the flock first and the back last, up to four seconds later.
+- **STARTLE sends a hawk through.** The flock scatters past the listeners and settles over RELEASE, and the stereo field goes with it.
+- **The display is the flock**, drawn in perspective on the faceplate with the listeners and the box the birds are leashed to. Drag to move the camera.
+
+**Controls:** Weight, Latitude, Struct, Agility, Lag, Rotate, Length, Chirp, Quant, Rate, Release, Variety, Startle.
+**Inputs:** Gate, V/Oct, Startle, and CV for every knob.
+**Outputs:** Left, Right.
+
+**Context menu:** Register, Quantize grid, Stereo width, Lead bird calls on the gate.
+
+See [docs/flock-manual.md](docs/flock-manual.md) for the full manual.
+
+##### Flock In (Expander)
+
+<img src="screenshots/FlockIn.png" alt="Flock In panel" height="320"> 
+
+An expander for Flock that sits immediately to its left. Patch audio in and the birds sing grains of it instead of sines: each call reads a short piece of the last few seconds of input, pitched by where the bird is in the flock.
+
+**Features:**
+- **ENV** is where each grain peaks, from a struck grain to a reversed swell.
+- **REACH** is how far back the birds may read, 50 ms to 10 s; birds deep in the flock read further back, so the flock is spread through time as well as space.
+- **FREEZE** holds the buffer, from the latch or a gate.
+
+**Inputs:** Left, Right (normalled from Left), and CV for Env, Reach and Freeze.
+**Outputs:** None; it speaks to the Flock on its right over the expander bus.
 
 ### Envelopes
 

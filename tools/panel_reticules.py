@@ -527,7 +527,8 @@ NO_SCREEN_SLAB = {"wheel", "flock"}
 # list in 2026-09 -- opmorph twice picked up a stray #1a1a32 rect from a run
 # aimed at another panel, which is exactly the failure this set exists to stop.
 FINISHED = {"crystal", "chime", "loom", "slide", "slidex", "fill", "gravity", "key",
-            "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin", "field"}
+            "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin", "field",
+            "flock", "flockin"}
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

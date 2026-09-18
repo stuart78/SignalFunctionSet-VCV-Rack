@@ -674,8 +674,18 @@ def module_svg(key):
     w = hp_units * HP
 
     art = [rect(x, y, pw, ph, PLATE, rx=6) for (x, y, pw, ph) in plates]
-    ret = [rect(cx - ew / 2, cy - eh / 2, ew, eh, SCREEN_BG, rx=3)
-           for k, cx, cy, ew, eh in elems if k == "screen"]
+    # A SCREENLESS display (Wheel, Flock) draws straight onto the faceplate in
+    # the panel's own greys, so a dark slab here would be drawn by the
+    # designer and then covered by nothing: the region is outlined instead,
+    # so it is kept clear of art without being painted.
+    if key in pr.NO_SCREEN_SLAB:
+        ret = [f'<rect x="{raw(cx - ew / 2)}" y="{raw(cy - eh / 2)}" '
+               f'width="{raw(ew)}" height="{raw(eh)}" fill="none" stroke="{HAIRLINE}" '
+               f'stroke-width="{raw(RETICULE_W * S)}" stroke-dasharray="{raw(3 * S)} {raw(3 * S)}"/>'
+               for k, cx, cy, ew, eh in elems if k == "screen"]
+    else:
+        ret = [rect(cx - ew / 2, cy - eh / 2, ew, eh, SCREEN_BG, rx=3)
+               for k, cx, cy, ew, eh in elems if k == "screen"]
     # Snapped, not 99%: in the design file the point of a reticule is that its
     # edges are on the grid. The shipped res/*.svg keeps 99% of the real part.
     for k, cx, cy, ew, eh in elems:

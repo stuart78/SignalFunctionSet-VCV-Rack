@@ -59,7 +59,9 @@ building underneath) is musical or merely a delay, and whether the SOFT/LEVEL
 velocity morph earns a second full spectrum's worth of editing.
 
 ### Flock: a murmuration as a microtonal granular voice
-Design written 2026-09, nothing built: see `docs/flock-design.md`. Persistent
+Built and shipped with Flock In in 2.21.0 (2026-09-17); the design and every
+listening round are in `docs/flock-design.md`. Still open: STRUCTURE is
+untuned, and the hawk's stereo effect depends on its random entry bearing. Persistent
 birds under Boids rules with topological neighbours, grains as their calls,
 height is pitch and the horizontal plane is the stage, a ROTATE that walks
 the listener round the flock with the screenless display being that view.

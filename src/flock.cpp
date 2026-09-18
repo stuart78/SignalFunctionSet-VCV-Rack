@@ -63,6 +63,7 @@ static const int FL_BUFN      = 1 << 19; // ring buffer frames (10.9 s at 48k) f
 static inline int   flBirds(float k)   { return clamp((int)std::round(1.f + 1023.f * k * k), 1, FL_MAXBIRDS); }
 static inline float flLatSt(float k)   { return 0.1f * std::pow(360.f, clamp(k, 0.f, 1.f)); }      // 0.1 .. 36 st
 static inline float flLenSec(float k)  { return 0.01f * std::pow(30.f, clamp(k, 0.f, 1.f)); }      // 10 .. 300 ms
+static float FL_LISTEN_D = 0.5f;      // not const, so the harness can compare distances   // the listener pair's distance from the roost, cube units
 static inline float flRateHz(float k)  { return 0.2f * std::pow(100.f, clamp(k, 0.f, 1.f)); }      // 0.2 .. 20 /s
 static inline float flRelSec(float k)  { return 0.05f * std::pow(160.f, clamp(k, 0.f, 1.f)); }     // 50 ms .. 8 s
 static inline float flLagSec(float k)  { k = clamp(k, 0.f, 1.f); return 4.f * k * k; }             // slowest bird, seconds
@@ -143,6 +144,8 @@ struct Flock : Module {
 		VARIETY_INPUT,
 		INPUTS_LEN
 	};
+	// CENTRE, DENSITY and HAWK came off the panel with the 2026-09 art and are
+	// RETIRED IN PLACE: outputs serialise by index, so the slots stay.
 	enum OutputId { L_OUTPUT, R_OUTPUT, CENTRE_OUTPUT, DENSITY_OUTPUT, HAWK_OUTPUT, OUTPUTS_LEN };
 	enum LightId { LIGHTS_LEN };
 
@@ -188,6 +191,7 @@ struct Flock : Module {
 	float cx = 0.f, cy = 0.f, cz = 0.f;   // centroid, in offset space
 	float cyAbs = 0.f;                    // the centroid's pitch as heard: mean(heard + y)
 	float spread = 1.f;                   // rms distance to the centroid, cube units
+	float spreadRef = 0.3f;               // the settled horizontal spread the pan is normalised by
 	float spreadH = 1.f;                  // the same in the stage plane only
 	float roostY = 0.f;
 	float latSt = 3.f, rotDeg = 0.f;
@@ -215,7 +219,21 @@ struct Flock : Module {
 	int   tick = 0;
 	int   octave = 1;                     // register: roost = V/OCT + octave
 	int   grid = 0;                       // QUANT grid, index into FL_GRIDS
-	int   width = 1;                      // stereo width: pan sharpness x4 / x8 / x16
+	int   width = 1;                      // stereo width: where the rms bird lands in the field
+	// A LEAD BIRD CALLS ON THE GATE. The gate is flight, not a trigger, and
+	// every call is a Poisson draw, so with one bird a note had a random
+	// onset (up to 0.6/RATE), a random count and sometimes no call at all.
+	// With this on, one bird calls the instant the gate rises, unconditionally,
+	// and the rest fan in as before -- invisible in a thousand birds, and
+	// what makes a single bird playable.
+	bool  leadCall = true;
+	bool  leadDue = false;
+	// THE CAMERA IS YOURS. Drag the display to orbit: yaw is added to the
+	// listener's bearing for the VIEW only (the listener pair stays where
+	// ROTATE put it), tilt is how far above the stage the camera looks
+	// down from. Saved with the patch; a double-click puts it back.
+	float camYaw = 0.f;                   // radians, 0 = behind the listener
+	float camTilt = 0.38f;                // radians, 22 degrees down
 	dsp::SchmittTrigger startleTrig, startleBtn;
 	bool  gateWas = false;
 	float sr = 48000.f;
@@ -548,6 +566,7 @@ struct Flock : Module {
 		}
 		spread = std::sqrt(ss * inv) + 1e-3f;
 		spreadH = std::sqrt(sh2 * inv) + 1e-3f;
+		if (!hawkOn) spreadRef += (spreadH - spreadRef) * std::min(1.f, dt / 2.f);
 
 		// ── the hawk ─────────────────────────────────────────────────────
 		if (hawkOn) {
@@ -584,7 +603,9 @@ struct Flock : Module {
 					continue;
 				}
 				b.callT = wait();
-				if (random::uniform() > flight) continue;      // a settling flock calls less
+				bool lead = leadDue && i == 0;
+				if (lead) leadDue = false;
+				else if (random::uniform() > flight) continue;  // a settling flock calls less
 				if (!startGrain(i, 0, variety)) b.callT = 0.02f;   // no voice free: try again soon
 			}
 		}
@@ -695,7 +716,13 @@ struct Flock : Module {
 		// and 0.25 after a startle) that the flock still fills the field from
 		// there, and a startled bird that reaches the face of the cube passes
 		// the pair.
-		const float D = 1.1f;                          // the front face of the cube
+		// CLOSE IN, since 2026-09: the pair stood at the front face of the
+		// cube (1.1) while width came from distance; now that width is
+		// normalised by the flock's own spread, distance only sets how hard
+		// a bird passing the pair swings and how much level and brightness
+		// it gains on the way, and both are stronger close. Half a unit is
+		// the edge of a settled flock, not inside it.
+		const float D = FL_LISTEN_D;
 		float dx = xr, dz = zr + D;
 		float dist = std::sqrt(dx * dx + dz * dz) + 1e-3f;
 		float azm = std::atan2(dx, dz);
@@ -707,8 +734,36 @@ struct Flock : Module {
 		float ccx = cx * std::cos(th) - cz * std::sin(th);
 		float ccz = cx * std::sin(th) + cz * std::cos(th);
 		float azm0 = std::atan2(ccx, ccz + D);
-		static const float WIDE[3] = {4.f, 8.f, 16.f};
-		float t = clamp(std::sin(azm - azm0) * WIDE[clamp(width, 0, 2)], -1.f, 1.f);
+		// NORMALISED BY THE FLOCK'S OWN SPREAD. A fixed sharpness panned a
+		// tight flock narrow and a loose one wide, so the image was a
+		// picture of how spread out the flock happened to be rather than of
+		// the flock. The bearing is divided by the flock's rms angular
+		// spread as seen from the pair, so the rms bird always sits at the
+		// same place in the field -- WIDTH says where: 0.7 of the way to
+		// the speaker, past it, or well past it, so that at Wide about half
+		// the flock is hard against a speaker (measured: L/R correlation
+		// 0.59 / 0.40 / 0.27 at the three settings, five flocks each,
+		// against 0.48 for the old fixed x8 -- the flock fills the
+		// image whether it is a knot or a cloud. A startled bird still goes
+		// wherever its bearing takes it.
+		float cdist = std::sqrt(ccx * ccx + (ccz + D) * (ccz + D)) + 1e-3f;
+		// spreadRef is the SETTLED horizontal spread, slewed over a couple of
+		// seconds and HELD while the hawk is in the flock: normalising by
+		// the live spread had cancelled the startle in the stereo field --
+		// the flock scattered, the reference grew with it, and every bird
+		// stayed where it was in the image. Against the settled spread a
+		// fleeing bird goes past the speaker. (The stereo axis gets 1/sqrt2
+		// of an rms taken over x and z.)
+		// Angles, not sines: close in, the flock subtends a wide angle and
+		// sin() saturates before the bearing does, which narrowed the image
+		// as the pair moved in. The bearing is wrapped to +-pi so a bird
+		// behind the pair reads as far off-axis, not as nearly ahead.
+		float angSpread = clamp(std::atan(0.7f * spreadRef / cdist), 0.03f, 1.2f);
+		float dazm = azm - azm0;
+		while (dazm > (float)M_PI) dazm -= 2.f * (float)M_PI;
+		while (dazm < -(float)M_PI) dazm += 2.f * (float)M_PI;
+		static const float WIDE[3] = {0.8f, 1.3f, 2.2f};
+		float t = clamp(dazm / angSpread * WIDE[clamp(width, 0, 2)], -1.f, 1.f);
 		G.gl = std::cos((t + 1.f) * (float)M_PI_4); G.gr = std::sin((t + 1.f) * (float)M_PI_4);
 		float near = clamp(D / dist, 0.2f, 2.5f);
 		G.amp = near * (0.75f + 0.25f * random::uniform());
@@ -724,12 +779,18 @@ struct Flock : Module {
 		json_object_set_new(r, "octave", json_integer(octave));
 		json_object_set_new(r, "grid", json_integer(grid));
 		json_object_set_new(r, "width", json_integer(width));
+		json_object_set_new(r, "leadCall", json_boolean(leadCall));
+		json_object_set_new(r, "camYaw", json_real(camYaw));
+		json_object_set_new(r, "camTilt", json_real(camTilt));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
 		if (json_t* j = json_object_get(r, "octave")) octave = clamp((int)json_integer_value(j), 0, 3);
 		if (json_t* j = json_object_get(r, "grid")) grid = clamp((int)json_integer_value(j), 0, FL_NGRID - 1);
 		if (json_t* j = json_object_get(r, "width")) width = clamp((int)json_integer_value(j), 0, 2);
+		if (json_t* j = json_object_get(r, "leadCall")) leadCall = json_boolean_value(j);
+		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_real_value(j);
+		if (json_t* j = json_object_get(r, "camTilt")) camTilt = clamp((float)json_real_value(j), 0.05f, 1.3f);
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -741,9 +802,11 @@ struct Flock : Module {
 		// were already due, and every one of them called on the first tick.
 		// Now the flock takes off over about 150 ms, and each bird's next
 		// call is re-drawn at the gate so they arrive one by one.
-		if (gate && !gateWas)
+		if (gate && !gateWas) {
 			for (int i = 0; i < nActive; i++)
 				bird[i].callT = random::uniform() * 0.6f / flRateHz(params[RATE_PARAM].getValue());
+			if (leadCall && nActive > 0) { bird[0].callT = 0.f; bird[0].sylAt = 0; leadDue = true; }
+		}
 		gateWas = gate;
 		if (gate) flight += (1.f - flight) * std::min(1.f, args.sampleTime / 0.15f);
 		else      flight *= std::exp(-args.sampleTime / rel);
@@ -889,6 +952,22 @@ struct FlockDisplay : OpaqueWidget {
 	float viewY = 0.f;                        // smoothed view centre, semitones
 	bool  viewInit = false;
 
+	void onButton(const ButtonEvent& e) override {
+		OpaqueWidget::onButton(e);
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS) e.consume(this);
+	}
+	void onDragMove(const DragMoveEvent& e) override {
+		if (!module || e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+		Vec d = e.mouseDelta.div(APP->scene->rackScroll->getZoom());
+		module->camYaw += d.x * 0.012f;
+		module->camTilt = clamp(module->camTilt + d.y * 0.008f, 0.05f, 1.3f);
+	}
+	void onDoubleClick(const DoubleClickEvent& e) override {
+		if (!module) return;
+		module->camYaw = 0.f; module->camTilt = 0.38f;
+		e.consume(this);
+	}
+
 	void draw(const DrawArgs& args) override {
 		if (!module) { module = flockPreview(); draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
@@ -904,8 +983,10 @@ struct FlockDisplay : OpaqueWidget {
 		// flock's centre slowly; the vertical scale follows its reach and is
 		// smoothed, or a startle would zoom the picture.
 		float th = module->rotDeg * (float)M_PI / 180.f;
-		float ct = std::cos(th), st = std::sin(th);
-		const float tilt = 0.38f;                       // camera looks down 22 degrees
+		float ct = std::cos(th), st = std::sin(th);     // the listener's frame
+		float thv = th + module->camYaw;                // the camera's: dragged round from it
+		float ctv = std::cos(thv), stv = std::sin(thv);
+		const float tilt = module->camTilt;             // how far down the camera looks
 		const float cphi = std::cos(tilt), sphi = std::sin(tilt);
 		if (!viewInit) { viewY = module->cyAbs; viewInit = true; }
 		viewY += (module->cyAbs - viewY) * 0.06f;
@@ -918,8 +999,8 @@ struct FlockDisplay : OpaqueWidget {
 		};
 		float Dc = 3.8f * visL;                         // camera distance
 		float fx = 0.28f * w * Dc / visL;               // horizontal scale
-		float fy = 0.25f * h * Dc / visL;               // vertical, so the cube fits
-		float ox = w * 0.5f, oy = h * 0.46f;
+		float fy = 0.22f * h * Dc / visL;               // vertical, so the taller box fits
+		float ox = w * 0.5f, oy = h * 0.50f;
 
 		struct Dot { float sx, sy, r, depth, flash; bool hawk; };
 		static std::vector<Dot> dots;
@@ -929,7 +1010,7 @@ struct FlockDisplay : OpaqueWidget {
 		// and from the view height in pitch.
 		auto project = [&](float x, float y, float z, Dot& d) {
 			float rx = x, rz = z, ry = y;              // all three are offsets, in cube units
-			float xr = rx * ct - rz * st, zr = rx * st + rz * ct;
+			float xr = rx * ctv - rz * stv, zr = rx * stv + rz * ctv;
 			float yt = ry * cphi + zr * sphi, zt = -ry * sphi + zr * cphi;
 			float depth = zt + Dc;
 			if (depth < 0.2f * Dc) depth = 0.2f * Dc;
@@ -946,16 +1027,30 @@ struct FlockDisplay : OpaqueWidget {
 		// behind. Edges fade with depth; the floor is lighter still.
 		{
 			float L = visL;
+			// TALLER THAN THE LEASH: birds are drawn up to 1.5 cube units
+			// above and below the view, and a box only one unit tall had
+			// them flying through its lid.
+			const float H = 1.3f * L;
 			Dot c[8];
 			for (int k = 0; k < 8; k++)
-				project(((k & 1) ? L : -L), ((k & 2) ? L : -L),
+				project(((k & 1) ? L : -L), ((k & 2) ? H : -H),
 				        ((k & 4) ? L : -L), c[k]);
+			// THE NEAR FACE IS NOT DRAWN. The four nearest corners are the
+			// face between the camera and the flock, and its edges read as
+			// a pane of glass the birds are behind; without it the box is
+			// a stage seen from the front, open toward the listener.
+			bool nearC[8] = {};
+			{
+				int idx[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+				std::sort(idx, idx + 8, [&](int a, int b) { return c[a].depth < c[b].depth; });
+				for (int k = 0; k < 4; k++) nearC[idx[k]] = true;
+			}
 			const int NG = 6;
 			for (int g = 1; g < NG; g++) {
 				float t = -L + 2.f * L * g / NG;
 				Dot a, b2, e, f2;
-				project(t, -L, -L, a); project(t, -L, L, b2);
-				project(-L, -L, t, e); project(L, -L, t, f2);
+				project(t, -H, -L, a); project(t, -H, L, b2);
+				project(-L, -H, t, e); project(L, -H, t, f2);
 				nvgBeginPath(vg);
 				nvgMoveTo(vg, a.sx, a.sy); nvgLineTo(vg, b2.sx, b2.sy);
 				nvgMoveTo(vg, e.sx, e.sy); nvgLineTo(vg, f2.sx, f2.sy);
@@ -965,6 +1060,10 @@ struct FlockDisplay : OpaqueWidget {
 			}
 			static const int E[12][2] = {{0,1},{2,3},{4,5},{6,7},{0,2},{1,3},{4,6},{5,7},{0,4},{1,5},{2,6},{3,7}};
 			for (int e = 0; e < 12; e++) {
+				// an edge of the near face is dropped -- unless it is the
+				// floor's front edge, which is the ground and always drawn
+				bool onFloor = !(E[e][0] & 2) && !(E[e][1] & 2);
+				if (nearC[E[e][0]] && nearC[E[e][1]] && !onFloor) continue;
 				const Dot& a = c[E[e][0]]; const Dot& b2 = c[E[e][1]];
 				float near = clamp(1.6f - 0.5f * (a.depth + b2.depth), 0.2f, 1.f);
 				nvgBeginPath(vg);
@@ -980,18 +1079,15 @@ struct FlockDisplay : OpaqueWidget {
 		// as a short line. It sits on the camera's own bearing, so as ROTATE
 		// turns the pair walks round the cube.
 		{
-			const float D = 1.1f, base = 0.18f;
+			const float D = FL_LISTEN_D, base = 0.18f;
 			// a point at bearing 0 in the rotated frame is (xr, zr) = (x, -D):
 			// undo the bearing to get flock coordinates
 			auto place = [&](float xr, float zr, Dot& d) {
 				float x = xr * ct + zr * st, z = -xr * st + zr * ct;
 				project(x, 0.f, z, d);
 			};
-			Dot l, r, m;
-			place(-base, -D, l); place(base, -D, r); place(0.f, -D, m);
-			nvgBeginPath(vg);
-			nvgMoveTo(vg, l.sx, l.sy); nvgLineTo(vg, r.sx, r.sy);
-			nvgStrokeColor(vg, FL_SOFT); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
+			Dot l, r;
+			place(-base, -D, l); place(base, -D, r);
 			const Dot* ear[2] = {&l, &r};
 			const char* nm[2] = {"L", "R"};
 			for (int k = 0; k < 2; k++) {
@@ -1060,77 +1156,67 @@ struct FlockDisplay : OpaqueWidget {
 };
 
 // =============================================================================
-// Panel: 18HP. The flock across the top, two rows of trimpots with their CVs
-// beneath, the transport row at the foot with the outputs on a plate.
+// Panel: 18HP, the designer's Figma export (2026-09). The flock across the
+// top, two rows of trimpots with their CVs beneath, GATE / V/OCT / STARTLE at
+// the foot with L and R on a plate. The art carries its own outlined labels,
+// so there is NO sfs::PanelLabels here -- adding one prints every label twice.
+// The PITCH, DENS and HAWK outputs came off the panel with this art; their
+// enum slots stay (outputs serialise by index) and they are simply not placed.
 // =============================================================================
-static const float FL_AX[6] = {7.62f, 22.86f, 38.10f, 53.34f, 68.58f, 83.82f};
-static const float FL_AY = 72.5f, FL_ACV = 84.0f;
-static const float FL_BY = 97.0f, FL_BCV = 108.5f;   // row B shares row A's six columns
-static const float FL_TX[9] = {5.08f, 15.24f, 25.40f, 35.56f, 45.72f, 55.88f, 66.04f, 76.20f, 86.36f};
-static const float FL_TY = 121.0f;
+static const float FL_X[6] = {10.86f, 24.86f, 38.83f, 52.80f, 66.73f, 80.73f};
+static const float FL_AY = 66.83f, FL_ACV = 78.51f;
+static const float FL_BY = 93.07f, FL_BCV = 104.76f;
+static const float FL_FY = 120.92f;                  // the foot row of jacks
+static const float FL_FY_STARTLE = 120.08f;          // the button and its jack sit a hair higher
+static const float FL_X_GATE = 10.79f, FL_X_VOCT = 24.93f, FL_X_STARTLE = 38.90f,
+                   FL_X_STARTLE_IN = 52.86f, FL_X_L = 66.66f, FL_X_R = 80.80f;
 
 struct FlockWidget : ModuleWidget {
 	FlockWidget(Flock* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/flock.svg")));
 
-		sfs::PanelLabels* lbl = new sfs::PanelLabels();
-		lbl->box.size = box.size;
-		addChild(lbl);
-		lbl->title(6.f, 8.f, "FLOCK");
-
 		FlockDisplay* disp = new FlockDisplay();
 		disp->module = module;
 		disp->box.pos  = mm2px(Vec(3.0f, 11.0f));
-		disp->box.size = mm2px(Vec(85.44f, 54.0f));
+		disp->box.size = mm2px(Vec(85.44f, 46.0f));   // stops above the row A labels
 		addChild(disp);
 
-		struct K { int p; int in; const char* t; };
+		struct K { int p; int in; };
 		const K rowA[6] = {
-			{Flock::WEIGHT_PARAM,    Flock::WEIGHT_INPUT,    "WEIGHT"},
-			{Flock::LATITUDE_PARAM,  Flock::LATITUDE_INPUT,  "LATITUDE"},
-			{Flock::STRUCTURE_PARAM, Flock::STRUCTURE_INPUT, "STRUCT"},
-			{Flock::AGILITY_PARAM,   Flock::AGILITY_INPUT,   "AGILITY"},
-			{Flock::LAG_PARAM,       Flock::LAG_INPUT,       "LAG"},
-			{Flock::ROTATE_PARAM,    Flock::ROTATE_INPUT,    "ROTATE"},
+			{Flock::WEIGHT_PARAM,    Flock::WEIGHT_INPUT},
+			{Flock::LATITUDE_PARAM,  Flock::LATITUDE_INPUT},
+			{Flock::STRUCTURE_PARAM, Flock::STRUCTURE_INPUT},
+			{Flock::AGILITY_PARAM,   Flock::AGILITY_INPUT},
+			{Flock::LAG_PARAM,       Flock::LAG_INPUT},
+			{Flock::ROTATE_PARAM,    Flock::ROTATE_INPUT},
 		};
 		for (int i = 0; i < 6; i++) {
-			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_AX[i], FL_AY)), module, rowA[i].p));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_AX[i], FL_ACV)), module, rowA[i].in));
-			lbl->pairDown(FL_AX[i], FL_AY, FL_ACV, rowA[i].t);
+			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_X[i], FL_AY)), module, rowA[i].p));
+			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X[i], FL_ACV)), module, rowA[i].in));
 		}
+		// Row B in the ART's order, which is not the enum's: the designer put
+		// the two envelope controls beside the length and the two pitch
+		// controls at the right.
 		const K rowB[6] = {
-			{Flock::LENGTH_PARAM,  Flock::LENGTH_INPUT,  "LENGTH"},
-			{Flock::CHIRP_PARAM,   Flock::CHIRP_INPUT,   "CHIRP"},
-			{Flock::QUANT_PARAM,   Flock::QUANT_INPUT,   "QUANT"},
-			{Flock::RATE_PARAM,    Flock::RATE_INPUT,    "RATE"},
-			{Flock::RELEASE_PARAM, Flock::RELEASE_INPUT, "RELEASE"},
-			{Flock::VARIETY_PARAM, Flock::VARIETY_INPUT, "VARIETY"},
+			{Flock::LENGTH_PARAM,  Flock::LENGTH_INPUT},
+			{Flock::RELEASE_PARAM, Flock::RELEASE_INPUT},
+			{Flock::CHIRP_PARAM,   Flock::CHIRP_INPUT},
+			{Flock::VARIETY_PARAM, Flock::VARIETY_INPUT},
+			{Flock::RATE_PARAM,    Flock::RATE_INPUT},
+			{Flock::QUANT_PARAM,   Flock::QUANT_INPUT},
 		};
 		for (int i = 0; i < 6; i++) {
-			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_AX[i], FL_BY)), module, rowB[i].p));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_AX[i], FL_BCV)), module, rowB[i].in));
-			lbl->pairDown(FL_AX[i], FL_BY, FL_BCV, rowB[i].t);
+			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_X[i], FL_BY)), module, rowB[i].p));
+			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X[i], FL_BCV)), module, rowB[i].in));
 		}
-		// the transport row: what is played in, and what comes out
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_TX[0], FL_TY)), module, Flock::VOCT_INPUT));
-		lbl->jack(FL_TX[0], FL_TY, "V/OCT");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_TX[1], FL_TY)), module, Flock::GATE_INPUT));
-		lbl->jack(FL_TX[1], FL_TY, "GATE");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_TX[2], FL_TY)), module, Flock::STARTLE_INPUT));
-		lbl->jack(FL_TX[2], FL_TY, "STARTLE");
-		addParam(createParamCentered<VCVButton>(mm2px(Vec(FL_TX[3], FL_TY)), module, Flock::STARTLE_PARAM));
-		lbl->link(FL_TX[2], FL_TY, FL_TX[3], FL_TY);
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_TX[4], FL_TY)), module, Flock::L_OUTPUT));
-		lbl->jackOnPlate(FL_TX[4], FL_TY, "L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_TX[5], FL_TY)), module, Flock::R_OUTPUT));
-		lbl->jackOnPlate(FL_TX[5], FL_TY, "R");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_TX[6], FL_TY)), module, Flock::CENTRE_OUTPUT));
-		lbl->jackOnPlate(FL_TX[6], FL_TY, "PITCH");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_TX[7], FL_TY)), module, Flock::DENSITY_OUTPUT));
-		lbl->jackOnPlate(FL_TX[7], FL_TY, "DENS");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_TX[8], FL_TY)), module, Flock::HAWK_OUTPUT));
-		lbl->jackOnPlate(FL_TX[8], FL_TY, "HAWK");
+		// foot
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_GATE, FL_FY)), module, Flock::GATE_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_VOCT, FL_FY)), module, Flock::VOCT_INPUT));
+		addParam(createParamCentered<VCVButton>(mm2px(Vec(FL_X_STARTLE, FL_FY_STARTLE)), module, Flock::STARTLE_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_STARTLE_IN, FL_FY_STARTLE)), module, Flock::STARTLE_INPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_X_L, FL_FY)), module, Flock::L_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_X_R, FL_FY)), module, Flock::R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
@@ -1145,6 +1231,7 @@ struct FlockWidget : ModuleWidget {
 		for (int i = 0; i < FL_NGRID; i++) gn.push_back(FL_GRIDS[i].name);
 		menu->addChild(createIndexPtrSubmenuItem("Quantize grid (offsets from the pitch)", gn, &m->grid));
 		menu->addChild(createIndexPtrSubmenuItem("Stereo width", {"Normal", "Wide", "Extreme"}, &m->width));
+		menu->addChild(createBoolPtrMenuItem("Lead bird calls on the gate", "", &m->leadCall));
 	}
 };
 

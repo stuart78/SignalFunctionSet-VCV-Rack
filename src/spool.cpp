@@ -72,6 +72,7 @@ struct Spool : Module {
 		ATTACK_PARAM, RELEASE_PARAM, RAMP_PARAM,
 		WOW_PARAM, FLUTTER_PARAM, SAT_PARAM,
 		ROOT_PARAM, PMODE_PARAM, SAG_PARAM, REWIND_PARAM, DETECT_PARAM,
+		STRETCH_PARAM,                 // appended: V/OCT moves the speed, or only the pitch
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -108,6 +109,12 @@ struct Spool : Module {
 		int stage = ST_IDLE;
 		int chan = -1;
 		uint32_t age = 0;
+		// ── the pitch shifter, for the time-stretched mode ──────────────
+		// Two taps a fixed distance apart, swept through the tape at the
+		// shifted rate while the transport runs at 1x; see shiftRead().
+		float  shPh = 0.5f;            // tap A's phase through the window, B is half a window on
+		float  shW = 0.f;              // the window, latched only when a tap is silent
+		double shPrev[2] = {0.0, 0.0}; // where each tap read last sample, for the seam
 	};
 
 	struct Tape {
@@ -239,6 +246,8 @@ struct Spool : Module {
 		//
 		// Measured once, the tape has one pitch, absolute mode is a fixed ratio,
 		// the performance keeps its life, and there is nothing to step or alias.
+		configSwitch(STRETCH_PARAM, 0.f, 1.f, 0.f, "V/OCT changes",
+			{"Speed (varispeed, as a Mellotron does)", "Pitch only (time-stretched)"});
 		configSwitch(DETECT_PARAM, 0.f, 1.f, 0.f, "Pitch detection",
 		             {"Once, when the tape is loaded", "Continuous (tracks, and flattens vibrato)"});
 		configInput(ROOT_INPUT, "Root CV (1V/oct, semitone-quantized)");
@@ -293,6 +302,103 @@ struct Spool : Module {
 		return ((c3 * f + c2) * f + c1) * f + c0;
 	}
 
+	// ── time-stretched pitch shift ──────────────────────────────────────────
+	// The transport runs at 1x and the PITCH is moved on the way off the tape,
+	// so the loop keeps its length and an octave down is still five seconds.
+	//
+	// Two read taps, each sweeping through the tape at the shifted rate and
+	// crossfaded as they run off the end of a window. That is every delay-line
+	// shifter ever built, and what makes them warble is the crossfade: two taps
+	// a window apart carry the same waveform at different phases, and where
+	// the fade hands over they cancel. On pitched material the tape's own
+	// period is known -- the detector has already measured it -- so THE TAPS
+	// ARE KEPT A WHOLE NUMBER OF PERIODS APART. Then the two reads are the same
+	// waveform at the same phase, the fade is between two copies of one thing,
+	// and there is nothing to cancel. The window is 2kP with k the smallest that
+	// makes it at least 20 ms, so a high note does not hand over every couple
+	// of milliseconds on a period that is only nearly right. That is Lent's
+	// method (1989), the pitch-synchronous half of PSOLA, done with a sweep
+	// rather than a grain scheduler.
+	//
+	// Unpitched material has no period to keep, so it gets a 50 ms window and
+	// an equal-power fade rather than an equal-amplitude one: two reads of
+	// noise add as power, and a Hann pair would dip 3 dB at every handover.
+	//
+	// The window is only ever CHANGED when a tap is silent. Tap A sits at the
+	// transport when its phase is 0.5, and B does when A's phase wraps, and at
+	// each of those moments the other tap has zero weight, so a new window
+	// length moves nothing that can be heard. Re-sizing at any other moment
+	// would jump both taps.
+	//
+	// AT UNITY THE SWEEP STOPS, and a stopped pair of taps is a comb filter on
+	// anything broadband: wherever the fade happened to halt, two reads a
+	// fixed distance apart are summed for good. Within five cents of unity the
+	// pair is walked to whichever single-tap point is nearer, at the speed a
+	// five-cent shift would sweep -- inaudible, and it ends on one tap. A new
+	// head starts there already.
+	float shiftRead(const Tape& t, Head& hd, float r, float rate, float sr) {
+		float d = r - 1.f;
+		float toward = 0.f;
+		if (std::fabs(d) < 0.003f) {
+			// nearest single-tap point: 0.5 is A alone, 0 or 1 is B alone
+			float target = (std::fabs(hd.shPh - 0.5f) < 0.25f) ? 0.5f : ((hd.shPh < 0.5f) ? 0.f : 1.f);
+			toward = target - hd.shPh;
+			d = (std::fabs(toward) < 1e-6f) ? 0.f : ((toward > 0.f) ? 0.003f : -0.003f);
+		}
+		bool pitched = t.detOk && t.detHz > 20.f;
+		auto window = [&]() {
+			float W;
+			if (pitched) {
+				float P = sr / t.detHz;
+				int k = std::max(1, (int)std::ceil(0.010f * sr / P));
+				W = 2.f * (float)k * P;
+			} else {
+				// DITHERED, 30 to 70 ms, drawn afresh at every handover. Two
+				// taps a fixed distance apart on the same tape are a delayed
+				// copy of each other, and on broadband material that is a
+				// comb whose spacing is set by the distance: measured at an
+				// octave up, spectral flatness 0.77 against 0.99 for the
+				// tape. A distance that changes every window moves the comb's
+				// teeth faster than the ear can find them.
+				rng = rng * 1664525u + 1013904223u;
+				W = (0.030f + 0.040f * (float)(rng >> 8) / 16777216.f) * sr;
+			}
+			return std::min(W, (float)t.len * 0.5f);
+		};
+		if (hd.shW <= 0.f) hd.shW = window();
+
+		float W = hd.shW;
+		float phA = hd.shPh;
+		float phB = phA + 0.5f; if (phB >= 1.f) phB -= 1.f;
+		// Hann pair: A carries the transport at phase 0.5, B at A's wrap.
+		float h = 0.5f - 0.5f * std::cos(2.f * (float)M_PI * phA);
+		float wA = pitched ? h : std::sqrt(h);
+		float wB = pitched ? (1.f - h) : std::sqrt(1.f - h);
+		double len = (double)t.len;
+		double pA = hd.pos + (double)((phA - 0.5f) * W);
+		double pB = hd.pos + (double)((phB - 0.5f) * W);
+		// a tap crossing the loop seam is the discontinuity, wherever the
+		// transport is; the one that is silent at the time does not count
+		if (wA > 0.02f && std::floor(pA / len) != std::floor(hd.shPrev[0] / len)) hd.declick = 0.f;
+		if (wB > 0.02f && std::floor(pB / len) != std::floor(hd.shPrev[1] / len)) hd.declick = 0.f;
+		hd.shPrev[0] = pA; hd.shPrev[1] = pB;
+		auto wrapP = [&](double p) { p = std::fmod(p, len); return (p < 0.0) ? p + len : p; };
+		float out = readAt(t, wrapP(pA)) * wA + readAt(t, wrapP(pB)) * wB;
+
+		// advance: the taps run d*rate faster (or slower) than the transport
+		float dph = d * rate / W;
+		if (toward != 0.f && std::fabs(dph) > std::fabs(toward)) dph = toward;
+		float before = hd.shPh;
+		float after = before + dph;
+		bool wrapped = false;
+		if (after >= 1.f) { after -= 1.f; wrapped = true; }
+		if (after < 0.f)  { after += 1.f; wrapped = true; }
+		// crossing 0.5 in either direction is B's wrap; crossing 0/1 is A's
+		if (wrapped || (before < 0.5f) != (after < 0.5f)) hd.shW = window();
+		hd.shPh = after;
+		return out;
+	}
+
 	void process(const ProcessArgs& args) override {
 		float sr = args.sampleRate;
 		int cap = maxLen(sr);
@@ -334,6 +440,7 @@ struct Spool : Module {
 		}
 
 		bool absolute = params[PMODE_PARAM].getValue() > 0.5f;
+		bool stretch  = params[STRETCH_PARAM].getValue() > 0.5f;
 		// Read the way Note reads it: the CV is whole semitones, added to the
 		// knob and wrapped into one octave, so a key change moves the tapes to
 		// the nearest voicing of the new key rather than transposing them away.
@@ -508,6 +615,9 @@ struct Spool : Module {
 					// the one allowed to rewind. From the keyboard the option
 					// simply did nothing, which is what you heard.
 					hd.pos = (params[REWIND_PARAM].getValue() > 0.5f) ? 0.0 : t.pos;
+					hd.shPh = 0.5f;            // on one tap, at the transport
+					hd.shW = 0.f;              // sized on the first read
+					hd.shPrev[0] = hd.shPrev[1] = hd.pos;
 					// `primary` now means only "the head the display and the
 					// pitch detector should read", which is the newest one.
 					t.primary = slot;
@@ -606,7 +716,15 @@ struct Spool : Module {
 					base = std::pow(2.f, want);
 				}
 				base = clamp(base, 0.05f, 20.f);
+				// TIME-STRETCHED: the capstan runs at 1x, with its ramp, sag and
+				// wow as before, and the pitch is moved on the way off the tape.
+				// Two octaves either way is what the shifter does honestly.
+				float shift = 1.f;
 				float rate = base * speedErr * hd.ramp;
+				if (stretch) {
+					shift = clamp(base, 0.25f, 4.f);
+					rate = speedErr * hd.ramp;
+				}
 
 				hd.declick += args.sampleTime / 0.001f;      // 1 ms
 				if (hd.declick > 1.f) hd.declick = 1.f;
@@ -616,14 +734,16 @@ struct Spool : Module {
 				// which is DC, and it bubbles. A capstan not yet up to speed also
 				// has poor head contact, so following it with the level is both
 				// the fix and the more honest picture.
-				out += readAt(t, hd.pos) * hd.env * hd.declick * hd.ramp;
+				float smp = stretch ? shiftRead(t, hd, shift, rate, sr) : readAt(t, hd.pos);
+				out += smp * hd.env * hd.declick * hd.ramp;
 				dens += hd.env * hd.ramp;
 
 				hd.pos += (double)rate;
 				bool wrapped = false;
 				while (hd.pos >= (double)t.len) { hd.pos -= (double)t.len; wrapped = true; }
 				while (hd.pos < 0.0)            { hd.pos += (double)t.len; wrapped = true; }
-				if (wrapped) hd.declick = 0.f;
+				// in the stretched mode the taps cross the seam, not the transport
+				if (wrapped && !stretch) hd.declick = 0.f;
 
 				// THE BOOKMARK FOLLOWS THE TAPE, AND THE TAPE ONLY MOVES WHILE A
 				// KEY IS DOWN. That distinction is the whole of the offset
@@ -1236,6 +1356,10 @@ struct SpoolWidget : ModuleWidget {
 			[=](int v) { m->params[Spool::REWIND_PARAM].setValue((float)clamp(v, 0, 1)); }));
 		// The pitch-detection choice had a param and no way to reach it: no
 		// trimpot on the panel and no menu entry, so it was "once" for everyone.
+		menu->addChild(createIndexSubmenuItem("V/OCT changes",
+			{"Speed (varispeed, as a Mellotron does)", "Pitch only (time-stretched)"},
+			[=]() { return (int)std::round(m->params[Spool::STRETCH_PARAM].getValue()); },
+			[=](int v) { m->params[Spool::STRETCH_PARAM].setValue((float)clamp(v, 0, 1)); }));
 		menu->addChild(createIndexSubmenuItem("Pitch detection",
 			{"Once, when the tape is loaded", "Continuous (tracks, and flattens vibrato)"},
 			[=]() { return (int)std::round(m->params[Spool::DETECT_PARAM].getValue()); },

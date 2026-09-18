@@ -196,6 +196,95 @@ Around 18HP, screenless, the flock across the top.
 - V/OCT, GATE, STARTLE (jack and button).
 - Out: L, R, PITCH, DENS, HAWK.
 
+## The designer's panel (2026-09)
+
+Both panels are now the designer's Figma exports (`res/flock.svg`,
+`res/flockin.svg`), adopted with the `figma-panel` skill: normalised,
+positions read out of the guide circles (30 and 8, every one matched to a
+control within 0.13 mm), runtime labels removed because the art outlines
+its own, guides stripped after the Rack render was checked.
+
+- Row A keeps the enum's order. **Row B is in the art's order, not the
+  enum's**: LENGTH, RELEASE, CHIRP, VARIETY, RATE, QUANT — the envelope
+  pair beside the length, the pitch pair at the right.
+- Foot: GATE, V/OCT, STARTLE (button, then its jack), LEFT and RIGHT on a
+  plate. **PITCH, DENS and HAWK came off the panel** for simplicity; their
+  enum slots stay, retired in place, since outputs serialise by index.
+- The display stops at 57 mm so the birds fly clear of row A's labels.
+- Flock In is one column: ENV, REACH, FREEZE each over its jack, the audio
+  pair at the foot.
+
+## After the panel: the box, the mics, the width
+
+- **The box is drawn without its near face.** The four nearest corners are
+  found by depth each frame (so ROTATE keeps it right) and the edges among
+  them are skipped: the picture is a stage seen from the front, open toward
+  the listener, rather than birds behind a pane of glass. It is 1.3 leash
+  units tall, since birds fly up to 1.5 above and below the view and a unit
+  box had them through its lid; the vertical scale and the picture's centre
+  moved to fit it in the shorter display.
+- **No bar between the mics.** Two circles and their aim lines.
+- **The floor's front edge is always drawn**, near face or not: it is the
+  ground, and a floor with no front edge reads as a rug.
+- **Drag the display to move the camera.** Horizontal drag orbits (a yaw
+  added to the listener's bearing for the view only, so the pair stays
+  where ROTATE put it), vertical drag tilts between 3 and 75 degrees
+  above the stage. The near face is re-found by depth every frame, so the
+  open side of the box is always the one facing you. Saved with the patch;
+  double-click resets to behind the listener, 22 degrees down.
+- **Width is normalised by the flock's own spread.** A fixed pan sharpness
+  panned a tight flock narrow and a loose one wide, so the image was a
+  picture of the flock's looseness. The bearing is now divided by the rms
+  angular spread seen from the pair (the horizontal rms, 1/√2 of `spreadH`,
+  over the distance to the centroid), and WIDTH sets where the rms bird
+  lands: 0.7 of the way to the speaker, past it (default), or well past.
+  Measured L/R correlation at rest, five flocks each, at agility 0.1 / 0.5:
+  Normal 0.58 / 0.60, Wide 0.38 / 0.42, Extreme 0.30 / 0.25 — against 0.48
+  for the old fixed ×8, and now the same for a knot as for a cloud. Two
+  cautions: correlation of a field filled *evenly* bottoms out at 0.64, so
+  anything lower means birds parked against the speakers, and that is what
+  Wide and Extreme do by design; and a startled bird still goes wherever
+  its bearing takes it.
+
+## The pair moves in, and the startle comes back to the field
+
+The listener pair stood at the front face of the cube (1.1 from the roost)
+because width used to come from distance. Once width was normalised by the
+flock's spread, distance only set how hard a bird passing the pair swings
+and how much level it gains on the way, and both are stronger close, so the
+pair now stands **half a unit** out (`FL_LISTEN_D`), at the edge of a
+settled flock rather than inside it.
+
+Moving it in exposed two faults in the normalised law, both fixed:
+
+- **The startle had been normalised away.** The flock scattered, the live
+  spread grew with it, and every bird stayed where it was in the image.
+  The pan is now divided by `spreadRef`, the settled horizontal spread
+  slewed over two seconds and **held while the hawk is in the flock**, so a
+  fleeing bird goes past the speaker.
+- **Sine saturated before the bearing did.** Close in, the flock subtends a
+  wide angle, and `sin(bearing)` flattened the outer birds. The pan is now
+  the wrapped angle over `atan(spread / distance)`, linear all the way round.
+
+Measured per call (the latched L/R gains of every grain started in the
+window, five flocks each; "hard" = within 10% of a speaker), at Wide:
+rest about 40% hard, then 45–50% in the first half second after the hawk
+and 55–85% in the second. The spread between runs is the hawk's bearing:
+one flying along the pair's axis scatters birds front to back, which a pan
+cannot show. Width tiers are now {0.8, 1.3, 2.2}; L/R correlation at rest
+0.65 / 0.34–0.44 / 0.26–0.31.
+
+## A lead bird calls on the gate (menu, default on)
+
+The gate is flight, not a trigger, and every call is a Poisson draw, so
+with one bird a note had a random onset, a random count and often no call
+at all: measured over twenty 200 ms gates, the first call came 44–177 ms
+after the gate and fifteen gates were silent. With **Lead bird calls on the
+gate** one bird calls the instant the gate rises, unconditionally (it skips
+the settling-flock probability too), and the rest fan in as before: onset
+1.3 ms on every gate, none silent. In a thousand birds it is one call among
+the fan-in and cannot be heard. Off restores the pure flock behaviour.
+
 ## What to measure before believing it
 
 A harness that extracts the flock step verbatim (as the Kit, Wheel and Sigma

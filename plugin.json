@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.20.1",
+  "version": "2.21.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -532,8 +532,7 @@
         "Granular",
         "Synth voice",
         "Polyphonic"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "FlockIn",
@@ -543,8 +542,7 @@
         "Expander",
         "Granular",
         "Sampler"
-      ],
-      "hidden": true
+      ]
     }
   ]
 }

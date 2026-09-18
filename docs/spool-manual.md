@@ -55,9 +55,25 @@ all tapes* does the same by hand.
 
 **V/OCT is varispeed, not transposition.** It changes how fast the tape runs,
 so the pitch and the loop's period move together, as they do on any machine
-with a capstan. An octave down is twice the loop length. Nothing here
-time-stretches, because a Mellotron cannot. Each head reads at the pitch it
-was struck at, and while its gate is held it follows the CV.
+with a capstan. An octave down is twice the loop length, because a Mellotron
+cannot do otherwise. Each head reads at the pitch it was struck at, and while
+its gate is held it follows the CV.
+
+**Pitch only (time-stretched)**, in the context menu under *V/OCT changes*,
+is the departure a Mellotron cannot make: the transport keeps running at its
+own speed, so the loop keeps its length, and only the pitch moves, two octaves
+either way. The shift is done on the way off the tape by two read heads that
+sweep through it at the shifted rate and hand over to each other as they run
+out of window. On a tape that has a pitch, the heads are kept a whole number
+of the tape's own periods apart, so where one hands over to the other they
+carry the same waveform at the same phase and there is nothing to cancel: the
+warble that made earlier attempts at this unsatisfactory is gone, measured at
+the same level ripple as plain varispeed. That is why the pitch detector runs
+whether or not ABS is on. A tape with no pitch, a drum loop or a breath, gets
+a window that changes length on every handover, so the comb the two heads
+would otherwise make never holds still. RAMP, WOW, FLUTTER and sag still act
+on the capstan, and the pitch follows them: the motor coming up to speed is
+still a glide.
 
 ## The shared row
 
@@ -127,6 +143,8 @@ the patch. A tape that is recording shows its record position instead.
 - **Motor sag**: how flat a chord goes.
 - **New note starts**: *Where the tape stopped* (default) or *At the
   beginning*.
+- **V/OCT changes**: *Speed* (default, varispeed) or *Pitch only*
+  (time-stretched, the loop keeps its length).
 - **Pitch detection**: *Once* (default) or *Continuous*.
 
 ## Tips
