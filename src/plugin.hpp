@@ -56,4 +56,6 @@ extern Model* modelSigma;
 extern Model* modelTouch;
 extern Model* modelFlock;
 extern Model* modelFlockIn;
+extern Model* modelCanon;
+extern Model* modelCount;
 extern Model* modelWheel;

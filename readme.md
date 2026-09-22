@@ -296,7 +296,7 @@ A polyphonic multisample player. Loads an `.sfz` or DecentSampler `.dspreset` in
 - **Playable display**: 88-key map (mapped = blue, playing = cyan) or a 12×8 Push-style pad grid with three layouts; tap a pad to audition the instrument with nothing patched.
 
 **Controls:** Instr, Level.
-**Inputs:** V/Oct (poly), Gate (poly), Vel, Instr CV, Level CV.
+**Inputs:** V/Oct (poly), Gate (poly), Vel (poly), Instr CV (poly), Level CV (poly).
 **Outputs:** L / R.
 
 See [docs/play-manual.md](docs/play-manual.md) for the full manual.

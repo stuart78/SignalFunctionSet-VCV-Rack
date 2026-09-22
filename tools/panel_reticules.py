@@ -309,7 +309,7 @@ def collect(body, env, extra_defs):
                 continue
             x, y = evaluate(pv[0], env), evaluate(pv[1], env)
             w, h = evaluate(sv[0], env), evaluate(sv[1], env)
-            if w >= 20.0 and h >= 12.0:      # a thin text readout is not a screen
+            if w >= 20.0 and h >= 8.0:       # a thin text readout is not a screen; Count's strip is
                 out.append(("screen", (x + w / 2) * MM, (y + h / 2) * MM, w * MM, h * MM))
         except Exception:
             pass
@@ -472,6 +472,9 @@ PLATES = {
     "helix": [(41.0, 103.5, 39.0, 13.0)],
     # the five outputs at the foot, right of the startle button
     "flock": [(40.64, 114.5, 50.8, 13.0)],
+    # each channel's V/OCT + GATE pair at the foot
+    "count": [],
+    "canon": [],
     "brigade": [(41.0, 103.5, 39.0, 13.0)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
     # each tape keeps its own column, and a plate over that row would cover four
@@ -510,6 +513,8 @@ MODULES = {
     "spool":   ("Spool",   "src/spool.cpp",   "res/spool.svg",   {}),
     "flock":   ("Flock",   "src/flock.cpp",   "res/flock.svg",   {}),
     "flockin": ("FlockIn", "src/flockin.cpp", "res/flockin.svg", {}),
+    "canon":   ("Canon",   "src/canon.cpp",   "res/canon.svg",   {"CN_CH": 4}),
+    "count":   ("Count",   "src/count.cpp",   "res/count.svg",   {"CT_N": 6}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
@@ -528,7 +533,7 @@ NO_SCREEN_SLAB = {"wheel", "flock"}
 # aimed at another panel, which is exactly the failure this set exists to stop.
 FINISHED = {"crystal", "chime", "loom", "slide", "slidex", "fill", "gravity", "key",
             "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin", "field",
-            "flock", "flockin"}
+            "flock", "flockin", "canon", "count"}
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

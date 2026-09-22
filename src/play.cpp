@@ -585,12 +585,17 @@ struct Play : Module {
 		bool active = false, held = false;
 		int chan = -1, instr = -1, reg = -1, note = 60;
 		double pos = 0, ratio = 1; float amp = 1.f, env = 0.f;
+		float lvl = 1.f;                                     // this voice's channel's LEVEL, refreshed every sample
 		int   envStage = 0;                                 // 0 attack, 1 decay, 2 sustain, 3 release
 		float cA = 1.f, cD = 1.f, cR = 1.f, susL = 1.f;     // one-pole coefficients resolved at note-on
 	};
 	Voice voices[PLAY_MAX_VOICES];
 	std::vector<Instrument> instruments;
 	int curInstrument = 0;
+	// Which channel the SCREEN follows, now that INSTR is polyphonic: the
+	// instrument list's selection, the grid's key map and the audition all
+	// belong to one channel's instrument, and this says whose (menu).
+	int dispChan = 0;
 	int rrCounter = 0;                       // rotates through round-robin takes
 	bool oneShot = false;                   // true = play samples through, ignoring gate-off (drums)
 	// Amp-envelope mode: Off = fast anti-click AR (legacy); SFZ = the instrument's own ampeg
@@ -678,8 +683,8 @@ struct Play : Module {
 		configInput(VOCT_INPUT, "V/oct (poly)");
 		configInput(GATE_INPUT, "Gate (poly)");
 		configInput(VEL_INPUT, "Velocity (poly)");
-		configInput(INSTR_CV_INPUT, "Instrument select CV");
-		configInput(LEVEL_CV_INPUT, "Level CV (VCA)");
+		configInput(INSTR_CV_INPUT, "Instrument select CV (poly: one per voice)");
+		configInput(LEVEL_CV_INPUT, "Level CV (VCA; poly: one per voice)");
 		configOutput(L_OUTPUT, "Left");
 		configOutput(R_OUTPUT, "Right");
 		refreshDisplay();
@@ -690,6 +695,23 @@ struct Play : Module {
 		for (auto& r : instruments[inst].regions)
 			if (r.loaded && note >= r.lokey && note <= r.hikey && vel >= r.lovel && vel <= r.hivel) return &r;
 		return nullptr;
+	}
+
+	// INSTR and LEVEL are POLYPHONIC: each voice takes its instrument and its
+	// level from ITS OWN CHANNEL of the two CVs, so a poly INSTR cable plays a
+	// different instrument per note and a poly LEVEL cable is sixteen VCAs.
+	// getPolyVoltage() hands channel 0 to every voice when the cable is mono,
+	// so a mono patch is exactly what it was.
+	int instrumentFor(int chan) {
+		float sel = params[INSTR_PARAM].getValue();
+		if (inputs[INSTR_CV_INPUT].isConnected()) sel += inputs[INSTR_CV_INPUT].getPolyVoltage(std::max(chan, 0)) / 10.f * 15.f;
+		return clamp((int)std::round(sel), 0, std::max(0, (int)instruments.size() - 1));
+	}
+	float levelFor(int chan) {
+		float lvl = params[LEVEL_PARAM].getValue();
+		if (inputs[LEVEL_CV_INPUT].isConnected())
+			lvl *= std::max(0.f, inputs[LEVEL_CV_INPUT].getPolyVoltage(std::max(chan, 0)) * 0.1f);
+		return lvl;
 	}
 
 	void noteOn(int chan, int note, int vel) {
@@ -752,9 +774,9 @@ struct Play : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
-		float sel = params[INSTR_PARAM].getValue();
-		if (inputs[INSTR_CV_INPUT].isConnected()) sel += inputs[INSTR_CV_INPUT].getVoltage() / 10.f * 15.f;
-		curInstrument = clamp((int)std::round(sel), 0, std::max(0, (int)instruments.size() - 1));
+		// what the screen and the knob's tooltip call "the" instrument is
+		// the displayed channel's; the UI audition plays that one
+		curInstrument = instrumentFor(dispChan);
 
 		if (suspended || instruments.empty()) {
 			outputs[L_OUTPUT].setVoltage(0.f); outputs[R_OUTPUT].setVoltage(0.f);
@@ -769,7 +791,13 @@ struct Play : Module {
 				int note = clamp((int)std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f + 60.f), 0, 127);
 				int vel  = inputs[VEL_INPUT].isConnected()
 					? clamp((int)std::round(inputs[VEL_INPUT].getPolyVoltage(c) * 12.7f), 1, 127) : 100;
+				// noteOn() reads curInstrument, so it is pointed at this
+				// channel's instrument for the call (the harness extracts
+				// noteOn verbatim, which is why the signature stays)
+				int shown = curInstrument;
+				curInstrument = instrumentFor(c);
 				noteOn(c, note, vel);
+				curInstrument = shown;
 			} else if (!g && gateWas[c]) {
 				for (auto& v : voices) if (v.active && v.chan == c) v.held = false;
 			}
@@ -783,6 +811,8 @@ struct Play : Module {
 			uiNotePrev = uiNote;
 		}
 
+		for (auto& v : voices)
+			if (v.active) v.lvl = (v.chan == GRID_UI_CHAN) ? levelFor(dispChan) : levelFor(v.chan);
 		float outL = 0.f, outR = 0.f;
 		for (auto& v : voices) {
 			if (!v.active) continue;
@@ -805,7 +835,7 @@ struct Play : Module {
 				case 3: v.env += (0.f - v.env) * v.cR; break;
 			}
 			if (v.envStage == 3 && v.env < 0.0008f) { v.active = false; continue; }
-			float ggain = v.amp * v.env * r.volGain;
+			float ggain = v.amp * v.env * r.volGain * v.lvl;
 			// Equal-power, as everywhere else in the plugin. A region pan of 0
 			// leaves both gains at 1/√2·√2 = 1, so an unpanned instrument is
 			// bit-identical to what it was before panning existed.
@@ -826,11 +856,9 @@ struct Play : Module {
 			if (wrapping && r.loopEnd > r.loopStart && v.pos >= r.loopEnd)
 				v.pos -= (r.loopEnd - r.loopStart);
 		}
-		float lvl = params[LEVEL_PARAM].getValue();
-		if (inputs[LEVEL_CV_INPUT].isConnected())          // CV acts as an output VCA
-			lvl *= std::max(0.f, inputs[LEVEL_CV_INPUT].getVoltage() * 0.1f);
-		outputs[L_OUTPUT].setVoltage(clamp(outL * lvl * 5.f, -10.f, 10.f));
-		outputs[R_OUTPUT].setVoltage(clamp(outR * lvl * 5.f, -10.f, 10.f));
+		// -- output -- (LEVEL and its CV are already in each voice's v.lvl)
+		outputs[L_OUTPUT].setVoltage(clamp(outL * 5.f, -10.f, 10.f));
+		outputs[R_OUTPUT].setVoltage(clamp(outR * 5.f, -10.f, 10.f));
 
 		if (++statusDiv >= 256) { statusDiv = 0; refreshDisplay(); }
 	}
@@ -853,8 +881,14 @@ struct Play : Module {
 			else if (loaded < tot)         snprintf(dispInfo, sizeof(dispInfo), "%d/%d samples missing", tot - loaded, tot);
 			else                           snprintf(dispInfo, sizeof(dispInfo), "%d regions", tot);
 		} else { snprintf(dispName, sizeof(dispName), "no instrument"); snprintf(dispInfo, sizeof(dispInfo), "load .sfz"); }
+		// Every active voice counts; only those playing the instrument on
+		// screen are marked on its keys, since a note on another instrument
+		// has no key of this one to sit on.
 		int cnt = 0;
-		for (auto& v : voices) if (v.active) { cnt++; if (v.note >= 0 && v.note < 128) dispPlaying[v.note] = 1; }
+		for (auto& v : voices) if (v.active) {
+			cnt++;
+			if (v.instr == curInstrument && v.note >= 0 && v.note < 128) dispPlaying[v.note] = 1;
+		}
 		dispCount = cnt;
 	}
 
@@ -947,6 +981,7 @@ struct Play : Module {
 			if (in.srcHead) json_array_append_new(arr, json_string(in.srcPath.c_str()));
 		json_object_set_new(root, "sfzPaths", arr);
 		json_object_set_new(root, "oneShot", json_boolean(oneShot));
+		json_object_set_new(root, "dispChan", json_integer(dispChan));
 		json_object_set_new(root, "envMode", json_integer(envMode));
 		json_object_set_new(root, "kbView", json_integer(kbView));
 		json_object_set_new(root, "gridLayout", json_integer(gridLayout));
@@ -957,6 +992,7 @@ struct Play : Module {
 	}
 	void dataFromJson(json_t* root) override {
 		if (json_t* j = json_object_get(root, "oneShot")) oneShot = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "dispChan")) dispChan = clamp((int)json_integer_value(j), 0, 15);
 		if (json_t* j = json_object_get(root, "envMode")) envMode = clamp((int)json_integer_value(j), 0, 2);
 		if (json_t* j = json_object_get(root, "kbView")) kbView = clamp((int)json_integer_value(j), 0, 1);
 		if (json_t* j = json_object_get(root, "gridLayout")) gridLayout = clamp((int)json_integer_value(j), 0, 2);
@@ -1371,6 +1407,11 @@ struct PlayWidget : ModuleWidget {
 			menu->addChild(createMenuItem("Remove current instrument", "", [m]() { m->removeInstrument(m->curInstrument); }));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("One-shot (play through, ignore gate-off)", "", &m->oneShot));
+		{
+			std::vector<std::string> chans;
+			for (int c = 0; c < 16; c++) chans.push_back(string::f("Channel %d", c + 1));
+			menu->addChild(createIndexPtrSubmenuItem("Screen shows (instrument of)", chans, &m->dispChan));
+		}
 		menu->addChild(createIndexPtrSubmenuItem("Amp envelope",
 			{"Off (fast release)", "Use envelopes (SFZ)", "Default ADSR (smooth)"},
 			&m->envMode));

@@ -43,7 +43,7 @@ def main():
     note_on       = slice_between(src, "\tvoid noteOn(int chan, int note, int vel) {",
                                   "\tvoid process(const ProcessArgs& args)", "noteOn + resolveEnv")
     render        = slice_between(src, "\t\tfloat outL = 0.f, outR = 0.f;",
-                                  "\t\tfloat lvl = params[LEVEL_PARAM].getValue();", "voice render")
+                                  "\t\t// -- output --", "voice render")
 
     # SfzRegion carries only the struct; playVelGain sits between it and Instrument.
     region_struct = region_struct[:region_struct.find("// Velocity → gain")]

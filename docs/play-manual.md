@@ -21,8 +21,8 @@ The context menu lists what's loaded and lets you remove entries. Instrument pat
 | **V/OCT** | Pitch. Polyphonic, one voice per channel. |
 | **GATE** | Note on/off. |
 | **VEL** | Velocity, 0–10V → 1–127. Sets the voice's level and picks the velocity layer. |
-| **INSTR CV** | Select instrument. |
-| **LEVEL CV** | Output VCA. |
+| **INSTR CV** | Select instrument. Polyphonic: each voice takes its instrument from its own channel, so a poly cable plays a different instrument per note. A mono cable selects for every voice. |
+| **LEVEL CV** | VCA. Polyphonic: channel N is the level of voice N, so a poly envelope cable is one VCA per note. A mono cable is one VCA on the output, as before. |
 
 **Outputs:** L / R.
 
@@ -82,3 +82,5 @@ If an instrument defines `seq_length` / `seq_position`, Play rotates through the
 **Velocity-layered drums**: a kit captured with several velocity layers, in One-shot mode, driven from Beat's velocity output.
 
 **Sampled pad with real loops**: capture a slow evolving voice with Record's loop detection on; Play holds the loop for as long as the note sustains.
+
+**Screen shows** (context menu): which polyphonic channel's instrument the screen follows, channel 1 by default. With a polyphonic INSTR cable each voice can be on its own instrument; the list's selection, the grid's key map, the playing marks and the on-screen audition all belong to the chosen channel's instrument. Notes playing on other instruments are counted but not marked on its keys.

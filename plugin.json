@@ -543,6 +543,28 @@
         "Granular",
         "Sampler"
       ]
+    },
+    {
+      "slug": "Canon",
+      "name": "Canon",
+      "description": "Four arpeggiators reading one chord progression, wandering from it the way Fugue does.",
+      "tags": [
+        "Arpeggiator",
+        "Sequencer",
+        "Quantizer"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "Count",
+      "name": "Count",
+      "description": "A narrow clock: six gate outputs, each a rate and a mask over one cycle of steps.",
+      "tags": [
+        "Clock generator",
+        "Clock modulator",
+        "Sequencer"
+      ],
+      "hidden": true
     }
   ]
 }

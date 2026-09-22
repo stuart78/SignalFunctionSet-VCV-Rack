@@ -68,6 +68,19 @@ the listener round the flock with the screenless display being that view.
 The built-in delay is information travelling through the flock at a finite
 speed plus a per-bird disposition (LAG). STARTLE is a hawk.
 
+### Canon (was Round): four arpeggiators reading one progression
+Built hidden 2026-09-19 (first pass, awaiting listening): see `docs/canon-design.md`. Four
+chord sets advanced by a SET gate or picked by CV, four channels each with
+GATE in, PATTERN, WANDER (Fugue's tiers, shared header) and OCTAVE, gate/CV
+pairs out, Fugue's harmonic lock across the channels, LEARN from a poly
+V/OCT. Channels keep their place through a set change.
+
+### Count (was Sieve): a narrow clock, six sieves over one stream of steps
+Built hidden 2026-09-20: see `docs/count-design.md`. BPM and STEPS with CV,
+CLOCK and RESET in, six outputs each with DIV (/64..x64) and MASK (twelve
+positions: none, downbeat, all, odd, even, four Euclidean ratios, early,
+late, burst); rotation and gate length in the menu; a 9 mm strip of screen.
+
 ### Tide (working name): public data as a modulation source
 Banked 2026-09. A player for real-world time series, where the patch's clock
 sets how fast the world goes by: SPAN is real time per bar (a day, a year, a
