@@ -2,6 +2,7 @@
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "membrane.hpp"
+#include "kit-hat.hpp"
 #include "polykit-messages.hpp"
 #include "waveguide.hpp"   // softClip
 #include <cmath>
@@ -21,6 +22,8 @@
 // those is already implied by the knob, so printing the percentage instead is
 // throwing information away. Each of these reads the module and reports the
 // quantity the control actually sets.
+// Is the instrument the knobs are showing a hi-hat? Defined after Kit.
+static bool kitEditIsHat(Module* m);
 struct KitSizeQ : ParamQuantity {
 	std::string getDisplayValueString() override {
 		// The range spans roughly a 6-inch splash to a 22-inch kick.
@@ -36,6 +39,11 @@ struct KitTensionQ : ParamQuantity {
 };
 struct KitDecayQ : ParamQuantity {
 	std::string getDisplayValueString() override {
+		// On a hi-hat DECAY is the clutch: how long any mode may ring.
+		if (kitEditIsHat(module)) {
+			float sec = 0.25f * std::pow(16.f, clamp(getValue(), 0.f, 1.f));
+			return string::f("rings up to %.2f s", sec);
+		}
 		// Depends on SIZE as well, so read it rather than pretending it does not.
 		float sz = 0.45f;
 		if (module) sz = clamp(module->params[0].getValue(), 0.f, 1.f);
@@ -83,6 +91,17 @@ struct KitToneQ : ParamQuantity {
 		return string::f("%s (%.0f%%)", n, v * 100.f);
 	}
 };
+// PEDAL reads as what the foot is doing, in the zones the model spends its
+// travel in: pressed, touching (where the rattle is), apart.
+struct KitPedalQ : ParamQuantity {
+	std::string getDisplayValueString() override {
+		float v = clamp(getValue(), 0.f, 1.f);
+		const char* n = v < 0.05f ? "closed hard" : v < 0.15f ? "closed" : v < 0.40f ? "touching"
+		              : v < 0.70f ? "half open" : v < 0.85f ? "barely touching" : "open";
+		return string::f("%s (%.0f%%)%s", n, v * 100.f,
+		                 kitEditIsHat(module) ? "" : " -- hi-hat only");
+	}
+};
 struct KitBendQ : ParamQuantity {
 	std::string getDisplayValueString() override {
 		return string::f("%.1f semitones at full strike", clamp(getValue(), 0.f, 1.f) * 4.2f);
@@ -102,27 +121,33 @@ struct KitPreset {
 	const char* name;
 	float size, tension, material, air, decay, tone, couple, reso,
 	      excite, muffle, bend, snare, snareTune, strikeY;
+	int   engine;      // 0 the membrane, 1 the two-plate hi-hat (left out = 0)
+	float pedal;       // hi-hat only
 };
 static const KitPreset KIT_PRESETS[] = {
-	{"Tom",          0.510f, 0.50f, 0.00f, 0.00f, 0.581f, 0.50f, 0.40f, 1.12f, 0.75f, 0.00f, 0.71f, 0.00f, 0.52f, 0.46f},
-	{"Floor tom",    0.654f, 0.50f, 0.00f, 0.00f, 0.640f, 0.45f, 0.45f, 1.08f, 0.70f, 0.05f, 0.86f, 0.00f, 0.52f, 0.41f},
-	{"Timpani",      0.699f, 0.50f, 0.00f, 1.00f, 0.773f, 0.35f, 0.30f, 1.00f, 0.30f, 0.00f, 0.43f, 0.00f, 0.52f, 0.74f},
-	{"Kick",         0.856f, 0.50f, 0.00f, 0.00f, 0.352f, 0.90f, 0.55f, 0.85f, 0.85f, 0.55f, 1.00f, 0.00f, 0.52f, 0.29f},
-	{"Snare",        0.282f, 0.50f, 0.00f, 0.00f, 0.370f, 0.80f, 0.50f, 1.30f, 0.90f, 0.00f, 0.57f, 0.80f, 0.22f, 0.52f},
-	{"Brush snare",  0.282f, 0.50f, 0.00f, 0.00f, 0.400f, 0.70f, 0.50f, 1.30f, 0.15f, 0.00f, 0.57f, 0.60f, 0.12f, 0.72f},
-	{"Gong",         0.799f, 0.50f, 1.00f, 0.00f, 0.689f, 0.20f, 0.20f, 1.00f, 0.50f, 0.00f, 0.29f, 0.00f, 0.52f, 0.52f},
-	{"Steel pan",    0.185f, 0.50f, 0.70f, 0.00f, 0.756f, 0.30f, 0.25f, 1.00f, 0.60f, 0.00f, 0.29f, 0.00f, 0.52f, 0.64f},
-	{"Frame drum",   0.441f, 0.50f, 0.00f, 0.20f, 0.523f, 0.60f, 0.25f, 1.00f, 0.45f, 0.20f, 1.00f, 0.00f, 0.52f, 0.82f},
-	{"Tabla",        0.221f, 0.50f, 0.15f, 0.50f, 0.658f, 0.55f, 0.30f, 1.00f, 0.80f, 0.35f, 1.00f, 0.00f, 0.52f, 0.70f},
+	{"Tom",          0.510f, 0.50f, 0.00f, 0.00f, 0.581f, 0.50f, 0.40f, 1.12f, 0.75f, 0.00f, 0.71f, 0.00f, 0.52f, 0.46f, 0, 0.f},
+	{"Floor tom",    0.654f, 0.50f, 0.00f, 0.00f, 0.640f, 0.45f, 0.45f, 1.08f, 0.70f, 0.05f, 0.86f, 0.00f, 0.52f, 0.41f, 0, 0.f},
+	{"Timpani",      0.699f, 0.50f, 0.00f, 1.00f, 0.773f, 0.35f, 0.30f, 1.00f, 0.30f, 0.00f, 0.43f, 0.00f, 0.52f, 0.74f, 0, 0.f},
+	{"Kick",         0.856f, 0.50f, 0.00f, 0.00f, 0.352f, 0.90f, 0.55f, 0.85f, 0.85f, 0.55f, 1.00f, 0.00f, 0.52f, 0.29f, 0, 0.f},
+	{"Snare",        0.282f, 0.50f, 0.00f, 0.00f, 0.370f, 0.80f, 0.50f, 1.30f, 0.90f, 0.00f, 0.57f, 0.80f, 0.22f, 0.52f, 0, 0.f},
+	{"Brush snare",  0.282f, 0.50f, 0.00f, 0.00f, 0.400f, 0.70f, 0.50f, 1.30f, 0.15f, 0.00f, 0.57f, 0.60f, 0.12f, 0.72f, 0, 0.f},
+	{"Gong",         0.799f, 0.50f, 1.00f, 0.00f, 0.689f, 0.20f, 0.20f, 1.00f, 0.50f, 0.00f, 0.29f, 0.00f, 0.52f, 0.52f, 0, 0.f},
+	{"Steel pan",    0.185f, 0.50f, 0.70f, 0.00f, 0.756f, 0.30f, 0.25f, 1.00f, 0.60f, 0.00f, 0.29f, 0.00f, 0.52f, 0.64f, 0, 0.f},
+	{"Frame drum",   0.441f, 0.50f, 0.00f, 0.20f, 0.523f, 0.60f, 0.25f, 1.00f, 0.45f, 0.20f, 1.00f, 0.00f, 0.52f, 0.82f, 0, 0.f},
+	{"Tabla",        0.221f, 0.50f, 0.15f, 0.50f, 0.658f, 0.55f, 0.30f, 1.00f, 0.80f, 0.35f, 1.00f, 0.00f, 0.52f, 0.70f, 0, 0.f},
 	// The four below exist so the default kit is Fill's eight channels (KICK
 	// SNR CHH OHH LOW HIGH CLAP BELL). A hat is a small stiff plate struck hard
 	// near its edge and choked (closed) or let ring (open); a clap is a short
 	// small drum that is nearly all wires; a bell is the steel pan's material
 	// at a bell's size with a long decay and the highs kept.
-	{"Closed hat",   0.120f, 0.60f, 1.00f, 0.00f, 0.120f, 0.25f, 0.20f, 1.00f, 1.00f, 0.55f, 0.00f, 0.00f, 0.52f, 0.72f},
-	{"Open hat",     0.120f, 0.60f, 1.00f, 0.00f, 0.450f, 0.25f, 0.20f, 1.00f, 1.00f, 0.10f, 0.00f, 0.00f, 0.52f, 0.72f},
-	{"Clap",         0.250f, 0.50f, 0.10f, 0.00f, 0.200f, 0.70f, 0.50f, 1.30f, 0.90f, 0.30f, 0.00f, 1.00f, 0.10f, 0.40f},
-	{"Bell",         0.200f, 0.70f, 1.00f, 0.00f, 0.800f, 0.15f, 0.20f, 1.00f, 1.00f, 0.00f, 0.00f, 0.00f, 0.52f, 0.55f},
+	// The hats are the two-plate engine (src/kit-hat.hpp): a 14" pair (SIZE
+	// 0.652), round Q1 exactly -- centred TENSION and TONE, the clutch at 2.5 s
+	// (DECAY 0.83), the hardest stick struck near the edge. Closed and open
+	// differ ONLY in the pedal, as on the instrument.
+	{"Closed hat",   0.652f, 0.50f, 0.00f, 0.00f, 0.830f, 0.50f, 0.00f, 1.00f, 1.00f, 0.00f, 0.00f, 0.00f, 0.52f, 0.876f, 1, 0.00f},
+	{"Open hat",     0.652f, 0.50f, 0.00f, 0.00f, 0.830f, 0.50f, 0.00f, 1.00f, 1.00f, 0.00f, 0.00f, 0.00f, 0.52f, 0.876f, 1, 1.00f},
+	{"Clap",         0.250f, 0.50f, 0.10f, 0.00f, 0.200f, 0.70f, 0.50f, 1.30f, 0.90f, 0.30f, 0.00f, 1.00f, 0.10f, 0.40f, 0, 0.f},
+	{"Bell",         0.200f, 0.70f, 1.00f, 0.00f, 0.800f, 0.15f, 0.20f, 1.00f, 1.00f, 0.00f, 0.00f, 0.00f, 0.52f, 0.55f, 0, 0.f},
 };
 static const int KIT_NPRESET = (int)(sizeof(KIT_PRESETS) / sizeof(KIT_PRESETS[0]));
 // Eight instruments: two poly channels each is the whole of a sixteen-channel
@@ -137,7 +162,8 @@ struct Kit : Module {
 		STRIKEX_PARAM, STRIKEY_PARAM,
 		MUFFLE_PARAM, MUFFLEANG_PARAM,
 		SNARE_PARAM, SNARETHR_PARAM,
-		LEVEL_PARAM, STRIKE_PARAM,
+		LEVEL_PARAM, STRIKE_PARAM,   // STRIKE is retired in place: the head is the button
+		PEDAL_PARAM,                 // appended 2026-09, in HIT's place on the panel
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -170,6 +196,32 @@ struct Kit : Module {
 		// QUIET means "not ringing": the mode bank is skipped entirely, so the
 		// cost of the module tracks how many drums are SOUNDING, not eight.
 		bool  quiet = true;
+		// V/OCT REFERENCE. Off, 0 V is the drum as its knobs tune it, which is
+		// what a kit wants: a kick and a hat on one mono cable stay a kick and a
+		// hat. On, 0 V is C4 (dsp::FREQ_C4) as everywhere else in Rack, SIZE
+		// stops moving the pitch (it keeps the diameter, the decay and the
+		// stereo image) and TENSION is the fine tune, a fifth either way and
+		// exactly C4 at its centre. Only while the instrument's V/OCT is fed: an
+		// unpatched jack reading 0 V would otherwise tune the whole kit to C4.
+		bool  voctC4 = false;
+		// Which engine this instrument is. The membrane is sfs::Drum; the
+		// two-plate hi-hat is sfs::Hat, built only when an instrument first
+		// becomes one (its calibration runs the model for 0.1 s, ~15 ms).
+		enum { HEAD, HAT };
+		int   engine = HEAD;
+		sfs::Hat hat;
+		int   hatSlot[sfs::Hat::MAXM];   // the membrane mode each top-plate mode is drawn as
+		void useHat(float sampleRate) {
+			if (hat.ready && hat.sr == sampleRate) return;
+			hat.init(sampleRate);
+			// a plate mode (m, n) is drawn as the membrane's (m, n + 1), whose
+			// shape the screen already knows; those without one are not drawn
+			for (int k = 0; k < hat.top.n; k++) {
+				hatSlot[k] = -1;
+				for (int j = 0; j < sfs::Drum::NM; j++)
+					if (sfs::MEMBRANE_MODES[j].m == hat.top.mi[k] && sfs::MEMBRANE_MODES[j].n == hat.top.ni[k] + 1) { hatSlot[k] = j; break; }
+			}
+		}
 		// what the screen draws this instrument from
 		float dispR = 0.55f, dispA = 0.f, dispEnergy = 0.f;
 		float dispSize = 0.45f, dispTens = 0.5f, dispAir = 0.f;
@@ -216,7 +268,8 @@ struct Kit : Module {
 		configParam(SNARE_PARAM, 0.f, 1.f, 0.f, "Snare wires", "%", 0.f, 100.f);
 		configParam(SNARETHR_PARAM, 0.f, 1.f, 0.3f, "Wire tightness (loose buzz to tight snap)", "%", 0.f, 100.f);
 		configParam(LEVEL_PARAM, 0.f, 2.f, 1.f, "Level", "x");
-		configButton(STRIKE_PARAM, "Strike");
+		configButton(STRIKE_PARAM, "Strike (retired: click the head)");
+		configParam<KitPedalQ>(PEDAL_PARAM, 0.f, 1.f, 0.f, "Hi-hat pedal");
 
 		configInput(GATE_INPUT, "Trigger (poly: channel N fires instrument N; a mono cable fires instrument 1; PolyKit In to the left gives each instrument its own jack)");
 		configInput(VEL_INPUT, "Velocity (0-10V)");
@@ -238,6 +291,9 @@ struct Kit : Module {
 		configOutput(OUT_OUTPUT, "Poly: instrument N on channels 2N-1 (L) and 2N (R)");
 		configOutput(HEAD_OUTPUT, "Mix L");
 		configOutput(SNARE_OUTPUT, "Mix R");
+		// the hats are built at the rate they will run at
+		if (APP && APP->engine)
+			for (int s = 0; s < KIT_N; s++) inst[s].drum.sr = APP->engine->getSampleRate();
 		loadDefaultKit();
 	}
 
@@ -288,11 +344,57 @@ struct Kit : Module {
 		sfs::Drum& drum = I.drum;
 		float size = pvc(c, SIZE_PARAM, SIZE_INPUT);
 		float tens = pvc(c, TENSION_PARAM, TENSION_INPUT);
+		// ── THE HI-HAT ─────────────────────────────────────────────────────
+		// Two plates, not a membrane (src/kit-hat.hpp). The knobs keep their
+		// meaning where a hat has one: SIZE is the diameter (a plate's modes go
+		// as 1/D^2, 14" is round Q1), TENSION and V/OCT move the pitch, DECAY
+		// is the clutch, TONE the brightness, MUFFLE a hand on the top plate,
+		// the strike point bow or edge. AIR, COUPLE, RESO, BEND and the wires
+		// have no hat meaning and are ignored.
+		if (I.engine == Inst::HAT) {
+			sfs::Hat& H = I.hat;
+			float in = 6.f * std::pow(22.f / 6.f, size);
+			float fs = (14.f / in) * (14.f / in) * std::pow(2.f, (tens - 0.5f) * 1.4f);
+			float vo;
+			if (xin(VOCT_INPUT, c, vo))
+				fs = I.voctC4 ? dsp::FREQ_C4 / sfs::Hat::F2 * std::pow(2.f, (tens - 0.5f) * 1.4f + vo)
+				              : fs * std::pow(2.f, vo);
+			H.fscale  = clamp(fs, 0.25f, 4.f);
+			H.ring    = 0.25f * std::pow(16.f, pvc(c, DECAY_PARAM, DECAY_INPUT));
+			H.radTilt = 1.15f - 0.8f * pvc(c, TONE_PARAM, TONE_INPUT);
+			H.muffle  = pvc(c, MUFFLE_PARAM, MUFFLE_INPUT);
+			H.pedalT  = clamp(I.v[PEDAL_PARAM], 0.f, 1.f);
+			float xcv = 0.f, ycv = 0.f;
+			xin(STRIKEX_INPUT, c, xcv); xin(STRIKEY_INPUT, c, ycv);
+			float x = clamp(I.v[STRIKEX_PARAM] + xcv * 0.2f, -1.f, 1.f);
+			float y = clamp(I.v[STRIKEY_PARAM] + ycv * 0.2f, -1.f, 1.f);
+			float r = std::min(1.f, std::sqrt(x * x + y * y));
+			H.strikeR   = clamp(r * 0.97f, 0.3f, 0.97f);
+			H.strikeAng = std::atan2(y, x);
+			H.outGain   = 4.8e-4f;     // closed peaks ~4.5 V, open ~2 V: a closed hit is nearly all transient
+			H.control(32);
+			drum.f0 = sfs::Hat::F2 * H.fscale;   // for the readout
+			I.dispR = r; I.dispA = H.strikeAng;
+			I.dispSize = size; I.dispTens = tens; I.dispAir = 0.f;
+			I.dispMuffle = H.muffle; I.dispCouple = 0.f; I.dispStiff = 1.f;
+			I.dispExcite = pvc(c, EXCITE_PARAM, EXCITE_INPUT);
+			I.dispWires = 0.f;
+			I.dispEnergy = std::min(1.f, H.level());
+			for (int k = 0; k < sfs::Drum::NM; k++) I.modeVis[k] = 0.f;
+			if (!I.quiet)
+				for (int k = 0; k < H.top.n; k++) {
+					int j = I.hatSlot[k];
+					if (j >= 0) I.modeVis[j] += 0.5f * std::sqrt(H.top.re[k] * H.top.re[k] + H.top.im[k] * H.top.im[k]) / H.top.w[k];
+				}
+			return;
+		}
 		// One pitch, from both. Size spans roughly a 22" kick to a 6" splash
 		// and tension is a fifth either way on top of it.
 		float f0 = 34.f * std::pow(11.f, 1.f - size) * std::pow(2.f, (tens - 0.5f) * 1.4f);
 		float vo;
-		if (xin(VOCT_INPUT, c, vo)) f0 *= std::pow(2.f, vo);
+		if (xin(VOCT_INPUT, c, vo))
+			f0 = I.voctC4 ? dsp::FREQ_C4 * std::pow(2.f, (tens - 0.5f) * 1.4f + vo)
+			              : f0 * std::pow(2.f, vo);
 		drum.f0 = clamp(f0, 12.f, 4000.f);
 		// The one place a drum's ABSOLUTE size matters. Everything about the
 		// modes is scale-invariant -- that is the whole argument for SIZE and
@@ -402,13 +504,17 @@ struct Kit : Module {
 			Inst& I = inst[c];
 			sfs::Drum& drum = I.drum;
 			drum.sr = args.sampleRate;
+			// a hat built at another rate (a patch loaded before the engine
+			// said what its rate is) is rebuilt once, here
+			if (I.engine == Inst::HAT && I.hat.sr != args.sampleRate) I.useHat(args.sampleRate);
 			if (fire[c]) {
 				I.lastVel = vel[c];
 				float hard = pvc(c, EXCITE_PARAM, EXCITE_INPUT);
 				// Velocity is a real approach speed, so everything downstream --
 				// contact time, brightness, how far the pitch bends -- follows
 				// from the collision rather than from a curve drawn over the top.
-				drum.strike(0.4f + vel[c] * 9.f, hard, I.v[WEIGHT_PARAM]);
+				if (I.engine == Inst::HAT) I.hat.strike(0.4f + vel[c] * 9.f, hard, I.v[WEIGHT_PARAM]);
+				else drum.strike(0.4f + vel[c] * 9.f, hard, I.v[WEIGHT_PARAM]);
 				I.uiFlash = 1.f;
 				I.quiet = false;
 				// The mallet has a pre-contact gap and the energy follower is
@@ -422,14 +528,20 @@ struct Kit : Module {
 			float L = 0.f, R = 0.f;
 			if (!I.quiet) {
 				float head[2] = {0.f, 0.f}, snare[2] = {0.f, 0.f};
-				drum.process(head, snare, stereo);
-				if (!stereo) { head[1] = head[0]; snare[1] = snare[0]; }
+				if (I.engine == Inst::HAT) {
+					I.hat.process(head, stereo);
+				} else {
+					drum.process(head, snare, stereo);
+					if (!stereo) { head[1] = head[0]; snare[1] = snare[0]; }
+				}
 				L = sfs::softClip((head[0] + snare[0]) * lvl * 5.f);
 				R = sfs::softClip((head[1] + snare[1]) * lvl * 5.f);
 				if (I.hold > 0) I.hold--;
 				// -88 dB below a full hit, in the follower's own units (it runs
 				// ahead of outGain and the 5 V scaling).
-				else if (drum.energy < 2e-8f) { I.quiet = true; drum.clear(); }
+				else if (I.engine == Inst::HAT ? I.hat.level() < 1e-7f : drum.energy < 2e-8f) {
+					I.quiet = true; drum.clear(); I.hat.clear();
+				}
 			}
 			outputs[OUT_OUTPUT].setVoltage(L, 2 * c);
 			outputs[OUT_OUTPUT].setVoltage(R, 2 * c + 1);
@@ -466,8 +578,22 @@ struct Kit : Module {
 		// Straight up the head: the radius is the tone control, the angle only
 		// matters against the muffle.
 		v[STRIKEX_PARAM] = 0.f;      v[STRIKEY_PARAM] = p.strikeY;
+		v[PEDAL_PARAM] = p.pedal;
+		// the hat is built BEFORE the instrument switches to it, so the audio
+		// thread never sees one half made
+		if (p.engine == Inst::HAT) inst[s].useHat(inst[s].drum.sr);
+		inst[s].engine = p.engine;
 		if (s == edit) pushSlotToParams();
 		inst[s].ctl = 0;                       // re-solve the layout on the next sample
+	}
+	// From the menu: turn an instrument into the other engine without loading
+	// a preset. Its knob values stay; they simply mean what that engine reads.
+	void setEngine(int s, int e) {
+		if (s < 0 || s >= KIT_N || inst[s].engine == e) return;
+		if (e == Inst::HAT) inst[s].useHat(inst[s].drum.sr);
+		inst[s].quiet = true;
+		inst[s].engine = e;
+		inst[s].ctl = 0;
 	}
 	void loadPreset(int i) {
 		if (i < 0 || i >= KIT_NPRESET) return;
@@ -513,6 +639,8 @@ struct Kit : Module {
 			for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(inst[s].drum.micR[c]));
 			for (int c = 0; c < 2; c++) json_array_append_new(mp, json_real(inst[s].drum.micAng[c]));
 			json_object_set_new(o, "mics", mp);
+			json_object_set_new(o, "voctC4", json_boolean(inst[s].voctC4));
+			json_object_set_new(o, "engine", json_integer(inst[s].engine));
 			json_array_append_new(arr, o);
 		}
 		json_object_set_new(r, "inst", arr);
@@ -550,6 +678,13 @@ struct Kit : Module {
 				for (int p = 0; p < PARAMS_LEN && p < (int)json_array_size(vv); p++)
 					inst[s].v[p] = (float)json_real_value(json_array_get(vv, p));
 			readMics(json_object_get(o, "mics"), inst[s].drum);
+			if (json_t* j = json_object_get(o, "voctC4")) inst[s].voctC4 = json_boolean_value(j);
+			// no "engine" = a patch from before the hat: every instrument a membrane,
+			// so it sounds exactly as it did when it was saved
+			int eng = Inst::HEAD;
+			if (json_t* j = json_object_get(o, "engine")) eng = json_integer_value(j) == Inst::HAT ? Inst::HAT : Inst::HEAD;
+			if (eng == Inst::HAT) inst[s].useHat(inst[s].drum.sr);
+			inst[s].engine = eng;
 			inst[s].ctl = 0;
 		}
 		if (json_t* j = json_object_get(r, "edit"))
@@ -565,13 +700,15 @@ struct Kit : Module {
 		for (int c = 0; c < 2; c++) { inst[s].drum.micR[c] = d.micR[c]; inst[s].drum.micAng[c] = d.micAng[c]; }
 	}
 	void onReset() override {
-		for (int s = 0; s < KIT_N; s++) inst[s].drum.clear();
+		for (int s = 0; s < KIT_N; s++) { inst[s].drum.clear(); inst[s].voctC4 = false; }
 		loadDefaultKit();
 	}
 	void onSampleRateChange() override {
 		for (int s = 0; s < KIT_N; s++) {
 			inst[s].drum.sr = APP->engine->getSampleRate();
 			inst[s].drum.clear();
+			if (inst[s].engine == Inst::HAT) inst[s].useHat(inst[s].drum.sr);
+			inst[s].hat.clear();
 		}
 	}
 };
@@ -598,6 +735,11 @@ static Kit* kitPreview() {
 		sfs::previewRun(*pm, (k == KIT_N - 1) ? 0.06f : 0.09f, f);
 	}
 	return pm;
+}
+
+static bool kitEditIsHat(Module* m) {
+	Kit* k = dynamic_cast<Kit*>(m);
+	return k && k->inst[k->edit].engine == Kit::Inst::HAT;
 }
 
 struct KitDisplay : OpaqueWidget {
@@ -909,9 +1051,151 @@ struct KitDisplay : OpaqueWidget {
 		}
 	}
 
+	// ── THE HI-HAT, drawn ─────────────────────────────────────────────────
+	// Two plates on a rod, facing each other rim to rim as a real pair does:
+	// the top one bell up, the bottom one bell down. The gap between them is
+	// the PEDAL, read from the engine's own slewed pedal so the picture moves
+	// with the foot rather than jumping with the knob, and the bottom plate is
+	// TILTED as it is in the model -- so a closed or touching hat visibly meets
+	// on one side first, which is where the rattle comes from. The top plate
+	// carries the mode pattern; the bottom one only warms with the energy,
+	// since it is only ever excited through the rim.
+	// Height of the plate's own profile at radius u (0 centre, 1 rim), up.
+	static float hatProfile(float u, float rad) {
+		const float bellR = 0.28f;
+		float h = 0.10f * rad * (1.f - u);                        // a shallow cone
+		if (u < bellR) h += 0.09f * rad * std::cos(0.5f * (float)M_PI * u / bellR);
+		return h;
+	}
+	float hatGap(float rad) const {
+		float g = module ? S->hat.gapG() : 0.6f;
+		float open = clamp((g + 0.5f) / 3.5f, 0.f, 1.f);
+		return rad * (0.05f + 0.34f * std::sqrt(open));
+	}
+	void drawHat3D(const DrawArgs& args, float cx, float cy, float rad, int RINGS, int SECT) {
+		const int ARCS = 6;
+		RINGS = std::min(RINGS, RMAX); SECT = std::min(SECT, SMAX);
+		const sfs::MembraneShapes& sh = sfs::membraneShapes();
+		float gap = hatGap(rad), tiltB = rad * 0.07f;
+		float sa = module ? S->dispA : 0.f;
+		float heat = module ? clamp(S->dispEnergy * 3.f, 0.f, 1.f) : 0.f;
+		// the top plate's motion, from the same mode shapes the head uses
+		static float ang[sfs::Drum::NM][SMAX + 1];
+		for (int k = 0; k < sfs::Drum::NM; k++) {
+			int mm = sfs::MEMBRANE_MODES[k].m;
+			for (int j = 0; j <= SECT; j++)
+				ang[k][j] = std::cos(mm * (2.f * (float)M_PI * (float)j / SECT - sa));
+		}
+		float z[RMAX + 1][SMAX + 1], zmax = 1e-6f;
+		for (int i = 0; i <= RINGS; i++) {
+			float u = (float)i / RINGS;
+			for (int j = 0; j <= SECT; j++) {
+				float v = 0.f;
+				for (int k = 0; k < sfs::Drum::NM; k++) {
+					float a = module ? S->modeVis[k] : 0.f;
+					if (a < 1e-4f) continue;
+					v += a * sh.at(k, u) * ang[k][j];
+				}
+				z[i][j] = v; zmax = std::max(zmax, std::fabs(v));
+			}
+		}
+		float zs = rad * 0.10f / std::max(zmax, 0.35f);
+		// where each plate's points land. The bottom rim's drop grows away
+		// from the contact side (screen right, the model's angle 0).
+		auto TOP = [&](int i, int j, float& X, float& Y) {
+			float u = (float)i / RINGS, th = 2.f * (float)M_PI * (float)j / SECT;
+			X = cx + std::cos(th) * u * rad;
+			Y = cy + std::sin(th) * u * rad * TILT - hatProfile(u, rad) - z[i][j] * zs;
+		};
+		auto BOT = [&](int i, int j, float& X, float& Y) {
+			float u = (float)i / RINGS, th = 2.f * (float)M_PI * (float)j / SECT;
+			X = cx + std::cos(th) * u * rad;
+			Y = cy + gap + tiltB * (1.f - std::cos(th)) * u
+			  + std::sin(th) * u * rad * TILT + hatProfile(u, rad);
+		};
+		auto col = [&](float amp, float th, float dim) {
+			float hot = clamp(amp, 0.f, 1.f);
+			float far = 0.72f + 0.28f * (0.5f + 0.5f * std::sin(th));
+			return nvgRGBAf(0.92f * hot, 0.59f - 0.19f * hot, 0.87f - 0.69f * hot,
+			                (0.30f + 0.60f * hot) * far * dim);
+		};
+		auto plate = [&](bool top) {
+			// the fill first, so the top plate hides what is behind it
+			nvgBeginPath(args.vg);
+			for (int j = 0; j <= SECT; j++) {
+				float X, Y; if (top) TOP(RINGS, j, X, Y); else BOT(RINGS, j, X, Y);
+				if (j == 0) nvgMoveTo(args.vg, X, Y); else nvgLineTo(args.vg, X, Y);
+			}
+			nvgClosePath(args.vg);
+			nvgFillColor(args.vg, nvgRGBAf(0.10f, 0.10f, 0.20f, 0.92f));
+			nvgFill(args.vg);
+			for (int i = RINGS; i >= 1; i--) {
+				int per = SECT / ARCS;
+				for (int a = 0; a < ARCS; a++) {
+					int j0 = a * per, j1 = j0 + per;
+					float amp = 0.f;
+					if (top) for (int j = j0; j <= j1; j++) amp = std::max(amp, std::fabs(z[i][j]) * zs / (rad * 0.10f));
+					else amp = heat * 0.5f;
+					nvgBeginPath(args.vg);
+					for (int j = j0; j <= j1; j++) {
+						float X, Y; if (top) TOP(i, j, X, Y); else BOT(i, j, X, Y);
+						if (j == j0) nvgMoveTo(args.vg, X, Y); else nvgLineTo(args.vg, X, Y);
+					}
+					float thm = 2.f * (float)M_PI * (float)(j0 + per / 2) / SECT;
+					NVGcolor rim = sfs::SCREEN_LINE;
+					if (!top) rim.a = 0.6f;     // the top plate is the one you read first
+					nvgStrokeColor(args.vg, i == RINGS ? rim : col(amp, thm, top ? 1.f : 0.6f));
+					nvgStrokeWidth(args.vg, (i == RINGS ? 1.5f : 0.8f + amp * 1.4f) * lineScale);
+					nvgStroke(args.vg);
+				}
+			}
+			for (int j = 0; j < SECT; j += 3) {
+				nvgBeginPath(args.vg);
+				for (int i = 0; i <= RINGS; i++) {
+					float X, Y; if (top) TOP(i, j, X, Y); else BOT(i, j, X, Y);
+					if (i == 0) nvgMoveTo(args.vg, X, Y); else nvgLineTo(args.vg, X, Y);
+				}
+				NVGcolor c = col(top ? 0.f : heat * 0.4f, 2.f * (float)M_PI * j / SECT, top ? 0.55f : 0.35f);
+				nvgStrokeColor(args.vg, c);
+				nvgStrokeWidth(args.vg, 0.6f * lineScale);
+				nvgStroke(args.vg);
+			}
+		};
+		auto rod = [&](float y0, float y1, float w) {
+			nvgBeginPath(args.vg);
+			nvgMoveTo(args.vg, cx, y0); nvgLineTo(args.vg, cx, y1);
+			nvgStrokeColor(args.vg, nvgRGBAf(0.42f, 0.42f, 0.55f, 0.9f));
+			nvgStrokeWidth(args.vg, w * lineScale);
+			nvgStroke(args.vg);
+		};
+		nvgLineCap(args.vg, NVG_ROUND);
+		float bellTop = cy - hatProfile(0.f, rad), bellBot = cy + gap + hatProfile(0.f, rad);
+		rod(bellBot, bellBot + rad * 0.30f, 2.2f);           // the stand, below
+		plate(false);
+		rod(bellTop, bellBot, 1.6f);                          // through the gap
+		plate(true);
+		// the clutch clamping the top plate, and the pull rod above it
+		rod(bellTop - rad * 0.22f, bellTop, 1.6f);
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, cx - rad * 0.05f, bellTop - rad * 0.09f, rad * 0.10f, rad * 0.07f);
+		nvgFillColor(args.vg, nvgRGBAf(0.42f, 0.42f, 0.55f, 0.95f));
+		nvgFill(args.vg);
+	}
+	// The object's centre: the top plate's rim plane sits a little above the
+	// middle, so the whole pair (and the rod) is centred in the view.
+	float hatCy(float mid, float rad) const { return mid - hatGap(rad) * 0.5f + rad * 0.04f; }
+
 	void drawLive(const DrawArgs& args) {
 		float cy = mainH() * 0.5f;
 		float rad = headRad(), cx = headCx();
+		if (module && S->engine == Kit::Inst::HAT) {
+			float hr = head3Rad(), hy = hatCy(mainH() * 0.5f, hr);
+			drawHat3D(args, head3Cx(), hy, hr, 12, 36);
+			drawScope(args);
+			drawStrikeMark(args, head3Cx(), hy, hr, true);
+			drawReadout(args, head3Cx());
+			return;
+		}
 		if (module && module->headView == 1) {
 			drawHead3D(args, head3Cx(), head3Cy(), head3Rad(), 12, 36);
 			drawScope(args);
@@ -962,13 +1246,14 @@ struct KitDisplay : OpaqueWidget {
 	// soft; a stick is small and hard. Those are the same two things EXCITER
 	// changes in the sound -- contact area and contact time -- so the icon and
 	// the tone move together instead of the icon being decoration.
-	void drawStrikeMark(const DrawArgs& args, float cx, float cy, float rad) {
+	void drawStrikeMark(const DrawArgs& args, float cx, float cy, float rad, bool hat = false) {
 		if (!module) return;
-		bool three = module->headView == 1;
+		bool three = hat || module->headView == 1;
 		float tilt = three ? TILT : 0.93f;
 		float sr = S->dispR * (three ? 1.f : 0.97f), sa = S->dispA;
 		float sx = cx + std::cos(sa) * sr * rad * (three ? 1.f : 0.93f);
 		float sy = cy + std::sin(sa) * sr * rad * tilt;
+		if (hat) sy -= hatProfile(std::min(1.f, sr), rad);   // on the plate, not the plane
 		float f = clamp(S->uiFlash, 0.f, 1.f);
 		float hard = clamp(S->dispExcite, 0.f, 1.f);
 		float r = mm2px(2.6f - 1.5f * hard) + f * mm2px(1.8f);
@@ -1013,7 +1298,7 @@ struct KitDisplay : OpaqueWidget {
 	// than the mark is drawn, since the mark is small; the cost is a 2.4 mm
 	// patch of head that grabs instead of striking, and only when stereo is on.
 	int micAt(Vec p) const {
-		if (!module || !module->stereo) return -1;
+		if (!module || !module->stereo || cur()->engine == Kit::Inst::HAT) return -1;
 		int best = -1;
 		float bestD = mm2px(2.4f) * mm2px(2.4f);
 		for (int c = 0; c < 2; c++) {
@@ -1040,7 +1325,7 @@ struct KitDisplay : OpaqueWidget {
 	}
 
 	void drawMics(const DrawArgs& args) {
-		if (!module || !module->stereo) return;
+		if (!module || !module->stereo || S->engine == Kit::Inst::HAT) return;
 		float cx, cy, rad, sq;
 		headFrame(cx, cy, rad, sq);
 		float sr = S->dispR, sa = S->dispA;
@@ -1184,8 +1469,17 @@ struct KitDisplay : OpaqueWidget {
 		sfs::screenFont(args.vg, font, sfs::TYPE_SCREEN);
 		nvgFillColor(args.vg, sfs::SCREEN_DIM);
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-		nvgText(args.vg, mm2px(1.4f), mm2px(1.2f),
-		        string::f("%d   %.0f Hz", module->edit + 1, md().f0).c_str(), NULL);
+		// On the C4 reference the pitch is a note, so say which, and how far off.
+		std::string rd = string::f("%d   %.0f Hz", module->edit + 1, md().f0);
+		if (module->inst[module->edit].voctC4 && md().f0 > 0.f) {
+			static const char* NN[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+			float midi = 60.f + 12.f * std::log2(md().f0 / dsp::FREQ_C4);
+			int n = (int)std::lround(midi);
+			int cents = (int)std::lround((midi - n) * 100.f);
+			rd += string::f("  %s%d", NN[((n % 12) + 12) % 12], n / 12 - 1);
+			if (cents) rd += string::f(" %+dc", cents);
+		}
+		nvgText(args.vg, mm2px(1.4f), mm2px(1.2f), rd.c_str(), NULL);
 		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP);
 		float pct = S->dispR * 100.f;
 		nvgText(args.vg, box.size.x - mm2px(1.4f), mm2px(1.2f),
@@ -1207,8 +1501,9 @@ struct KitDisplay : OpaqueWidget {
 		} else {
 			nvgFillColor(args.vg, sfs::SCREEN_PMID);
 			nvgText(args.vg, cx, mainH() - mm2px(1.f),
-			        module->stereo ? "CLICK THE HEAD TO PLAY   DRAG L AND R TO MOVE THE MICS"
-			                       : "CLICK THE HEAD TO PLAY", NULL);
+			        S && S->engine == Kit::Inst::HAT ? "HI-HAT   CLICK TO PLAY   PEDAL SETS THE GAP"
+			        : module->stereo ? "CLICK THE HEAD TO PLAY   DRAG L AND R TO MOVE THE MICS"
+			                         : "CLICK THE HEAD TO PLAY", NULL);
 		}
 	}
 
@@ -1262,7 +1557,11 @@ struct KitDisplay : OpaqueWidget {
 			// centre the OBJECT (rise + disc + shell) in the drum area
 			float cy = y0 + mm2px(0.8f) + drumH * 0.5f - (shell - hgt) * 0.5f;
 			lineScale = 0.45f;
-			drawHead3D(args, cx, cy, rad, 8, 24);
+			if (S && S->engine == Kit::Inst::HAT) {
+				float hr = std::min(radMax, drumH / (0.9f + 2.f * TILT));
+				drawHat3D(args, cx, hatCy(y0 + mm2px(0.8f) + drumH * 0.5f, hr), hr, 8, 24);
+			} else
+				drawHead3D(args, cx, cy, rad, 8, 24);
 			lineScale = 1.f;
 			// the number, top-left of the cell
 			if (font && font->handle >= 0) {
@@ -1371,6 +1670,12 @@ struct KitDisplay : OpaqueWidget {
 					[=]() { m->presetToSlot(tab, KIT_PRESETS[idx]); }));
 			}
 			menu->addChild(new MenuSeparator);
+			menu->addChild(createBoolMenuItem("Hi-hat (two plates, not a membrane)", "",
+				[=]() { return m->inst[tab].engine == Kit::Inst::HAT; },
+				[=](bool b) { m->setEngine(tab, b ? Kit::Inst::HAT : Kit::Inst::HEAD); }));
+			menu->addChild(createBoolMenuItem("V/OCT: 0V = C4 (Rack standard)", "",
+				[=]() { return m->inst[tab].voctC4; },
+				[=](bool b) { m->inst[tab].voctC4 = b; m->inst[tab].ctl = 0; }));
 			menu->addChild(createMenuItem("Reset mic positions", "",
 			                              [=]() { m->resetMics(tab); }));
 			e.consume(this);
@@ -1425,6 +1730,24 @@ struct KitWidget : ModuleWidget {
 		menu->addChild(createMenuItem("Reset mic positions", "",
 		                              [=]() { m->resetMics(m->edit); },
 		                              !m->stereo));
+		// Per instrument, because a kit is usually half pitched and half not:
+		// the toms and the bell on a sequencer's V/OCT, the kick where it is.
+		menu->addChild(createBoolMenuItem(string::f("Instrument %d is a hi-hat (two plates)", m->edit + 1), "",
+			[=]() { return m->inst[m->edit].engine == Kit::Inst::HAT; },
+			[=](bool b) { m->setEngine(m->edit, b ? Kit::Inst::HAT : Kit::Inst::HEAD); }));
+		menu->addChild(createSubmenuItem("V/OCT reference", "", [=](Menu* sub) {
+			sub->addChild(createMenuLabel("0 V is the drum's own pitch, or C4 as in the rest of Rack"));
+			for (int s = 0; s < KIT_N; s++)
+				sub->addChild(createBoolMenuItem(
+					string::f("Instrument %d: 0V = C4", s + 1), "",
+					[=]() { return m->inst[s].voctC4; },
+					[=](bool b) { m->inst[s].voctC4 = b; m->inst[s].ctl = 0; }));
+			sub->addChild(new MenuSeparator);
+			sub->addChild(createMenuItem("All eight: 0V = C4", "",
+				[=]() { for (int s = 0; s < KIT_N; s++) { m->inst[s].voctC4 = true;  m->inst[s].ctl = 0; } }));
+			sub->addChild(createMenuItem("All eight: the drum's own pitch", "",
+				[=]() { for (int s = 0; s < KIT_N; s++) { m->inst[s].voctC4 = false; m->inst[s].ctl = 0; } }));
+		}));
 		menu->addChild(createSubmenuItem(string::f("Load into instrument %d", m->edit + 1), "",
 			[=](Menu* sub) {
 				for (int i = 0; i < KIT_NPRESET; i++) {
@@ -1478,9 +1801,9 @@ struct KitWidget : ModuleWidget {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(KX[i], Y_VOICE)), module, voice[i].p));
 		}
 
-		// HIT stays a BUTTON. It is a momentary strike, not a value, and the
-		// only reason it sits in a row of trimpots is that VCVButton is 6.10mm
-		// against Trimpot's 6.05 -- near enough to hold the grid.
+		// PEDAL sits where HIT was (2026-09). HIT was a second way to do what
+		// clicking the head already does; the hi-hat's pedal is a performed
+		// control and needed a place. It does nothing on a membrane.
 		const K chr[7] = {
 			{Kit::COUPLE_PARAM, "COUPLE"}, {Kit::RESO_PARAM, "RESO"},
 			{Kit::BEND_PARAM, "BEND"},     {Kit::WEIGHT_PARAM, "WEIGHT"},
@@ -1489,8 +1812,7 @@ struct KitWidget : ModuleWidget {
 		for (int i = 0; i < 7; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(KX[i], Y_CHAR)), module, chr[i].p));
 		}
-		addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<GreenLight>>>(
-			mm2px(Vec(KX[7], Y_CHAR)), module, Kit::STRIKE_PARAM, Kit::STRIKE_LIGHT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(KX[7], Y_CHAR)), module, Kit::PEDAL_PARAM));
 
 		struct J { int id; const char* t; };
 		const J cv[8] = {
@@ -1508,7 +1830,7 @@ struct KitWidget : ModuleWidget {
 		// instrument is played with, then its outputs on a plate at the right.
 		// Per-parameter CV belongs above, beside its control. See
 		// docs/conventions/panel-design.md.
-		const J perf[5] = {{Kit::GATE_INPUT, "GATE"}, {Kit::VOCT_INPUT, "V/OCT"},
+		const J perf[5] = {{Kit::GATE_INPUT, "TRIG"}, {Kit::VOCT_INPUT, "V/OCT"},
 		                   {Kit::VEL_INPUT, "VEL"},   {Kit::STRIKEX_INPUT, "X"},
 		                   {Kit::STRIKEY_INPUT, "Y"}};
 		for (int i = 0; i < 5; i++) {

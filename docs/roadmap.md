@@ -81,6 +81,15 @@ CLOCK and RESET in, six outputs each with DIV (/64..x64) and MASK (twelve
 positions: none, downbeat, all, odd, even, four Euclidean ratios, early,
 late, burst); rotation and gate length in the menu; a 9 mm strip of screen.
 
+### Peal: a grid of bells joined by rods
+Built hidden 2026-09-22 (first pass, awaiting listening): see `docs/peal-design.md`. Twenty-five
+modal bells on a 5 by 5 grid (Tonnetz layout by default), rods the player draws
+between neighbours carrying energy with delay, loss and a floor so velocity
+decides reach, ROOT/SCALE masking bells with a felt rather than retuning them,
+a SPEED that is one clock pulse per crossing when clocked, two draggable mics
+for the stereo out, and the sixteen loudest bells on a poly out. Screenless,
+drawn on the faceplate from a foreshortened angle as Wheel and Flock are.
+
 ### Tide (working name): public data as a modulation source
 Banked 2026-09. A player for real-world time series, where the patch's clock
 sets how fast the world goes by: SPAN is real time per bar (a day, a year, a

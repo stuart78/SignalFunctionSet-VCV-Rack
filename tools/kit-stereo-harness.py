@@ -48,7 +48,8 @@ pushP    = grab(r'\tvoid pushSlotToParams\(\) \{.*?\n\t\}', 'pushSlotToParams()'
 presetToSlotS = grab(r'\tvoid presetToSlot\(int s, const KitPreset& p\) \{.*?\n\t\}', 'presetToSlot()')
 loadP    = grab(r'\tvoid loadPreset\(int i\) \{.*?\n\t\}', 'loadPreset()')
 ctlblk   = grab(r'\tvoid control\(int c\) \{.*?\n\t\}', 'control(int c)')
-strikeL  = grab(r'\t\t\t\tdrum\.strike\(0\.4f \+ vel\[c\] \* 9\.f, hard, I\.v\[WEIGHT_PARAM\]\);',
+# 2026-09: the hi-hat engine strikes first, the membrane in the else
+strikeL  = grab(r'\t\t\t\tif \(I\.engine == Inst::HAT\) I\.hat\.strike\([^\n]*\n\t\t\t\telse drum\.strike\(0\.4f \+ vel\[c\] \* 9\.f, hard, I\.v\[WEIGHT_PARAM\]\);',
                 'drum.strike()')
 
 # The display's geometry and its mouse handling, for the `mouse` mode. These are
@@ -91,6 +92,7 @@ H = r'''
 #include <algorithm>
 static float clamp(float v, float lo, float hi){ return v<lo?lo:(v>hi?hi:v); }
 #include "membrane.hpp"
+#include "kit-hat.hpp"
 #include "polykit-messages.hpp"
 
 // ── the Rack shims ──────────────────────────────────────────────────────────
@@ -102,7 +104,7 @@ struct I { bool c = false; float v = 0.f;
            bool isConnected() const { return c; }
            float getVoltage() const { return v; }
            float getPolyVoltage(int) const { return v; } };
-namespace dsp { struct SchmittTrigger { bool process(float, float, float) { return false; } }; }
+namespace dsp { struct SchmittTrigger { bool process(float, float, float) { return false; } }; static const float FREQ_C4 = 261.6256f; }
 __KITN__
 
 __PRESETS__
@@ -233,6 +235,7 @@ int main(int argc, char** argv) {
 		printf("0 = unrelated. mono sum vs mono mode is what a downstream summing\n");
 		printf("mixer does to the tone.\n\n");
 		for (int i = 0; i < KIT_NPRESET; i++) {
+			if (KIT_PRESETS[i].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 			Kit k; k.loadPreset(i);
 			report(KIT_PRESETS[i].name, measure(k, 1.0f, KIT_PRESETS[i].snare > 0.f));
 		}
@@ -260,6 +263,7 @@ int main(int argc, char** argv) {
 		// is the ceiling on how wide the drum can be.
 		printf("energy by angular order m, at the default tap radius\n\n");
 		for (int i = 0; i < KIT_NPRESET; i++) {
+			if (KIT_PRESETS[i].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 			Kit k; k.loadPreset(i);
 			k.inst[0].drum.sr = SR; k.inst[0].drum.clear(); k.control(); k.hit(0.7f);
 			double e[4] = {0,0,0,0};
@@ -289,6 +293,7 @@ int main(int argc, char** argv) {
 			double cs = 0, sm = 0, lv = 0; int n = 0;
 			double e[3] = {0,0,0};
 			for (int p = 0; p < KIT_NPRESET; p++) for (int a = 0; a < 4; a++) {
+				if (KIT_PRESETS[p].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 				Kit k; k.loadPreset(p);
 				float th = (float)a / 4.f * 2.f * (float)M_PI + 0.3f;
 				k.params[Kit::STRIKEX_PARAM].v = 0.55f * std::cos(th);
@@ -303,6 +308,7 @@ int main(int argc, char** argv) {
 			}
 			const sfs::MembraneShapes& sh = sfs::membraneShapes();
 			for (int p = 0; p < KIT_NPRESET; p++) {
+		if (KIT_PRESETS[p].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 				Kit k; k.loadPreset(p);
 				k.inst[0].drum.sr = SR; k.inst[0].drum.clear(); k.control(); k.hit(0.7f);
 				for (int t = 0; t < (int)(0.4f * SR); t++) {
@@ -342,6 +348,7 @@ int main(int argc, char** argv) {
 			if (std::cos(aL) > 0.f || std::cos(aR) < 0.f) continue;   // L left, R right
 			double dl = 0, ds = 0, ss = 0, wl = 0, sm = 0; int n = 0;
 			for (int p = 0; p < KIT_NPRESET; p++) {
+		if (KIT_PRESETS[p].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 				Kit k; k.loadPreset(p);
 				k.inst[0].drum.micAng[0] = aL; k.inst[0].drum.micAng[1] = aR;
 				Stat s = measure(k, 0.6f, false);
@@ -378,6 +385,7 @@ int main(int argc, char** argv) {
 			float hgt = 0.30f + 0.20f * i;
 			double dl = 0, ss = 0, wl = 0, sm = 0; int n = 0;
 			for (int p = 0; p < KIT_NPRESET; p++) {
+		if (KIT_PRESETS[p].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 				Kit k; k.loadPreset(p); k.inst[0].drum.micH = hgt;
 				Stat s = measure(k, 0.6f, false);
 				dl += db(std::sqrt(s.l / s.n), std::sqrt(s.r / s.n));
@@ -466,6 +474,7 @@ int main(int argc, char** argv) {
 		printf("both mics at the strike point: stereo must collapse onto mono\n\n");
 		double worst = 0;
 		for (int i = 0; i < KIT_NPRESET; i++) {
+			if (KIT_PRESETS[i].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 			Kit a; a.loadPreset(i); a.params[Kit::SNARE_PARAM].v = 0.6f;
 			a.inst[0].drum.sr = SR; a.inst[0].drum.clear(); a.control();
 			Kit b = a;

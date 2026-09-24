@@ -115,7 +115,7 @@ competing for the same panel.
 | WIRES | Snare wire amount. |
 | TIGHT | Wire tightness, loose buzz to tight snap. |
 | LEVEL | Output trim. |
-| HIT | A momentary strike. A button, not a value. |
+| PEDAL | The hi-hat's pedal, for an instrument that is a hi-hat (below). Closed hard at the bottom, the plates just touching and rattling through most of the travel, apart at the top. Does nothing on a drum head. (This was HIT, a strike button; click the head on the screen instead.) |
 
 ### Row 3, CV
 
@@ -130,8 +130,8 @@ All inputs are polyphonic, channel N for instrument N.
 
 | Input | Notes |
 |---|---|
-| GATE | Strikes on a rising edge. Channel N fires instrument N; a mono cable fires instrument 1. |
-| V/OCT | 1V/oct. A mono cable pitches all eight. |
+| TRIG | Strikes on a rising edge. Channel N fires instrument N; a mono cable fires instrument 1. |
+| V/OCT | 1V/oct. A mono cable pitches all eight. By default 0V is the drum as its knobs tune it; see *V/OCT reference* below for 0V = C4. |
 | VEL | Velocity, 0–10V. |
 | X, Y | Strike position, ±5V, summed with the STRIKE X/Y parameters. |
 | CV row | One CV per voice control, channel N for instrument N. |
@@ -184,6 +184,15 @@ modes are actually sounding.
   instrument, and the mics are dragged on the head of the selected instrument.
   With it off the mics are not drawn, since they do nothing.
 - **Reset mic positions**: the measured pair, for the selected instrument.
+- **V/OCT reference**, per instrument, off by default. Off, 0V is the drum's
+  own pitch from SIZE and TENSION, so a kick and a hat on one mono cable stay a
+  kick and a hat. On, 0V is C4 (261.63 Hz) as in the rest of Rack: SIZE stops
+  moving the pitch and keeps the diameter, the decay and the stereo image, and
+  TENSION becomes the fine tune, a fifth either way and exactly on the note at
+  its centre. It applies only while that instrument's V/OCT is fed, so an
+  unpatched jack does not pull the kit to C4. The readout names the note. The
+  default kit at 0V, for reference: Kick 48 Hz (about G1), Floor tom 78 Hz,
+  Tom 110 Hz (A2), Snare 190 Hz, Clap 205 Hz, Bell 281 Hz, the hats 309 Hz.
 - **Load into instrument N**: Tom, Floor tom, Timpani, Kick, Snare, Brush snare,
   Gong, Steel pan, Frame drum, Tabla, Closed hat, Open hat, Clap, Bell. The
   first ten are the instruments the engine was measured against while it was
@@ -192,11 +201,34 @@ modes are actually sounding.
 - **Load the default kit into all eight.**
 
 Right-clicking a tab gives the same menu for that tab's instrument: every
-preset, and *Reset mic positions*.
+preset, *V/OCT: 0V = C4* and *Reset mic positions*.
 
-## Known gap: Closed hat, Open hat, Clap, Bell
+## The hi-hat: two plates
 
-These four presets exist so that the default kit lines up with Fill's eight
+Closed hat and Open hat are not membranes. An instrument can be a **hi-hat**
+instead (the Closed hat and Open hat presets make it one, and so does the tab's
+right-click menu or the module menu): two modal plates on a rod that collide
+round a tilted rim, with the dense top of their spectrum above 5 kHz modelled
+as an energy field, because a real plate has thousands of modes there and they
+are heard as noise. The model and how it was arrived at are in
+`docs/kit-hat-design.md`.
+
+The two presets are the same pair of plates, and differ only in PEDAL: closed
+is pressed hard, open is apart. Turn PEDAL on either and it becomes the other,
+through touching and half open, where the plates rattle against each other.
+The screen draws the pair, the gap between them following the pedal.
+
+On a hi-hat the knobs mean: SIZE the diameter (14 inches is the preset),
+TENSION and V/OCT the pitch, DECAY how long the clutch lets it ring, TONE its
+brightness, EXCITER the stick, WEIGHT the stick's weight, MUFFLE a hand on the
+top plate, STRIKE X/Y bow or edge, LEVEL, and PEDAL. AIR, COUPLE, RESO, BEND
+and the wires do nothing to a hat. The mics are fixed, so they are not drawn.
+
+A hi-hat costs about 2% of a core while it rings, and nothing when quiet.
+
+## Known gap: Clap, Bell
+
+These two presets exist so that the default kit lines up with Fill's eight
 channels, and they do not yet sound right. Measured through the real engine
 (`tools/kit-voice-harness.py`), the reasons are not preset settings:
 
@@ -207,6 +239,7 @@ channels, and they do not yet sound right. Measured through the real engine
 - **The output tilt is a membrane's.** The pickup rolls off high partials
   twice over, which is right for a drum and puts every partial of a plate
   15 dB under its fundamental, which is why the bell reads as one tone.
+- (Closed and open hat were in this list; they are now the hi-hat above.)
 - **A clap is not a drum**: it is three or four hits a few milliseconds apart
   through a hand-cavity resonance, and nothing here makes bursts.
 - **The bell cannot get high enough**: the fundamental tops out near 600 Hz,
@@ -215,7 +248,7 @@ channels, and they do not yet sound right. Measured through the real engine
 The plan, not yet built: contact stiffness and output tilt keyed to MATERIAL
 so every membrane stays bit-identical, a shorter decay floor for plates, and
 per-instrument strike count, noise band and octave so a clap and a bell can be
-described at all. Until then, treat those four as placeholders.
+described at all. Until then, treat those two as placeholders.
 
 ## Patch ideas
 

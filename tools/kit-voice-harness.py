@@ -26,6 +26,7 @@ struct Band { float lo, hi; double e; };
 int main(int argc, char** argv) {
 	const int N = 4096;
 	for (int p = 0; p < KIT_NPRESET; p++) {
+		if (KIT_PRESETS[p].engine) continue;   // the hi-hat: tools/kit-hat-check.cpp
 		if (argc > 1) { bool want = false; for (int a = 1; a < argc; a++) if (!std::strcmp(argv[a], KIT_PRESETS[p].name)) want = true; if (!want) continue; }
 		Kit k; k.loadPreset(p); k.stereo = getenv("KV_STEREO") != NULL;
 		if (getenv("KV_SNARE")) k.params[Kit::SNARE_PARAM].v = atof(getenv("KV_SNARE"));

@@ -474,6 +474,8 @@ PLATES = {
     "flock": [(40.64, 114.5, 50.8, 13.0)],
     # each channel's V/OCT + GATE pair at the foot
     "count": [],
+    # the three outputs at the foot
+    "peal": [(87.5, 110.5, 43.5, 13.5)],
     "canon": [],
     "brigade": [(41.0, 103.5, 39.0, 13.0)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -515,6 +517,7 @@ MODULES = {
     "flockin": ("FlockIn", "src/flockin.cpp", "res/flockin.svg", {}),
     "canon":   ("Canon",   "src/canon.cpp",   "res/canon.svg",   {"CN_CH": 4}),
     "count":   ("Count",   "src/count.cpp",   "res/count.svg",   {"CT_N": 6}),
+    "peal":    ("Peal",    "src/peal.cpp",    "res/peal.svg",    {}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
@@ -524,7 +527,7 @@ MODULES = {
 # than a target for it. Splicing generated reticules into these would draw
 # circles straight over the design. Named explicitly on the command line they
 # still run, so the guard is against the bare sweep, not against intent.
-NO_SCREEN_SLAB = {"wheel", "flock"}
+NO_SCREEN_SLAB = {"wheel", "flock", "peal"}
 
 # Panels whose ART is now the specification: the designer has drawn them, their
 # screens and plates are flattened into the export, and regenerating over one
