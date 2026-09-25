@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include <cmath>
 #include <vector>
 #include <deque>
@@ -42,6 +43,8 @@ static inline float wrapPi(float a) {
 
 
 struct Gravity : Module {
+	sfs::Memo mSpeed;                          // the speed knob's pow (fastmath.hpp)
+	float secSin[NUM_SECTORS], secCos[NUM_SECTORS];   // each sector's fixed axis
 	enum ParamId {
 		SPEED_PARAM,
 		CHAOS_PARAM,
@@ -273,6 +276,10 @@ struct Gravity : Module {
 	int trailLength = 90;            // trail ring-buffer length (frames); 0 = off
 
 	Gravity() {
+		for (int i = 0; i < NUM_SECTORS; i++) {
+			float center = (i * 60.f + 30.f) * DEG;
+			secSin[i] = std::sin(center); secCos[i] = std::cos(center);
+		}
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam(SPEED_PARAM, 0.f, 1.f, 0.4f, "Speed", "");
 		configParam(CHAOS_PARAM, 0.f, 1.f, 0.6f, "Chaos", "");
@@ -375,7 +382,7 @@ struct Gravity : Module {
 		if (inputs[SPEED_INPUT].isConnected())
 			speed += inputs[SPEED_INPUT].getVoltage() / 10.f;   // ~1 oct / 10V handled below
 		float speedOct = clamp(speed, -0.5f, 1.5f) * 9.f - 3.f;
-		float speedMult = std::pow(2.f, speedOct);
+		float speedMult = mSpeed(speedOct, [](float o) { return std::pow(2.f, o); });
 		double h = args.sampleTime * speedMult;
 
 		float chaos = params[CHAOS_PARAM].getValue();
@@ -453,10 +460,13 @@ struct Gravity : Module {
 					prevDragTh1 = nt1;
 				}
 			}
-			float b1x = L1 * std::sin((float) th1);
-			float b1y = L1 * std::cos((float) th1);
-			float b2x = b1x + L2 * std::sin((float) th2);
-			float b2y = b1y + L2 * std::cos((float) th2);
+			// Output and display only (the simulation is th1/th2 in double,
+			// untouched): the polynomial sine, 4e-6 of a pendulum length.
+			const float r2pi = 0.15915494f;
+			float b1x = L1 * SFS_SIN2PI((float) th1 * r2pi);
+			float b1y = L1 * SFS_COS2PI((float) th1 * r2pi);
+			float b2x = b1x + L2 * SFS_SIN2PI((float) th2 * r2pi);
+			float b2y = b1y + L2 * SFS_COS2PI((float) th2 * r2pi);
 			dispB1x = b1x; dispB1y = b1y;
 			dispB2x = b2x; dispB2y = b2y;
 			trackedX = b2x; trackedY = b2y;
@@ -531,7 +541,7 @@ struct Gravity : Module {
 				// the panel places the jacks in. +5V means the point is ON the rim
 				// in this sector's direction, 0V the centre, -5V the far rim: the
 				// distance from the edge is (5 - out) in the same units.
-				float proj = (tx * std::sin(center) + ty * std::cos(center)) / REACH;
+				float proj = (tx * secSin[i] + ty * secCos[i]) / REACH;   // fixed axes, see the constructor
 				target = clamp(proj, -1.f, 1.f) * 5.f;
 			}
 			sectorOut[i] += (target - sectorOut[i]) * 0.02f;

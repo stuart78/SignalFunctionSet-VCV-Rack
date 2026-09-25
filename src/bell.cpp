@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "opmorph-messages.hpp"
 #include "bell_voice.h"
 #include <osdialog.h>
@@ -79,6 +80,7 @@ static const struct AlgoOp { uint8_t id, x, y, link, fb; } kAlgo[32][6] = {
 };
 
 struct Bell : Module {
+	sfs::Memo mOutGain;   // OUTPUT LEVEL's pow (fastmath.hpp)
 	enum ParamId {
 		VOICE_PARAM, BANK_PARAM, VOICE_PREV_PARAM, VOICE_NEXT_PARAM,
 		TUNE_PARAM, BRIGHTNESS_PARAM, FEEDBACK_PARAM,
@@ -395,7 +397,7 @@ struct Bell : Module {
 		// Follower gain toward a useful 0-10V range. The audio path now carries the
 		// bulk of the makeup gain (below), so this is modest.
 		const float ENV_GAIN = 2.f;
-		const float outGain = std::pow(10.f, outLevelDb / 20.f);   // user OUTPUT LEVEL trim
+		const float outGain = mOutGain(outLevelDb, [](float db) { return std::pow(10.f, db / 20.f); });   // user OUTPUT LEVEL trim
 		float blkEnv = 0.f;
 		for (int ch = 0; ch < chans; ch++) {
 			float n = engine.sample(ch, blockPos);
@@ -408,7 +410,7 @@ struct Bell : Module {
 			// unity they were far quieter than a ±5V VCV oscillator. Drive into a tanh
 			// so a typical patch reaches ~±5V and hot multi-carrier patches saturate
 			// gracefully toward ±10V (no hard clip). OUTPUT LEVEL trims the drive.
-			float v = 10.f * std::tanh(n * (1.7f * outGain));
+			float v = 10.f * SFS_TANH(n * (1.7f * outGain));   // 2e-4 of full scale (2026-09-25)
 			outputs[AUDIO_OUTPUT].setVoltage(v, ch);
 			// Envelope follower (computed always so the display works unpatched).
 			float rect = std::fabs(v) * ENV_GAIN;

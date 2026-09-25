@@ -36,11 +36,22 @@ stage     = grab(r'enum Stage \{[^}]*\};', 'Stage')
 moddest   = grab(r'enum SgModDest \{.*?SG_MOD_N \};', 'SgModDest')
 consts    = "\n".join(grab(r'static const int %s[^\n]*\n' % c, c) for c in
                       ['SG_MAXP','SG_VOICES','SG_MODSRC','SG_NPRESET'])
-# the level chain, exactly as the engine runs it
-levelchain= between('float lv = pSoft[p] + (pLevel[p] - pSoft[p]) * morph;',
-                    'lv *= envAmt;', 'level chain')
-ratechain = between('float rateOwn = 0.25f * std::pow(16.f, pRate[p]);',
+# the level chain, exactly as the engine runs it. Since 2026-09-25 it is two
+# blocks: the envelope's share every sample, and the rest at control rate, with
+# the product taken at the output -- so it is lifted as two and multiplied.
+envblock  = between('float d = pDepth[p];',
+                    'envAmt = -d * (V.envMax[p] - V.env[p]);\n\t\t\t\t}', 'envelope share')
+lvblock   = between('float lv = pSoft[p] + (pLevel[p] - pSoft[p]) * morph;',
+                    '(1.f - std::max(0.f, -oddEven));   // even', 'level chain')
+levelchain = envblock + '\n' + lvblock + '\n\tlv *= envAmt;'
+log2n     = grab(r'static inline float sgLog2n\(int n\) \{.*?\n\}', 'sgLog2n()')
+# the rate multiplier is memoised in the engine; the formula inside the memo,
+# verbatim, stands in for the array it fills
+ratef     = grab(r'rateOwnP\[p\] = mRateOwn\[p\]\(pRate\[p\], \[\]\(float r\) \{ return (.*?); \}\);', 'rate formula')
+ratef     = re.search(r'return (.*?); \}', ratef).group(1).replace(', r)', ', pRate[p])')
+ratechain = between('float rateOwn = rateOwnP[p];',
                     'float rateDie = rateOwn * (1.f + envRate * (float)p * 0.35f);', 'rate')
+ratechain = ratechain.replace('rateOwnP[p]', '(' + ratef + ')')
 
 gatepass  = between('// \u2500\u2500 gate pass: channels strike voices',
                     'for (int c = nch; c < SG_VOICES; c++) chanVoice[c] = -1;', 'gate pass')
@@ -56,6 +67,8 @@ H = r'''
 #include <cstdlib>
 #include <cstdint>
 #include <algorithm>
+#include "__FASTMATH__"
+%(log2n)s
 static float clamp(float v, float lo, float hi){ return v<lo?lo:(v>hi?hi:v); }
 %(consts)s
 %(moddest)s
@@ -89,6 +102,7 @@ struct Voice {
 	float relFrom[SG_MAXP] = {}; float envMax[SG_MAXP] = {};
 	float mEnv = 0.f; int mStage = 0; float mRelFrom = 0.f;
 	float ampGain = 1.f;
+	int ctl = 0;     // sigma.cpp: the partial-resolve countdown the gate pass resets
 	float lfoPh[3] = {}, rndCur[3] = {}, rndNext[3] = {};
 	uint32_t rng = 1u; float age = 0.f;
 };
@@ -550,9 +564,10 @@ int main(int argc, char** argv) {
 '''
 # the level chain needs V.env[p] renamed to a plain local
 lc = levelchain.replace('V.envMax[p]', 'V_emax_p').replace('V.env[p]', 'V_env_p')
+H = H.replace('__FASTMATH__', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'fastmath.hpp'))
 open(os.path.join(OUT,'h.cpp'),'w').write(H % dict(
     consts=consts, moddest=moddest, paramenum=paramenum, defaultFor=defaultFor,
     initSpec=initSpec, stage=stage, helpers=helpers, loadpre=loadpre, advance=advance, softclip=softclip, vrandfn=vrandfn, gatepass=gatepass,
-    levelchain_body=lc,
+    levelchain_body=lc, log2n=log2n,
     ratechain_body=ratechain.replace('pRate[p]', 'm.pRate[p]')))
 print("generated; extracted %d blocks verbatim" % 9)

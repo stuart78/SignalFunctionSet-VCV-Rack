@@ -18,6 +18,7 @@
 // =============================================================================
 
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -624,6 +625,7 @@ static void traceInto(TapSet& ts, const Geom& g, float sizeM, float absorb,
 
 // ── module ──────────────────────────────────────────────────────────────────
 struct Crystal : Module {
+	float exDecay[3] = {0.f, 0.f, 0.f}, exDk = -1.f, exDt = -1.f;   // exciter partial decays, per knob move
 	// NOTE: Rack serialises params/ports POSITIONALLY. Only ever APPEND here.
 	enum ParamId {
 		SIZE_PARAM, DAMP_PARAM, MATERIAL_PARAM, TAIL_PARAM,
@@ -997,19 +999,24 @@ struct Crystal : Module {
 		static const float RAT[3] = {1.f, 3.932f, 9.538f}, AMP[3] = {1.f, 0.4f, 0.15f}, DEC[3] = {1.f, 0.45f, 0.22f};
 		float ex[CR_NE] = {};
 		float nyq = 0.45f * args.sampleRate;
+		// The exciter's partial decays move only with DECAY and the rate (2026-09-25).
+		if (dk != exDk || args.sampleTime != exDt) {
+			exDk = dk; exDt = args.sampleTime;
+			for (int i = 0; i < 3; i++) exDecay[i] = std::exp(-args.sampleTime / (dk * DEC[i]));
+		}
 		for (int e = 0; e < CR_NE; e++) {
 			bool exAttacking = exAtk[e] > 0.f;
 			if (exAttacking) exAtk[e] -= args.sampleTime;
 			float f0 = exFreq[e];                            // held until this side is struck again
 			for (int i = 0; i < 3; i++) {
 				if (exAttacking) exEnv[e][i] += (1.f - exEnv[e][i]) * std::min(1.f, args.sampleTime / 0.0006f);
-				else exEnv[e][i] *= std::exp(-args.sampleTime / (dk * DEC[i]));
+				else exEnv[e][i] *= exDecay[i];
 				if (exEnv[e][i] <= 1e-5f) continue;
 				float fp = f0 * RAT[i];
 				if (fp >= nyq) continue;                     // would alias — leave it out
 				exPhase[e][i] += fp * args.sampleTime;
 				if (exPhase[e][i] >= 1.f) exPhase[e][i] -= 1.f;
-				ex[e] += AMP[i] * exEnv[e][i] * std::sin(2.f * M_PI * exPhase[e][i]);
+				ex[e] += AMP[i] * exEnv[e][i] * SFS_SIN2PI(exPhase[e][i]);   // was double sin
 			}
 		}
 
@@ -1109,7 +1116,7 @@ struct Crystal : Module {
 				lp = pkDcY[e][k];
 				float g = A0ready ? AF.loopGain[e][k] : 0.5f;
 				loopBuf[e][k][loopWr[e][k]] =
-					clamp(fbDcY[e] * 0.7f + std::tanh(lp * fbAmt * g * 1.15f) * 0.87f, -8.f, 8.f);
+					clamp(fbDcY[e] * 0.7f + SFS_TANH(lp * fbAmt * g * 1.15f) * 0.87f, -8.f, 8.f);   // slope 1 at 0: same decay
 				loopWr[e][k] = (loopWr[e][k] + 1) % CR_LOOPBUF;
 				int li = A0ready ? AF.loopOut[e][k] : (k % CR_NL);
 				float sc = A0ready ? AF.loopScale[e][k] : 0.5f;

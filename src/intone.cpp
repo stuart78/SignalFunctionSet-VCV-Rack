@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include <cmath>
 
 
@@ -30,6 +31,12 @@ struct FOFGrain {
 	float beta = 0.f;       // attack rate (radians per sample)
 	float amplitude = 0.f;
 	float envelope = 1.f;   // current decay envelope value (running e^(-αk))
+	// The per-sample maths, done once or incrementally (2026-09-25; libm was 85%
+	// of Intone): alpha is fixed for a grain's life, so e^(-alpha) is taken at
+	// the trigger, and the carrier and the attack window are phases that step
+	// each sample into the polynomial sine (-108 dB) -- more precise than
+	// sin(omega * k), whose argument loses bits as k grows.
+	float decay = 1.f, ph = 0.f, dph = 0.f, aph = 0.f, daph = 0.f;
 
 	void trigger(float w, float a, float b, float amp) {
 		k = 0;
@@ -38,6 +45,10 @@ struct FOFGrain {
 		beta = b;
 		amplitude = amp;
 		envelope = 1.f;
+		decay = std::exp(-a);
+		ph = aph = 0.f;
+		dph = w * 0.15915494f;        // radians per sample, in cycles
+		daph = b * 0.15915494f;
 		// attackSamples = π/β (when β > 0); cap to reasonable max
 		attackSamples = (b > 0.f) ? (int)(M_PI / b) : 64;
 		if (attackSamples > 2048) attackSamples = 2048;
@@ -49,12 +60,12 @@ struct FOFGrain {
 		if (!active) return 0.f;
 
 		// Sinusoid component
-		float s = std::sin(omega * (float)k);
+		float s = SFS_SIN2PI(ph);
 
 		// Envelope: cosine attack window then exponential decay
 		float env;
 		if (k < attackSamples) {
-			env = 0.5f * (1.f - std::cos(beta * (float)k));
+			env = 0.5f * (1.f - SFS_COS2PI(aph));
 		} else {
 			env = 1.f;
 		}
@@ -63,7 +74,9 @@ struct FOFGrain {
 
 		// Update state
 		k++;
-		envelope *= std::exp(-alpha);
+		ph += dph; ph -= std::floor(ph);
+		aph += daph;
+		envelope *= decay;
 
 		// Deactivate when envelope is very small
 		if (envelope < 1e-5f && k > attackSamples) {
@@ -161,6 +174,7 @@ struct VowelMorphSlider : app::SvgSlider {
 
 
 struct Intone : Module {
+	sfs::Memo mVoct, mOff[NUM_FORMANTS];   // knob- and V/OCT-only pows
 	enum ParamId {
 		F1_FREQ_PARAM, F2_FREQ_PARAM, F3_FREQ_PARAM, F4_FREQ_PARAM, F5_FREQ_PARAM,
 		F1_BW_PARAM,   F2_BW_PARAM,   F3_BW_PARAM,   F4_BW_PARAM,   F5_BW_PARAM,
@@ -283,11 +297,11 @@ struct Intone : Module {
 		float f0;
 		float formantTransposeRatio = 1.f;
 		if (defaultMode) {
-			f0 = dsp::FREQ_C4 * std::pow(2.f, voct);
+			f0 = dsp::FREQ_C4 * mVoct(voct, [](float v) { return std::pow(2.f, v); });
 			f0 = clamp(f0, 8.f, 4000.f);
 		} else {
 			f0 = dsp::FREQ_C4; // not used in audio/trigger modes
-			formantTransposeRatio = std::pow(2.f, voct);
+			formantTransposeRatio = mVoct(voct, [](float v) { return std::pow(2.f, v); });
 		}
 
 		// Compute per-formant parameters
@@ -303,7 +317,7 @@ struct Intone : Module {
 			if (inputs[F1_FREQ_CV + i].isConnected())
 				offset += inputs[F1_FREQ_CV + i].getVoltage() / 5.f;
 			offset = clamp(offset, -1.f, 1.f);
-			float freq = baseFreq * std::pow(2.f, offset) * formantTransposeRatio;
+			float freq = baseFreq * mOff[i](offset, [](float o) { return std::pow(2.f, o); }) * formantTransposeRatio;
 			freq = clamp(freq, 30.f, 8000.f);
 			formantFreqs[i] = freq;
 

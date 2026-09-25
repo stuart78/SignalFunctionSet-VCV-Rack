@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "flock-messages.hpp"
@@ -438,6 +439,8 @@ struct Flock : Module {
 		}
 
 		// ── steering ─────────────────────────────────────────────────────
+		// Fixed time constants: one exp each per tick, not one per bird.
+		const float kStill = std::exp(-dt / 0.4f), kFlash = std::exp(-dt / 0.12f);
 		for (int i = 0; i < nActive; i++) {
 			Bird& b = bird[i];
 			float ax = 0.f, ay = 0.f, az = 0.f;
@@ -538,16 +541,16 @@ struct Flock : Module {
 			float vl = std::sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz);
 			float vm = (flying ? vmax : vmax * 0.6f) * std::sqrt(resp);
 			if (vl > vm) { float s = vm / vl; b.vx *= s; b.vy *= s; b.vz *= s; }
-			if (!flying) { float k = std::exp(-dt / 0.4f); b.vx *= k; b.vy *= k; b.vz *= k; }
+			if (!flying) { float k = kStill; b.vx *= k; b.vy *= k; b.vz *= k; }
 			b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
-			b.flash *= std::exp(-dt / 0.12f);
+			b.flash *= kFlash;
 			// WHAT THIS BIRD HEARS. Its own copy of the roost slews toward the
 			// real one with a time constant of its own: zero for the keenest,
 			// LAG seconds for the most sluggish. At LAG zero the whole flock
 			// takes a new pitch on the same tick.
 			float tau = lagSec * b.disp * b.disp;
 			if (tau < 0.005f) b.heard = roostY;
-			else b.heard += (roostY - b.heard) * (1.f - std::exp(-dt / tau));
+			else b.heard += (roostY - b.heard) * (1.f - SFS_EXP(-dt / tau));   // a slew rate: 1e-4 is nothing
 		}
 
 		// ── the flock as one thing ───────────────────────────────────────
@@ -890,12 +893,13 @@ struct Flock : Module {
 			// middle; at 2:1 it croaked and at 1:1 it screeched, and a flock of
 			// sines is the sound that was asked for. Timbre is left to the
 			// chirp, the envelope and the crowd.
-			float phs = (float)G.ph * 2.f * (float)M_PI;
-			float s = std::sin(phs);
+			// the polynomial sine and cosine (-108 dB): sixty-four calls a
+			// sample were half of Flock (2026-09-25)
+			float s = SFS_SIN2PI((float)G.ph);
 			if (G.h2 > 0.f || G.h3 > 0.f) {
 				// the partials from the fundamental's own sine and cosine, not
 				// two more sine calls: sin 2x = 2 sin x cos x, sin 3x = 3 sin x - 4 sin^3 x
-				float c = std::cos(phs);
+				float c = SFS_COS2PI((float)G.ph);
 				float s2 = 2.f * s * c, s3 = s * (3.f - 4.f * s * s);
 				s = (s + G.h2 * s2 + G.h3 * s3) / (1.f + G.h2 + G.h3);
 			}

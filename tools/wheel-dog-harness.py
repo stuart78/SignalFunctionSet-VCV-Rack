@@ -65,6 +65,7 @@ H = r'''
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include "__FASTMATH__"   // rippleAt() uses the polynomial sine (2026-09)
 extern "C" int atoi(const char*);
 extern "C" double atof(const char*);
 static float clamp(float v, float lo, float hi){ return v<lo?lo:(v>hi?hi:v); }
@@ -87,6 +88,7 @@ struct Rig {
   float speed=1.6f, speedBase=1.6f;
   float impulse=0.f, impulseTgt=0.f;
   float buzzEnv=0.f, clickEnv=0.f, dogHold=0.f, dogFlash=0.f;
+  sfs::Memo mImp, mClick, mDog, mSlot, mSwell; sfs::Memo2 mBuzz;   // wheel.cpp's memoised decays
   float slotFlash[WH_MAXCOUPS]={};
   float dogThresh=0.44f, strokeGain=1.f;
   double rattle=0.0;
@@ -279,6 +281,7 @@ H = H.replace('\t\t\tdogFlash = 1.f;',
               '\t\t\tdogFlash = 1.f;\n\t\t\tif (nfire < 64) fireSlot[nfire++] = coupSlot;\n\t\t\tfires++;')
 if 'fireSlot[nfire++]' not in H: sys.exit("EXTRACT FAILED: no dog-fire site to instrument")
 
+H = H.replace('__FASTMATH__', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'fastmath.hpp'))
 open(os.path.join(OUT, 'h.cpp'), 'w').write(H)
 
 # Build it HERE. The generator used to stop at writing h.cpp, and a compile

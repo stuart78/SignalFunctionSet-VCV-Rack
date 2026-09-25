@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 
 
 struct Gsx : Module {
@@ -36,6 +37,8 @@ struct Gsx : Module {
 		LIGHTS_LEN
 	};
 
+	sfs::Memo mFreq, mVoct;   // knob- and CV-only pows (fastmath.hpp)
+
 	// Grain structure to track individual grain state
 	struct Grain {
 		bool active = false;           // Is this grain currently playing?
@@ -44,6 +47,7 @@ struct Gsx : Module {
 		float frequency = 440.f;       // Grain frequency in Hz
 		float duration = 0.02f;        // Total grain duration in seconds
 		float pan = 0.5f;              // Stereo pan position (0=left, 1=right)
+		float gl = 0.707f, gr = 0.707f; // its equal-power gains, fixed for the grain's life
 
 		void reset() {
 			active = false;
@@ -58,6 +62,7 @@ struct Gsx : Module {
 			frequency = freq;
 			duration = dur;
 			pan = clamp(panPos, 0.f, 1.f);
+			gl = std::sqrt(1.f - pan); gr = std::sqrt(pan);
 		}
 	};
 
@@ -66,7 +71,7 @@ struct Gsx : Module {
 	float hannWindow(float phase) {
 		if (phase < 0.f || phase > 1.f)
 			return 0.f;
-		return 0.5f * (1.f - std::cos(2.f * M_PI * phase));
+		return 0.5f * (1.f - SFS_COS2PI(phase));   // was double cos per grain per sample: -108 dB
 	}
 
 	// Generate waveform sample at given phase with shape morphing
@@ -74,7 +79,7 @@ struct Gsx : Module {
 	// shape: 0-1 (0=sine, 0.33=tri, 0.66=saw, 1=square)
 	float generateGrainWave(float phase, float shape) {
 		// Sine wave
-		float sine = std::sin(phase * 2.f * M_PI);
+		float sine = SFS_SIN2PI(phase);
 
 		// Triangle wave: starts at 0, goes to +1 at 0.25, 0 at 0.5, -1 at 0.75, 0 at 1.0
 		float triangle;
@@ -154,9 +159,9 @@ struct Gsx : Module {
 
 	void process(const ProcessArgs& args) override {
 		// Read parameters with CV inputs
-		float centerFreq = std::pow(2.f, params[PARAMFREQUENCY_PARAM].getValue());
+		float centerFreq = mFreq(params[PARAMFREQUENCY_PARAM].getValue(), [](float v) { return std::pow(2.f, v); });
 		if (inputs[INFREQUENCY_INPUT].isConnected()) {
-			centerFreq *= std::pow(2.f, inputs[INFREQUENCY_INPUT].getVoltage());
+			centerFreq *= mVoct(inputs[INFREQUENCY_INPUT].getVoltage(), [](float v) { return std::pow(2.f, v); });
 		}
 		centerFreq = clamp(centerFreq, 50.f, 2000.f);
 
@@ -312,8 +317,8 @@ struct Gsx : Module {
 				grainSample *= envelope;
 
 				// Apply stereo panning (equal-power)
-				float leftGain = std::sqrt(1.f - grain.pan);
-				float rightGain = std::sqrt(grain.pan);
+				float leftGain = grain.gl;
+				float rightGain = grain.gr;
 
 				leftOut += grainSample * leftGain;
 				rightOut += grainSample * rightGain;

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
 #include "waveguide.hpp"
@@ -45,6 +46,13 @@
 static const int SLIDE_NCH  = 8;
 static const int SLIDE_BUF  = 16384;
 static const int SLIDE_AP   = 4;
+// Per-string coefficients (pitch, damping, loop gain, pickup comb, pan) cost
+// a dozen libm calls per string per sample (first cut on the MetaModule, whose
+// newlib is slow; on desktop since 2026-09-25, where they were half of Slide).
+// At 48k, every 16 samples is still 3 kHz: the bar moves the delay every
+// sample regardless, since dSm eases toward dTarget each sample. Measured with
+// tools/perf/compare.py: the render is the same at 1 and at 16.
+static const int SLIDE_MM_CTRL = 16;
 static const int SLIDE_FRETS = 24;      // how far up the neck the bar travels
 
 struct SlideTuning { const char* name; float semis[SLIDE_NCH]; };
@@ -159,6 +167,11 @@ struct SlideString {
 	float velocity = 1.f;
 	float dTarget = 0.f, dSm = 0.f;
 	float dampC = 0.f;
+	// Loop gain, pickup fraction and pan, kept between control-rate updates
+	// (every SLIDE_MM_CTRL samples).
+	float cG = 0.f, cPu = 0.f, cPanL = 0.f, cPanR = 0.f;
+	bool asleep = false;              // rung out below -80 dB: skipped until picked
+	int hold = 0, snooze = 0;          // bridge-wake hysteresis (samples)
 	float brLp = 0.f;                 // what this string sends to the bridge
 	float pending = -1.f, pendVel = 1.f;
 
@@ -288,6 +301,10 @@ struct Slide : Module {
 	// ── the pickup ────────────────────────────────────────────────────────────
 	sfs::SVF coil, honk;
 	float coilSr = 0.f, coilHz = 0.f;
+	uint32_t mmCtrl = 0;          // control-rate phase
+	float heldBarTarget = 0.f;     // the scale-snapped bar, between control ticks
+	// Coefficients that only move with a knob or the sample rate (fastmath.hpp).
+	sfs::Memo mRate, mVelK, mSlantK, mMotionK, mBrC, mSwellK, mLiveK, mDampHz, mExcHz, mExcC, mWantHz, mDecay;
 	int   pickupType = 0;             // 0 = modern single coil, 1 = horseshoe
 	float coupleBus = 0.f, coupleDcX = 0.f, coupleDcY = 0.f;
 
@@ -570,8 +587,12 @@ struct Slide : Module {
 
 	void process(const ProcessArgs& args) override {
 		const float sr = args.sampleRate;
+		const bool ctrl = (mmCtrl++ % SLIDE_MM_CTRL) == 0;
 
 		// ── the bar ───────────────────────────────────────────────────────────
+		// Resolving the scale bus and snapping to it builds a whole scale; it
+		// happens at control rate and the target is held between.
+		if (ctrl) {
 		curScale = clamp((int)std::round(params[SCALE_PARAM].getValue()
 		                 + inputs[SCALE_CV_INPUT].getVoltage()), 0, sfs::NUM_SCALES) - 1;
 		scale = sfs::busResolve(inputs[SCALE_CV_INPUT], std::max(curScale, 0));
@@ -588,7 +609,9 @@ struct Slide : Module {
 			barTarget = posKnob;      // nothing to offset; the knob IS the position
 		}
 		if (params[AUTO_PARAM].getValue() > 0.5f && autoMovesBar) barTarget += autoBarOff;
-		barTarget = snapBar(barTarget);
+		heldBarTarget = snapBar(barTarget);
+		}   // ctrl
+		float barTarget = heldBarTarget;
 
 		if (playMode == 1 && inputs[VOCT_INPUT].isConnected()) {
 			int nv = std::max(1, inputs[VOCT_INPUT].getChannels());
@@ -744,7 +767,7 @@ struct Slide : Module {
 		// constant speed, so a wide move simply takes longer. Constant time per
 		// interval is what makes a synth portamento sound like a synth.
 		float glide = clamp(params[GLIDE_PARAM].getValue(), 0.f, 1.f);
-		float rate = 400.f * std::pow(0.006f, glide);      // semitones per second
+		float rate = mRate(glide, [](float g) { return 400.f * std::pow(0.006f, g); });      // semitones per second
 		barPrev = barSm;
 		float dBar = barTarget - barSm;
 		// A hand accelerates away and eases into the note. Moving at exactly the
@@ -768,13 +791,13 @@ struct Slide : Module {
 		float ease = std::min(upR * upR * (3.f - 2.f * upR),
 		                      dnR * dnR * (3.f - 2.f * dnR));
 		float want = rate * (0.10f + 0.90f * ease);
-		barVel += (want - barVel) * (1.f - std::exp(-args.sampleTime / 0.018f));
+		barVel += (want - barVel) * mVelK(args.sampleTime, [](float t) { return 1.f - std::exp(-t / 0.018f); });
 		float step = barVel * args.sampleTime;
 		if (std::fabs(dBar) <= step) { barSm = barTarget; barVel = 0.f; moveDist = 0.f; }
 		else barSm += (dBar > 0.f) ? step : -step;
 
 		float slantTarget = paramCV(SLANT_PARAM, SLANT_CV_INPUT, -6.f, 6.f);
-		slantSm += (slantTarget - slantSm) * (1.f - std::exp(-args.sampleTime / 0.02f));
+		slantSm += (slantTarget - slantSm) * mSlantK(args.sampleTime, [](float t) { return 1.f - std::exp(-t / 0.02f); });
 
 		// Rocking the bar: wide, and centred on the note rather than bending up
 		// to it, which is what separates slide vibrato from a fretted one.
@@ -783,15 +806,15 @@ struct Slide : Module {
 		vibDrift = clamp(vibDrift, -0.15f, 0.15f);
 		vibPhase += args.sampleTime * (params[VIBRATE_PARAM].getValue() + vibDrift * 6.f);
 		if (vibPhase >= 1.f) vibPhase -= 1.f;
-		float vib = vibDepth * 0.7f * std::sin(2.f * (float)M_PI * vibPhase);
+		float vib = vibDepth * 0.7f * SFS_SIN2PI(vibPhase);
 
 		// Nobody holds a steel bar perfectly still. A few cents of wander, always
 		// present and a little wider while the bar is travelling, is the
 		// difference between a hand and a control voltage — and it costs nothing.
 		tremPhase  += args.sampleTime * 3.1f;  if (tremPhase  >= 1.f) tremPhase  -= 1.f;
 		tremPhase2 += args.sampleTime * 7.7f;  if (tremPhase2 >= 1.f) tremPhase2 -= 1.f;
-		float trem = (std::sin(2.f * (float)M_PI * tremPhase) * 0.030f
-		            + std::sin(2.f * (float)M_PI * tremPhase2) * 0.014f)
+		float trem = (SFS_SIN2PI(tremPhase) * 0.030f
+		            + SFS_SIN2PI(tremPhase2) * 0.014f)
 		           * (1.f + 1.6f * barMotion);
 		vib += trem;
 
@@ -800,7 +823,7 @@ struct Slide : Module {
 		// bar is on the move, which is worth having on its own.
 		float speed = std::fabs(barSm - barPrev) * sr;    // semitones per second
 		float target = clamp(speed / 16.f, 0.f, 1.f);
-		barMotion += (target - barMotion) * (1.f - std::exp(-args.sampleTime / 0.004f));
+		barMotion += (target - barMotion) * mMotionK(args.sampleTime, [](float t) { return 1.f - std::exp(-t / 0.004f); });
 
 		// ── tone controls ─────────────────────────────────────────────────────
 		float dampAmt = paramCV(DAMP_PARAM, DAMP_CV_INPUT, 0.f, 1.f);
@@ -810,7 +833,7 @@ struct Slide : Module {
 		float drive   = clamp(params[DRIVE_PARAM].getValue(), 0.f, 1.f);
 		float decaySec = params[DECAY_PARAM].getValue();
 		if (inputs[DECAY_CV_INPUT].isConnected())
-			decaySec *= std::pow(2.f, inputs[DECAY_CV_INPUT].getVoltage() / 5.f);
+			decaySec *= mDecay(inputs[DECAY_CV_INPUT].getVoltage(), [](float v) { return std::pow(2.f, v / 5.f); });
 		decaySec = clamp(decaySec, 0.05f, 40.f);
 
 		// Ported from Loom, where it is measured and stable: a string gives up the
@@ -819,22 +842,22 @@ struct Slide : Module {
 		// growing and only the sustain suffers. Slide had NO coupling at all,
 		// which is why it had no halo.
 		float coupAmt = clamp(params[COUPLE_PARAM].getValue(), 0.f, 1.f);
-		float brC = clamp(1.f - std::exp(-2.f * (float)M_PI * 1200.f / sr), 0.01f, 1.f);
+		float brC = mBrC(sr, [](float r) { return clamp(1.f - std::exp(-2.f * (float)M_PI * 1200.f / r), 0.01f, 1.f); });
 		float couplePrev = coupleBus;
 		float motion = 0.f;
 		float swellAmt = clamp(params[SWELL_PARAM].getValue(), 0.f, 1.f);
-		float swellRate = 1.f - std::exp(-args.sampleTime / (0.035f + 0.42f * swellAmt));
+		float swellRate = mSwellK(swellAmt + 1000.f * args.sampleTime, [&](float) { return 1.f - std::exp(-args.sampleTime / (0.035f + 0.42f * swellAmt)); });
 
 		float blockAmt = clamp(params[BLOCK_PARAM].getValue(), 0.f, 1.f);
-		float liveDecay = std::exp(-args.sampleTime / 2.5f);
-		float dampHz = 500.f * std::pow(12000.f / 500.f, dampAmt);
-		float excHz = 900.f * std::pow(11000.f / 900.f, pickHard);
-		float excC = clamp(1.f - std::exp(-2.f * (float)M_PI * excHz / sr), 0.01f, 1.f);
+		float liveDecay = mLiveK(args.sampleTime, [](float t) { return std::exp(-t / 2.5f); });
+		float dampHz = mDampHz(dampAmt, [](float a) { return 500.f * std::pow(12000.f / 500.f, a); });
+		float excHz = mExcHz(pickHard, [](float a) { return 900.f * std::pow(11000.f / 900.f, a); });
+		float excC = mExcC(excHz / sr, [](float f) { return clamp(1.f - std::exp(-2.f * (float)M_PI * f), 0.01f, 1.f); });
 
 		// A magnetic pickup is a resonant lowpass: the coil's inductance against
 		// the cable capacitance puts a peak a couple of kHz up, and that peak is
 		// most of what a pickup sounds like.
-		float wantHz = 1600.f * std::pow(6200.f / 1600.f, tone);
+		float wantHz = mWantHz(tone, [](float t) { return 1600.f * std::pow(6200.f / 1600.f, t); });
 		if (coilSr != sr || std::fabs(wantHz - coilHz) > 1.f) {
 			coil.set(wantHz, 1.4f, sr);
 			// A horseshoe's character is not a brighter peak, it is a broad
@@ -900,6 +923,8 @@ struct Slide : Module {
 		// Slide X's gates address STRINGS, one jack each -- unlike the poly GATE
 		// above, where channel N is the Nth note and which string it lands on is
 		// the solver's business. A jack labelled "3" has to play string 3.
+		// MetaModule has no expander bus, so SLIDE XP is not ported there and
+		// Slide is played entirely from its own poly GATE.
 		if (rightExpander.module && rightExpander.module->model == modelSlideX) {
 			auto* xg = (SlideXMessage*) rightExpander.module->leftExpander.consumerMessage;
 			if (xg && xg->active)
@@ -946,6 +971,43 @@ struct Slide : Module {
 
 			float stop = barFor(i) + vib;
 			shownBar[i] = stop;
+			float b = 0.10f * 0.42f;               // a steel string has some stiffness
+			float apC = -b;
+			// A blocked string still sounds when picked — it just stops ringing
+			// almost at once, which is what a palm on the strings does.
+			s.live *= liveDecay;
+			// A string that has rung out to -80 dB is skipped outright: most of a
+			// patch's strings are silent most of the time, and running eight
+			// waveguides to produce zeros was the whole of Slide's idle load.
+			//
+			// A pick wakes it. So does the bridge, but on probation: the bridge
+			// carries every ringing string, so waking on any energy there kept
+			// all eight awake whenever one rang (measured: 70% of the device
+			// for one plucked note). A string woken by the bridge gets 85 ms to
+			// ring past -80 dB -- a string tuned to resonate does, easily -- and
+			// otherwise goes back to sleep and ignores the bridge for 340 ms.
+			bool excited = s.burst > 0.f || s.pending >= 0.f;
+			if (s.snooze > 0) s.snooze--;
+			if (excited) { s.hold = 0; s.snooze = 0; }
+			else if (s.amp < 1e-4f) {
+				bool busDrive = coupAmt > 0.f && s.snooze == 0
+				    && std::fabs(couplePrev) * coupAmt * coupAmt * 0.06f > 1e-5f;
+				bool sleepNow = false;
+				if (s.asleep) {
+					if (busDrive) s.hold = 4096;
+					else sleepNow = true;
+				} else if (s.hold > 0) s.hold--;
+				else { sleepNow = true; s.snooze = 16384; }
+				if (sleepNow) {
+					s.asleep = true;
+					s.out = 0.f;
+					if (xmsg) xmsg->string[i] = 0.f;
+					continue;
+				}
+			}
+			bool wake = s.asleep;
+			s.asleep = false;
+			if (ctrl || wake) {
 			float semis = basePitch * 12.f + tune[i] + stop;
 			float freq = clamp(dsp::FREQ_C4 * std::pow(2.f, semis / 12.f),
 			                   20.f, std::min(8000.f, sr * 0.24f));
@@ -957,8 +1019,6 @@ struct Slide : Module {
 			float dHz = std::max(dampHz, freq * 10.f) * (1.f - 0.25f * clamp(stop / 12.f, 0.f, 1.f));
 			s.dampC = clamp(1.f - std::exp(-2.f * (float)M_PI * dHz / sr), 0.02f, 0.999f);
 
-			float b = 0.10f * 0.42f;               // a steel string has some stiffness
-			float apC = -b;
 			float w = 2.f * (float)M_PI * freq / sr;
 			s.dTarget = clamp(sr / freq
 			                  - SLIDE_AP * sfs::allpassDelay(apC, w)
@@ -968,13 +1028,6 @@ struct Slide : Module {
 			// a string whose speaking length is physically changing while it
 			// rings is exactly what a slide IS, and a waveguide gives it for
 			// free — the energy already circulating carries through the move.
-			if (s.dSm <= 0.f) s.dSm = s.dTarget;
-			s.dSm += (s.dTarget - s.dSm) * 0.25f;
-			float d = s.dSm;
-
-			// A blocked string still sounds when picked — it just stops ringing
-			// almost at once, which is what a palm on the strings does.
-			s.live *= liveDecay;
 			float openness = 1.f - blockAmt * (1.f - s.live);
 			float t60 = std::max(decaySec * (0.03f + 0.97f * openness), 0.02f);
 			// g is what the WHOLE LOOP must have, so divide out what the loop
@@ -987,7 +1040,16 @@ struct Slide : Module {
 			float hdc = std::sqrt(std::max(0.f, (2.f - 2.f * cw))
 			                    / std::max(1e-9f, 1.f - 2.f * 0.99985f * cw + 0.99985f * 0.99985f));
 			float parasitic = clamp(hlp * hdc, 0.5f, 1.f);
-			float g = std::min(std::exp(-6.907755f / (freq * t60)) / parasitic, 0.99995f);
+			s.cG = std::min(std::exp(-6.907755f / (freq * t60)) / parasitic, 0.99995f);
+			s.cPu = clamp(pickupPos * std::pow(2.f, stop / 12.f), 0.02f, 0.48f);
+			float p = ((float)i / (float)(SLIDE_NCH - 1) * 2.f - 1.f) * stereoWidth;
+			float th = (p + 1.f) * (float)M_PI_4;
+			s.cPanL = std::cos(th); s.cPanR = std::sin(th);
+			}   // ctrl
+			float g = s.cG;
+			if (s.dSm <= 0.f) s.dSm = s.dTarget;
+			s.dSm += (s.dTarget - s.dSm) * 0.25f;
+			float d = s.dSm;
 
 			// Cubic, because this delay is MOVING — see waveguide.hpp.
 			float v = s.dl.tapCubic(d);
@@ -996,14 +1058,14 @@ struct Slide : Module {
 			// speaking length changes, so its position as a FRACTION of the
 			// string grows as the bar goes up — and the comb notch walks down
 			// the harmonic series with it. This is the up-the-neck tone change.
-			float puFrac = clamp(pickupPos * std::pow(2.f, stop / 12.f), 0.02f, 0.48f);
+			float puFrac = s.cPu;
 			float combD = std::min(d * (1.f + puFrac), (float)SLIDE_BUF - 4.f);
 			s.out = v - s.dl.tapCubic(combD);
 
 			float exc = 0.f;
 			if (s.burst > 0.f) {
 				float t = 1.f - s.burst / s.burstLen;
-				float win = 0.5f - 0.5f * std::cos(2.f * (float)M_PI * t);
+				float win = 0.5f - 0.5f * SFS_COS2PI(t);
 				s.excLp += excC * (win * (2.f * random::uniform() - 1.f) - s.excLp);
 				exc = s.excLp * s.burstAmp;
 				s.burst -= 1.f;
@@ -1030,10 +1092,8 @@ struct Slide : Module {
 			s.out *= s.swell;
 
 			bus += s.out;
-			float p = ((float)i / (float)(SLIDE_NCH - 1) * 2.f - 1.f) * stereoWidth;
-			float th = (p + 1.f) * (float)M_PI_4;
-			mixL += s.out * std::cos(th);
-			mixR += s.out * std::sin(th);
+			mixL += s.out * s.cPanL;
+			mixR += s.out * s.cPanR;
 			if (xmsg) xmsg->string[i] = sfs::softClip(s.out * 10.f);
 			// String 1 is index 0, so the ODD strings are the even indices.
 			(i % 2 ? sumEven : sumOdd) += s.out;
@@ -1078,8 +1138,9 @@ struct Slide : Module {
 		}
 
 		float dr = 1.f + drive * 8.f;
-		yL = std::tanh(yL * dr) / std::sqrt(dr);
-		yR = std::tanh(yR * dr) / std::sqrt(dr);
+		float drN = 1.f / std::sqrt(dr);
+		yL = SFS_TANH(yL * dr) * drN;
+		yR = SFS_TANH(yR * dr) * drN;
 
 		if (xmsg) rightExpander.requestMessageFlip();
 		outputs[EVEN_OUTPUT].setVoltage(sfs::softClip(sumEven * 10.f));

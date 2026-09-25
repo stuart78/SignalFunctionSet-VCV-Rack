@@ -24,6 +24,7 @@
 // =============================================================================
 
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "panel-style.hpp"
@@ -41,6 +42,10 @@ static const float PART_AMP[CHIME_NPART]   = {1.f, 0.40f, 0.15f};
 static const float PART_DECAY[CHIME_NPART] = {1.f, 0.45f, 0.22f};   // × DECAY knob
 
 struct Chime : Module {
+	// Values that move only with a knob, computed when they do (fastmath.hpp).
+	float partDecay[16] = {0.f}, pdDecay = -1.f, pdDt = -1.f;
+	float panL[16] = {0.f}, panR[16] = {0.f};
+	sfs::Memo mShape, mVoct[16];
 	// NOTE: Rack serialises params/ports POSITIONALLY. Only ever APPEND to these
 	// enums — inserting in the middle silently shifts every later value (and every
 	// cable) in already-saved patches.
@@ -107,6 +112,11 @@ struct Chime : Module {
 	float clkSince = 1e6f;                 // seconds since last edge
 
 	Chime() {
+		// The equal-power pan of each fixed channel, exactly as the mix computed it.
+		for (int c = 0; c < CHIME_NCH; c++) {
+			float pan = (CHIME_NCH > 1) ? (float)c / (CHIME_NCH - 1) : 0.5f;   // 0..1 L to R
+			panL[c] = std::cos(pan * M_PI_2); panR[c] = std::sin(pan * M_PI_2);
+		}
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam(RATE_PARAM, std::log2(0.02f), std::log2(2.f), std::log2(0.15f), "Rotation rate", " Hz", 2.f);
 		configParam(SPREAD_PARAM, 0.f, 1.f, 0.35f, "Rate spread (Ripple: coupling)", "%", 0.f, 100.f);
@@ -206,7 +216,7 @@ struct Chime : Module {
 
 		float exciteX = clamp(params[EXCITE_PARAM].getValue() + inputs[EXCITE_INPUT].getVoltage() / 10.f, 0.f, 1.f);   // 0 bow → 1 strike
 		float shapeC = clamp(params[SHAPE_PARAM].getValue() + inputs[SHAPE_INPUT].getVoltage() / 5.f, -1.f, 1.f);
-		float shapeP = std::exp2(shapeC * 2.f);                           // 0.25 exp ‥ 1 linear ‥ 4 log
+		float shapeP = mShape(shapeC, [](float s) { return std::exp2(s * 2.f); });   // 0.25 exp ‥ 1 linear ‥ 4 log
 		float decayK = clamp(params[DECAY_PARAM].getValue() + inputs[DECAY_INPUT].getVoltage(), 0.3f, 8.f);
 
 		// clock measurement
@@ -263,6 +273,14 @@ struct Chime : Module {
 		// declick time constants
 		const float kWin  = std::min(1.f, args.sampleTime / 0.004f);   // window smoother
 		const float kAtk  = std::min(1.f, args.sampleTime / 0.0008f);  // strike attack rise
+		// Per-partial decay factors: one exp per partial per sample was 8 x
+		// CHIME_NPART exps for eight identical answers. They move only with
+		// DECAY and the sample rate (2026-09-25; libm was 67% of Chime).
+		if (decayK != pdDecay || args.sampleTime != pdDt) {
+			pdDecay = decayK; pdDt = args.sampleTime;
+			for (int p = 0; p < CHIME_NPART; p++)
+				partDecay[p] = std::exp(-args.sampleTime / (decayK * PART_DECAY[p] * 0.25f));
+		}
 
 		float mixL = 0.f, mixR = 0.f;
 		for (int c = 0; c < CHIME_NCH; c++) {
@@ -278,7 +296,7 @@ struct Chime : Module {
 			// dwells at the extremes and whips through center (short bright blooms).
 			// Positive = logarithmic: it lingers near center (long swells, brief gaps).
 			if (shapeP != 1.f) {
-				float a = std::pow(std::fabs(t), shapeP);
+				float a = SFS_POWABS(t, shapeP);   // a shape: 1e-4 is invisible
 				t = (t < 0.f) ? -a : a;
 			}
 			t *= att;                                                // shape first, then shrink the arc
@@ -324,9 +342,9 @@ struct Chime : Module {
 				partPhase[c][p] += freqSm[c] * PART_RATIO[p] * args.sampleTime;
 				if (partPhase[c][p] >= 1.f) partPhase[c][p] -= 1.f;
 				if (attacking) partEnv[c][p] += (1.f - partEnv[c][p]) * kAtk;   // continuous retrigger
-				else partEnv[c][p] *= std::exp(-args.sampleTime / (decayK * PART_DECAY[p] * 0.25f));
+				else partEnv[c][p] *= partDecay[p];
 				float env = (1.f - exciteX) + exciteX * partEnv[c][p];          // bow bed → struck ring
-				v += PART_AMP[p] * env * std::sin(2.f * M_PI * partPhase[c][p]);
+				v += PART_AMP[p] * env * SFS_SIN2PI(partPhase[c][p]);   // was double sin: -108 dB
 			}
 			v *= winSm[c];                                           // the rotating tube's coupling
 			v *= (1.f - exciteX) * wgt + exciteX;                    // bow end: weight = level
@@ -341,13 +359,12 @@ struct Chime : Module {
 			dispLevel[c] += (clamp(lvl, 0.f, 1.f) - dispLevel[c]) * kWin;
 
 			// poly CV/gate: Chime as a generative sequencer
-			outputs[VOCT_OUTPUT].setVoltage(std::log2(std::max(freqSm[c], 8.f) / 261.63f), c);
+			outputs[VOCT_OUTPUT].setVoltage(mVoct[c](freqSm[c], [](float f) { return std::log2(std::max(f, 8.f) / 261.63f); }), c);
 			bool gate = winSm[c] > 0.2f && wgt > 0.001f && (exciteX < 0.5f || lastStruck[c]);
 			outputs[GATE_OUTPUT].setVoltage(gate ? 10.f : 0.f, c);
 
-			float pan = (CHIME_NCH > 1) ? (float)c / (CHIME_NCH - 1) : 0.5f;   // 0..1 L→R
-			mixL += out * std::cos(pan * M_PI_2);
-			mixR += out * std::sin(pan * M_PI_2);
+			mixL += out * panL[c];                                   // fixed per channel, see the constructor
+			mixR += out * panR[c];
 		}
 		outputs[VOCT_OUTPUT].setChannels(CHIME_NCH);
 		outputs[GATE_OUTPUT].setChannels(CHIME_NCH);

@@ -1,4 +1,6 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
+#include <cstdlib>
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include <algorithm>
@@ -48,6 +50,12 @@
 // is 1024 oscillators, which the benchmark puts near 5% of one core -- so the
 // ceiling is editability and Nyquist, not CPU.
 static const int SG_MAXP   = 64;
+// A partial's level, pitch and pan are resolved every 16 samples (3 kHz) and
+// held (MetaModule first; desktop since 2026-09-25, render-checked); its envelope, phase and sine still run every sample. The resolve is
+// most of an additive voice's cost: three LFOs, the tilt law, the filter's
+// response at the partial and an equal-power pan, for each of up to 64
+// partials -- which put one voice at 60% of the device.
+static const int SG_MM_CTRL = 16;
 static const int SG_VOICES = 16;
 static const int SG_NCOUNT = 3;
 static const int SG_COUNTS[SG_NCOUNT] = {16, 32, 64};
@@ -64,6 +72,14 @@ static void prInitTable() {
 		sgSinTbl[i] = std::sin(2.0 * M_PI * (double)i / (double)SG_TBL);
 	prTblReady = true;
 }
+// log2(n) for partial numbers, for the TILT law n^(-2.5 tilt) = 2^(-2.5 tilt log2 n).
+static inline float sgLog2n(int n) {
+	static float t[257];
+	static bool built = false;
+	if (!built) { for (int i = 1; i <= 256; i++) t[i] = std::log2((float)i); t[0] = 0.f; built = true; }
+	return t[n & 255];
+}
+
 static inline float sgSin(float ph) {              // ph in [0,1)
 	float f = ph * SG_TBL;
 	int k = (int)f;
@@ -123,8 +139,12 @@ struct SgTimeQuantity : ParamQuantity {
 		return ms < 10.f ? string::f("%.1f ms", ms) : string::f("%.0f ms", ms);
 	}
 	void setDisplayValueString(std::string t) override {
-		float ms = 0.f;
-		if (std::sscanf(t.c_str(), "%f", &ms) != 1) return;
+		// strtof rather than sscanf (the MetaModule libc has no locale table
+		// behind scanf; the same on desktop so the two files stay one).
+		const char* cs = t.c_str();
+		char* end = nullptr;
+		float ms = std::strtof(cs, &end);
+		if (end == cs) return;
 		float sec = clamp(ms * 0.001f, lo, hi);
 		setValue(std::log(sec / lo) / std::log(hi / lo));
 	}
@@ -170,6 +190,7 @@ struct Sigma : Module {
 	float pPan[SG_MAXP]    = {};   // -1..1
 	float pDepth[SG_MAXP]  = {};   // how much envelope this partial takes
 	float pRate[SG_MAXP]   = {};   // 0..1 -> 0.25x .. 4x
+	sfs::Memo mRateOwn[SG_MAXP];      // fastmath.hpp
 
 	// ── voices ──────────────────────────────────────────────────────────────
 	enum Stage { ST_IDLE, ST_ATT, ST_DEC, ST_SUS, ST_REL };
@@ -187,6 +208,11 @@ struct Sigma : Module {
 		// end of a note and also 1 before it has started, and the second of
 		// those is not a bloom, it is a blast.
 		float envMax[SG_MAXP] = {};
+		// Control-rate partial state (every SG_MM_CTRL samples): level before
+		// the envelope, phase increment, pan gains.
+		float cLv[SG_MAXP] = {}, cInc[SG_MAXP] = {}, cPL[SG_MAXP] = {}, cPR[SG_MAXP] = {};
+		bool  cOver[SG_MAXP] = {};
+		int   ctl = 0;
 		float mEnv = 0.f; int mStage = ST_IDLE; float mRelFrom = 0.f;
 		float ampGain = 1.f;      // velocity -> level, latched at note-on
 		// The LFOs run PER VOICE. A periodic vibrato locks every voice together
@@ -1195,6 +1221,7 @@ struct Sigma : Module {
 				chanVoice[c] = v = pick;
 				Voice& V = voice[v];
 				V.on = true;
+				V.ctl = 0;                // resolve the partials on the first sample
 				// LATCHED AT NOTE-ON, both of them. Reading V/OCT every sample
 				// meant a voice that had been released still tracked the input,
 				// so a mono sequencer moving to the next note dragged the tone
@@ -1254,14 +1281,21 @@ struct Sigma : Module {
 		}
 		for (int c = nch; c < SG_VOICES; c++) chanVoice[c] = -1;
 
+		bool envRouted = false;
+		for (int t = 0; t < SG_MOD_N; t++) envRouted = envRouted || mod[3][t] != 0.f;
+
 		// ── synthesis pass: EVERY voice, not just the patched channels ──────
 		// A released voice is still sounding, so the loop that renders them
 		// cannot be bounded by the cable's channel count.
+		// Each partial's own envelope rate is a knob, not a voice property.
+		float rateOwnP[SG_MAXP];
+		for (int p = 0; p < nPartials; p++)
+			rateOwnP[p] = mRateOwn[p](pRate[p], [](float r) { return 0.25f * std::pow(16.f, r); });
 		for (int c = 0; c < SG_VOICES; c++) {
 			Voice& V = voice[c];
 			if (V.mStage == ST_IDLE && !V.on) continue;
 
-			float f0 = 261.6256f * std::pow(2.f, V.pitch);
+			float f0 = 261.6256f * SFS_EXP2(V.pitch);
 			// MORPH is the CENTRE of the timbre range; MORPH SENS is how much
 			// of it velocity commands. At sens 0.5 with morph at zero this is
 			// exactly the old `vel + morphK`.
@@ -1311,7 +1345,7 @@ struct Sigma : Module {
 			float B = stretch * stretch * 0.02f;
 			// Cutoff runs 30Hz to well past Nyquist so the top of the knob is
 			// genuinely open rather than "nearly open".
-			float fc = 30.f * std::pow(2.f, clamp(cutK, 0.f, 1.f) * 10.f + cutM * 4.f);
+			float fc = 30.f * SFS_EXP2(clamp(cutK, 0.f, 1.f) * 10.f + cutM * 4.f);
 			float Q  = 0.5f + reso * 8.f;
 
 			// the master envelope: unscaled, drives the VCA and frees the voice
@@ -1319,19 +1353,40 @@ struct Sigma : Module {
 			if (V.mStage == ST_IDLE) { V.mEnv = 0.f; continue; }
 
 			float vL = 0.f, vR = 0.f;
+			// EXCEPT while the envelope is routed in the matrix and moving: a
+			// 2 ms attack sweeping a resonant cutoff three octaves (Acid) jumps
+			// the peak half an octave per 16 samples, which is a different
+			// pluck (measured: 3 dB in an octave band). The LFOs, at a few tens
+			// of Hz at most, are nowhere near 3 kHz and hold fine.
+			const bool envMoving = envRouted
+			    && (V.mStage == ST_ATT || V.mStage == ST_DEC || V.mStage == ST_REL);
+			const bool resolve = envMoving || (V.ctl-- <= 0);
+			if (resolve) V.ctl = SG_MM_CTRL - 1;
 			for (int p = 0; p < nPartials; p++) {
 				int n = p + 1;
 
 				// per-partial envelope, at its own rate and after its own wait
-				float rateOwn = 0.25f * std::pow(16.f, pRate[p]);   // 0.25x..4x
+				float rateOwn = rateOwnP[p];                      // 0.25x..4x, per knob move
 				float rateDie = rateOwn * (1.f + envRate * (float)p * 0.35f);
 				if (V.wait[p] > 0.f) { V.wait[p] -= dt; }
 				else advance(V.env[p], V.stage[p], V.relFrom[p],
 				             rateOwn, rateDie, dt, A, D, S, R);
 
+				// DEPTH against the envelope -- per sample, since the envelope is.
+				float d = pDepth[p];
+				float envAmt;
+				if (d >= 0.f) {
+					envAmt = 1.f - d + d * V.env[p];
+				} else {
+					// BLOOM FROM SILENCE: see the comment in the resolve below.
+					if (V.env[p] > V.envMax[p]) V.envMax[p] = V.env[p];
+					envAmt = -d * (V.envMax[p] - V.env[p]);
+				}
+
+				if (resolve) {
 				// ── level ───────────────────────────────────────────────────
 				float lv = pSoft[p] + (pLevel[p] - pSoft[p]) * morph;
-				lv *= std::pow((float)n, -tilt * 2.5f);
+				lv *= SFS_EXP2(-tilt * 2.5f * sgLog2n(n));
 				lv *= (n % 2) ? (1.f - std::max(0.f, oddEven))     // odd
 				              : (1.f - std::max(0.f, -oddEven));   // even
 				// DEPTH is BIPOLAR. Above zero the partial follows its envelope
@@ -1340,11 +1395,7 @@ struct Sigma : Module {
 				// of at the front of it -- partials arriving as others leave,
 				// which is the spectral evolution additive is actually for and
 				// which a 0..1 control cannot ask for at all.
-				float d = pDepth[p];
-				float envAmt;
-				if (d >= 0.f) {
-					envAmt = 1.f - d + d * V.env[p];
-				} else {
+				if (d < 0.f) {
 					// BLOOM FROM SILENCE, not from full. `1 + d*env` is at its
 					// maximum when the envelope is at zero -- which is the end
 					// of the note, as intended, but ALSO the beginning of it.
@@ -1357,11 +1408,8 @@ struct Sigma : Module {
 					// Measuring the distance the envelope has FALLEN from its
 					// own peak is zero before the note and zero at the peak,
 					// and only opens as the note decays. Which is what a bloom
-					// is.
-					if (V.env[p] > V.envMax[p]) V.envMax[p] = V.env[p];
-					envAmt = -d * (V.envMax[p] - V.env[p]);
+					// is. (Applied per sample, above.)
 				}
-				lv *= envAmt;
 
 				// ── pitch ───────────────────────────────────────────────────
 				float ratio = (float)n * std::sqrt(1.f + B * (float)(n * n));
@@ -1409,7 +1457,7 @@ struct Sigma : Module {
 					pan    = clamp(pan + m * mod[i][SG_MOD_PAN], -1.f, 1.f);
 				}
 
-				float f = f0 * ratio * std::pow(2.f, cents / 1200.f);
+				float f = f0 * ratio * SFS_EXP2(cents * (1.f / 1200.f));
 				// The second-order lowpass magnitude, evaluated at this
 				// partial's own frequency. Resonance is a real peak at fc, not
 				// a fake one -- the maths is the same as the filter's.
@@ -1430,20 +1478,21 @@ struct Sigma : Module {
 				// they last reported and their dots froze on the pan display --
 				// and the ones past Nyquist are always the high ones, which is
 				// why only part of the picture stuck.
+				V.cLv[p] = lv; V.cOver[p] = over; V.cInc[p] = f * dt;
+				V.cPL[p] = std::sqrt(0.5f * (1.f - pan));   // equal power
+				V.cPR[p] = std::sqrt(0.5f * (1.f + pan));
 				if (c == dispVoice) {
-					liveAmp[p]   = over ? 0.f : lv;
+					liveAmp[p]   = over ? 0.f : lv * envAmt;
 					liveEnv[p]   = V.env[p];
 					livePan[p]   = pan;
-					liveCents[p] = 1200.f * std::log2(std::max(ratio / (float)n, 1e-6f)) + cents;
+					liveCents[p] = 1200.f * SFS_LOG2(std::max(ratio / (float)n, 1e-6f)) + cents;
 				}
-				if (over) continue;
-				V.phase[p] += f * dt;
+				}   // resolve
+				if (V.cOver[p]) continue;
+				V.phase[p] += V.cInc[p];
 				V.phase[p] -= std::floor(V.phase[p]);
-				float s = sgSin(V.phase[p]) * lv;
-
-				float pl = std::sqrt(0.5f * (1.f - pan));   // equal power
-				float pr = std::sqrt(0.5f * (1.f + pan));
-				vL += s * pl; vR += s * pr;
+				float s = sgSin(V.phase[p]) * V.cLv[p] * envAmt;
+				vL += s * V.cPL[p]; vR += s * V.cPR[p];
 			}
 
 			// VELOCITY REACHES THE LEVEL AT LAST. Until now V.vel fed the morph

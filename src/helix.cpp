@@ -86,10 +86,10 @@ struct Helix : Module {
 			if (lastH < 0) { lastH = h; fcB = fc; }
 			if (h != lastH) { b = a; xf = 0.f; lastH = h; }
 			xf += (1.f - xf) * xfA;
-			a.set(fc, Q, sr);
+			a.setFast(fc, Q, sr);   // moves every sample while it climbs
 			float wet;
 			if (xf < 0.999f) {
-				b.set(fcB, Q, sr);
+				b.setFast(fcB, Q, sr);
 				wet = (1.f - xf) * b.bandpass(x) + xf * a.bandpass(x);
 			} else {
 				fcB = fc;
@@ -99,6 +99,8 @@ struct Helix : Module {
 		}
 	};
 	Notch nt[2][HX_NOTCH];
+	sfs::Memo mF0, mQ;
+	sfs::Memo2 mXf;
 	float lastK = -1.f;
 	sfs::PitchTracker tracker;
 	int analyseCounter = 0;
@@ -178,8 +180,10 @@ struct Helix : Module {
 			analyseCounter = 0;
 			tracker.analyse(sr);
 		}
-		float manualF0 = HX_C4 * std::pow(2.f, params[TUNE_PARAM].getValue()
-		                                     + inputs[VOCT_INPUT].getVoltage());
+		// Knob-only values are memoised (fastmath.hpp): a pow, an exp and a
+		// pow per sample for things that move only when a hand does.
+		float manualF0 = mF0(params[TUNE_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage(),
+		                     [](float v) { return HX_C4 * std::pow(2.f, v); });
 		bool detected = followPitch && !inputs[VOCT_INPUT].isConnected()
 		                && tracker.valid && tracker.f0 > 1.f;
 		float f0 = clamp(detected ? tracker.f0 : manualF0, 8.f, sr * 0.45f);
@@ -205,14 +209,14 @@ struct Helix : Module {
 		// WIDTH is the Q of each notch, and it runs the useful way round: at the
 		// bottom it is a broad tilt (the gong gradient), at the top a narrow
 		// null (the classic phaser tooth).
-		float Q = 0.6f * std::pow(24.f, wKnob);
+		float Q = mQ(wKnob, [](float w) { return 0.6f * std::pow(24.f, w); });
 
 		// The stationary window. Everything about the illusion lives here: it
 		// does NOT move with the notches, which is what hides their birth and
 		// death. Centred where the ear is most sensitive to spectral change.
 		const float winCentreHz = 1200.f;
 
-		float k = std::pow(2.f, phase);
+		float k = SFS_EXP2(phase);            // 2e-6: the notch frequencies
 
 		// AT THE WRAP EVERY FILTER IS ASKED TO BECOME ITS NEIGHBOUR. k falls from
 		// 2 to 1, so notch i drops to where notch i-1 was standing a sample ago.
@@ -233,18 +237,19 @@ struct Helix : Module {
 
 		static const float SMOOTH_MS[3] = {0.f, 2.f, 10.f};
 		float sm = SMOOTH_MS[clamp(stepSmooth, 0, 2)];
-		float xfA = (sm <= 0.f) ? 1.f : 1.f - std::exp(-1.f / (sm * 0.001f * sr));
+		float xfA = mXf(sm, sr, [](float s, float r) { return (s <= 0.f) ? 1.f : 1.f - std::exp(-1.f / (s * 0.001f * r)); });
 		float wetL = inL, wetR = inR;
 		for (int i = 0; i < HX_NOTCH; i++) {
-			float h = k * std::pow(2.f, (float)i);
+			float h = k * (float)(1 << i);     // exact
 			if (snapOn) h = std::max(1.f, std::round(h));
 			float fc = clamp(h * f0, 8.f, sr * 0.45f);
 			dispHarm[i] = h;
 
 			// raised cosine in log frequency, zero at both edges
-			float x = std::log2(fc / winCentreHz) / span;
+			// (1e-4 on a notch's depth, -80 dB: the window is a shape, not a pitch)
+			float x = SFS_LOG2(fc / winCentreHz) / span;
 			float amp = (std::fabs(x) >= 1.f)
-			          ? 0.f : 0.5f * (1.f + std::cos((float)M_PI * x));
+			          ? 0.f : 0.5f * (1.f + SFS_COS2PI(0.5f * x));
 			float d = depth * amp;
 			dispDepth[i] = d;
 			// The filters run even when the notch is silent. Skipping them left
@@ -262,7 +267,7 @@ struct Helix : Module {
 				// Unlinked, the right channel runs half an octave behind, so the
 				// pair opens into a moving stereo image instead of one mono
 				// gesture heard twice.
-				float h2 = k * std::pow(2.f, (float)i + 0.5f);
+				float h2 = k * (float)(1 << i) * 1.41421356f;
 				if (snapOn) h2 = std::max(1.f, std::round(h2));
 				float fc2 = clamp(h2 * f0, 8.f, sr * 0.45f);
 				int hi2 = snapOn ? (int)h2 : 0;

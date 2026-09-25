@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
 #include "scales.hpp"
@@ -188,6 +189,10 @@ struct LoomString {
 	float bowEnv = 0.f, bowGain = 1.f;      // what the string is doing, and the pressure answer
 	float vPrev = 0.f;                      // for oversampling the friction curve
 	float dampC = 0.f;                      // loop lowpass, floored at this string's pitch
+	float cG = 0.f;                         // loop gain, refreshed with the geometry
+	float freq = 261.63f;                   // this string's pitch, likewise
+	bool asleep = false;                    // rung out below -80 dB: skipped
+	int hold = 0, snooze = 0;               // bridge-wake hysteresis
 	float gustPhase = 0.f, gust = 0.f;      // wind does not blow at a constant rate
 	LoomSVF aeo;                            // the narrow band the wind actually drives
 	float brLp = 0.f;                       // what this string sends to the bridge
@@ -571,21 +576,23 @@ struct Loom : Module {
 		float pick    = paramCV(PICK_PARAM,   PICK_CV_INPUT,   0.f, 1.f);
 		float decaySec = params[DECAY_PARAM].getValue();
 		if (inputs[DECAY_CV_INPUT].isConnected())
-			decaySec *= std::pow(2.f, inputs[DECAY_CV_INPUT].getVoltage() / 5.f);
+			decaySec *= mDecay(inputs[DECAY_CV_INPUT].getVoltage(), [](float v) { return std::pow(2.f, v / 5.f); });
 		decaySec = clamp(decaySec, 0.05f, 40.f);
 
 		// Loop lowpass: 0 = dark and short-lived treble, 1 = wire-bright.
-		float dampHz = 420.f * std::pow(11500.f / 420.f, dampAmt);
-		float excHz  = 700.f * std::pow(11000.f / 700.f, pick);
-		float excC   = clamp(1.f - std::exp(-2.f * (float)M_PI * excHz / sr), 0.01f, 1.f);
+		float dampHz = mDampHz(dampAmt, [](float a) { return 420.f * std::pow(11500.f / 420.f, a); });
+		float excC   = mExcC(pick, sr, [](float pk, float r) {
+			float excHz = 700.f * std::pow(11000.f / 700.f, pk);
+			return clamp(1.f - std::exp(-2.f * (float)M_PI * excHz / r), 0.01f, 1.f); });
 		// PICK is the exciter's brightness everywhere: for the bow it is the
 		// contact width, for the wind it is which partial the gusts sit on.
-		float bowHz  = 900.f * std::pow(3200.f / 900.f, pick);
-		float bowC   = clamp(1.f - std::exp(-2.f * (float)M_PI * bowHz / sr), 0.01f, 1.f);
-		float bowAtk = 1.f - std::exp(-args.sampleTime / 0.045f);   // ~45ms to speak
-		float bowEnvC = 1.f - std::exp(-args.sampleTime / 0.030f);
+		float bowC   = mBowC(pick, sr, [](float pk, float r) {
+			float bowHz = 900.f * std::pow(3200.f / 900.f, pk);
+			return clamp(1.f - std::exp(-2.f * (float)M_PI * bowHz / r), 0.01f, 1.f); });
+		float bowAtk = mBowAtk(args.sampleTime, [](float t) { return 1.f - std::exp(-t / 0.045f); });   // ~45ms to speak
+		float bowEnvC = mBowEnv(args.sampleTime, [](float t) { return 1.f - std::exp(-t / 0.030f); });
 		float bowAgcC = args.sampleTime / 0.12f;                    // pressure follows slowly
-		float brC    = clamp(1.f - std::exp(-2.f * (float)M_PI * LOOM_BRIDGE_HZ / sr), 0.01f, 1.f);
+		float brC    = mBrC(sr, [](float r) { return clamp(1.f - std::exp(-2.f * (float)M_PI * LOOM_BRIDGE_HZ / r), 0.01f, 1.f); });
 		float windBand = 3.f + 5.f * pick;      // which partial the wind excites
 
 		// ── pitch ──────────────────────────────────────────────────────────────
@@ -700,16 +707,52 @@ struct Loom : Module {
 				continue;
 			}
 
+			bool sustaining = s.gateHeld || s.sustainTimer > 0.f;
+			// Rung out to -80 dB and not being bowed or blown: skip it. The bridge
+			// wakes a sleeping string on probation, as in Slide -- 85 ms to ring
+			// past -80 dB or it sleeps again and ignores the bridge for 340 ms --
+			// because waking on any bridge energy keeps all eight awake whenever
+			// one string rings.
+			bool mmWake = false;
+			{
+				bool excited = sustaining || s.burst > 0.f || s.pending >= 0.f;
+				if (s.snooze > 0) s.snooze--;
+				if (excited) { s.hold = 0; s.snooze = 0; }
+				else if (s.amp < 1e-4f) {
+					bool busDrive = coupAmt > 0.f && s.snooze == 0
+					    && std::fabs(couplePrev) * coupAmt * coupAmt * LOOM_COUPLE_MAX > 1e-5f;
+					bool sleepNow = false;
+					if (s.asleep) { if (busDrive) s.hold = 4096; else sleepNow = true; }
+					else if (s.hold > 0) s.hold--;
+					else { sleepNow = true; s.snooze = 16384; }
+					if (sleepNow) {
+						s.asleep = true;
+						s.out = 0.f;
+						s.amp *= 0.9994f;
+						s.flash *= 0.9994f;
+						motion += s.brLp;
+						outputs[STRING_OUTPUT + i].setVoltage(0.f);
+						continue;
+					}
+				}
+				mmWake = s.asleep;
+				s.asleep = false;
+			}
 			// ── geometry of the loop ───────────────────────────────────────────
-			float semis = basePitch * 12.f + tuneOf(i) + noteOff[i];
-			float freq = dsp::FREQ_C4 * std::pow(2.f, semis / 12.f);
-			freq = clamp(freq, 20.f, std::min(8000.f, sr * 0.24f));
-
 			float b = stiff[i] * 0.42f;
 			float apC = -b;
 			// Recomputing the exact filter delay costs three atan2s, so it runs
 			// every 32 samples with the strings staggered, and `d` glides to it.
-			if (((geomCount + i) & 31) == 0 || s.dSm <= 0.f) {
+			// Pitch and loop gain ride along: pow and exp per string per sample
+			// were most of the rest of the cost.
+			if (((geomCount + i) & 31) == 0 || s.dSm <= 0.f || mmWake) {
+				float semis = basePitch * 12.f + tuneOf(i) + noteOff[i];
+				float freq = dsp::FREQ_C4 * std::pow(2.f, semis / 12.f);
+				freq = clamp(freq, 20.f, std::min(8000.f, sr * 0.24f));
+				s.freq = freq;
+				// Loop gain for a T60: the round trip happens `freq` times a second.
+				float t60 = decaySec * std::pow(4.f, (decayOff[i] - 0.5f) * 2.f);
+				s.cG = std::min(std::exp(-6.907755f / (freq * std::max(t60, 0.02f))), 0.99995f);
 				float w = 2.f * (float)M_PI * freq / sr;
 				// DAMP is an absolute cutoff, which is wrong for a bank of strings
 				// spanning octaves: at the dark end a 262 Hz string was filtered
@@ -741,11 +784,7 @@ struct Loom : Module {
 			}
 			s.dSm += (s.dTarget - s.dSm) * 0.004f;
 			float d = s.dSm;
-
-			// Loop gain for a T60: the round trip happens `freq` times a second.
-			float t60 = decaySec * std::pow(4.f, (decayOff[i] - 0.5f) * 2.f);
-			float g = std::exp(-6.907755f / (freq * std::max(t60, 0.02f)));
-			g = std::min(g, 0.99995f);
+			float g = s.cG;
 
 			// ── read ───────────────────────────────────────────────────────────
 			float v = s.tap(d);
@@ -758,13 +797,12 @@ struct Loom : Module {
 
 			// ── excitation ─────────────────────────────────────────────────────
 			float exc = 0.f;
-			bool sustaining = s.gateHeld || s.sustainTimer > 0.f;
 			float exw[EX_COUNT];
 			loomExciteWeights(excite[i], exw);
 
 			if (s.burst > 0.f) {
 				float t = 1.f - s.burst / s.burstLen;
-				float win = 0.5f - 0.5f * std::cos(2.f * (float)M_PI * t);
+				float win = 0.5f - 0.5f * SFS_COS2PI(t);
 				// A hammer imparts a velocity pulse, which is bipolar — a plain
 				// one-sided bump is a DC step, and a delay loop passes DC at very
 				// nearly unity, so it came out roughly ten times louder than a
@@ -777,10 +815,10 @@ struct Loom : Module {
 				if (s.burstMix <= 0.f)
 					raw = win * (2.f * random::uniform() - 1.f);
 				else if (s.burstMix >= 1.f)
-					raw = win * (std::sin(2.f * (float)M_PI * t)
+					raw = win * (SFS_SIN2PI(t)
 					             + 0.12f * (2.f * random::uniform() - 1.f));
 				else {
-					float ham = win * (std::sin(2.f * (float)M_PI * t)
+					float ham = win * (SFS_SIN2PI(t)
 					                   + 0.12f * (2.f * random::uniform() - 1.f));
 					float plk = win * (2.f * random::uniform() - 1.f);
 					raw = s.burstMix * ham + (1.f - s.burstMix) * plk;
@@ -923,9 +961,9 @@ struct Loom : Module {
 			// thin every other string the moment you took its output.
 			if (!(soloOnPatch && outputs[STRING_OUTPUT + i].isConnected())) {
 				float p = ((float)i / (float)(LOOM_N - 1) * 2.f - 1.f) * stereoWidth;
-				float th = (p + 1.f) * (float)M_PI_4;
-				mixL += y * std::cos(th);
-				mixR += y * std::sin(th);
+				float th = (p + 1.f) * 0.125f;          // quarter turn, in cycles
+				mixL += y * SFS_COS2PI(th);
+				mixR += y * SFS_SIN2PI(th);
 			}
 
 			outputs[STRING_OUTPUT + i].setVoltage(loomSoftClip(y * LOOM_OUT_GAIN));
@@ -962,6 +1000,8 @@ struct Loom : Module {
 		outputs[MIX_R_OUTPUT].setVoltage(loomSoftClip(wetR * LOOM_OUT_GAIN));
 	}
 
+	sfs::Memo mDecay, mDampHz, mBowAtk, mBowEnv, mBrC;   // fastmath.hpp
+	sfs::Memo2 mExcC, mBowC;
 	float coupleBus = 0.f;
 
 	// ── mouse plucks: GUI thread → audio thread ───────────────────────────────

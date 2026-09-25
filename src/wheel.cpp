@@ -28,6 +28,7 @@
 // wheel, not from the string.
 // =============================================================================
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "scales.hpp"
 #include "scale-bus.hpp"
@@ -202,20 +203,31 @@ struct WheelOsc {
 	float value(float shape, double dt, float offset) const {
 		double p = phase + (double)offset;
 		p -= std::floor(p);
-		float sine = std::sin(2.f * (float)M_PI * (float)p);
-		float tri  = 4.f * std::fabs((float)p - 0.5f) - 1.f;
-		float saw  = (float)(2.0 * p - 1.0) - wheelBlep(p, dt);
-		double q = p + 0.5; q -= std::floor(q);
-		float sqr  = (p < 0.5 ? 1.f : -1.f) + wheelBlep(p, dt) - wheelBlep(q, dt);
+		// Only the two shapes being blended are computed (the sine was taken
+		// every sample for every voice whatever WAVE said: 2026-09-25), and the
+		// sine is the polynomial one (-108 dB).
 		float s = clamp(shape, 0.f, 1.f) * 3.f;
 		int seg = (int)s; if (seg > 2) seg = 2;
 		float f = s - (float)seg;
-		const float* tbl[4] = {&sine, &tri, &saw, &sqr};
-		return *tbl[seg] * (1.f - f) + *tbl[seg + 1] * f;
+		float w[4] = {0.f, 0.f, 0.f, 0.f};
+		for (int i = seg; i <= seg + 1; i++) {
+			if (i == 0) w[0] = SFS_SIN2PI((float)p);
+			else if (i == 1) w[1] = 4.f * std::fabs((float)p - 0.5f) - 1.f;
+			else if (i == 2) w[2] = (float)(2.0 * p - 1.0) - wheelBlep(p, dt);
+			else {
+				double q = p + 0.5; q -= std::floor(q);
+				w[3] = (p < 0.5 ? 1.f : -1.f) + wheelBlep(p, dt) - wheelBlep(q, dt);
+			}
+		}
+		return w[seg] * (1.f - f) + w[seg + 1] * f;
 	}
 };
 
 struct Wheel : Module {
+	// Knob- and rate-only values, recomputed when they move (fastmath.hpp).
+	sfs::Memo mImp, mClick, mDog, mSlot, mSwell;
+	sfs::Memo2 mBuzz;
+	float panWidth[8] = {NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN}, panL[8] = {0.f}, panR[8] = {0.f};
 	enum ParamId {
 		ROOT_PARAM, SCALE_PARAM, CRANK_PARAM, COUPS_PARAM,
 		PRESS_PARAM, RIPPLE_PARAM, DOG_PARAM, TEMPER_PARAM,
@@ -439,14 +451,14 @@ struct Wheel : Module {
 	// The slow wander on top is rosin wearing and humidity, not the ripple.
 	float rippleAt(double ph) const {
 		double p = ph - std::floor(ph);
-		float a = std::sin(2.f * (float)M_PI * (float)p);
-		float b = 0.34f * std::sin(4.f * (float)M_PI * ((float)p + 0.18f));
-		float c = 0.17f * std::sin(6.f * (float)M_PI * ((float)p + 0.62f));
+		float a = SFS_SIN2PI((float)p);
+		float b = 0.34f * SFS_SIN2PI(2.f * ((float)p + 0.18f));
+		float c = 0.17f * SFS_SIN2PI(3.f * ((float)p + 0.62f));
 		// the seam: a narrow loss of grip at one angle, once per turn
 		float d = (float)p - WH_SEAM;
 		if (d >  0.5f) d -= 1.f;
 		if (d < -0.5f) d += 1.f;
-		float seam = -0.72f * std::exp(-(d * d) / (2.f * 0.024f * 0.024f));
+		float seam = -0.72f * SFS_EXP(-(d * d) / (2.f * 0.024f * 0.024f));
 		// +0.035 takes the mean back to zero. The seam is a one-sided event, so
 		// without it RIPPLE quietly turns the whole instrument down as it is
 		// raised — a level change wearing a modulation's clothes. Measured with
@@ -563,7 +575,7 @@ struct Wheel : Module {
 		// it all comes off one wrist.
 		if (impulseTgt > impulse) impulse += (impulseTgt - impulse) * dt * 170.f;
 		else                      impulse += (impulseTgt - impulse) * dt * 26.f;
-		impulseTgt *= std::exp(-dt * 34.f);
+		impulseTgt *= mImp(dt, [](float t) { return std::exp(-t * 34.f); });
 		speed = speedBase * (1.f + impulse * 0.55f);
 
 		// ── the dog ──────────────────────────────────────────────────────────
@@ -613,10 +625,11 @@ struct Wheel : Module {
 			slotFlash[clamp(coupSlot, 0, WH_MAXCOUPS - 1)] = 1.f;
 		}
 		float decayS = 0.04f + 0.11f * params[DECAY_PARAM].getValue();
-		buzzEnv  *= std::exp(-dt / decayS);
-		clickEnv *= std::exp(-dt / 0.0022f);
-		dogFlash *= std::exp(-dt / 0.09f);
-		float slotDecay = std::exp(-dt / 0.14f);
+		// Per-sample decays of fixed (or knob-only) time constants, memoised.
+		buzzEnv  *= mBuzz(decayS, dt, [](float d, float t) { return std::exp(-t / d); });
+		clickEnv *= mClick(dt, [](float t) { return std::exp(-t / 0.0022f); });
+		dogFlash *= mDog(dt, [](float t) { return std::exp(-t / 0.09f); });
+		float slotDecay = mSlot(dt, [](float t) { return std::exp(-t / 0.14f); });
 		for (int k = 0; k < WH_MAXCOUPS; k++) slotFlash[k] *= slotDecay;
 
 		float rattleHz = 21.f + 38.f * buzzEnv;
@@ -645,7 +658,7 @@ struct Wheel : Module {
 		// How long the wheel takes to grip under a gate. The SAME curve the
 		// tooltip prints: 8ms * 150^swell. An earlier version used a different
 		// one in the DSP, so the readout said 28ms while the string took 83.
-		float swellDur = 0.008f * std::pow(150.f, params[SWELL_PARAM].getValue());
+		float swellDur = mSwell(params[SWELL_PARAM].getValue(), [](float s) { return 0.008f * std::pow(150.f, s); });
 
 		for (int v = 0; v < WH_V; v++) {
 			// press: the string on the wheel. The GATE input drives THIS rather
@@ -715,7 +728,7 @@ struct Wheel : Module {
 			bright *= clamp(1.f + 0.9f * depth * r, 0.05f, 3.f);
 			bright += 0.5f * buzzEnv * impulse;                  // the coup swells everything
 			float cut = clamp(freq[v] * (1.8f + 34.f * bright), 60.f, sr * 0.45f);
-			float a = 1.f - std::exp(-2.f * (float)M_PI * cut * dt);
+			float a = 1.f - SFS_EXP(-2.f * (float)M_PI * cut * dt);   // cut moves with the ripple
 			lp[v] += (raw - lp[v]) * a;
 
 			// A string barely touching the wheel is not merely quieter: it slips,
@@ -741,7 +754,7 @@ struct Wheel : Module {
 			// happens to be gripping at that instant.
 			if (v == WH_TRP) rip += (1.f - rip) * buzzEnv;
 			float amp = levelSm[v] * rip
-			          * std::pow(press + 1e-4f, 0.55f)
+			          * SFS_POWABS(press + 1e-4f, 0.55f)
 			          * (1.f + 0.35f * impulse);         // every voice swells on a coup
 
 			if (v == WH_TRP) {
@@ -755,7 +768,7 @@ struct Wheel : Module {
 				// the drive and the click are all there to make the coup an event.
 				float chop = 1.f - buzzEnv * (1.f - rattleGate);
 				tone *= chop;
-				tone = std::tanh(tone * (1.f + 4.5f * buzzEnv));
+				tone = SFS_TANH(tone * (1.f + 4.5f * buzzEnv));
 				float click = buzzHP.bandpass(white * clickEnv * 3.2f);
 				tone += click * 1.4f;
 				amp *= 1.f + 2.2f * buzzEnv;
@@ -763,10 +776,15 @@ struct Wheel : Module {
 
 			float outv = tone * amp * 3.2f;
 			polyV[v] = outv;
-			float pan = clamp(panOf[v] * params[WIDTH_PARAM].getValue(), -1.f, 1.f);
-			float th = (pan + 1.f) * 0.25f * (float)M_PI;
-			mixL += outv * std::cos(th);
-			mixR += outv * std::sin(th);
+			float wd = params[WIDTH_PARAM].getValue();
+			if (wd != panWidth[v]) {                        // only WIDTH moves a pan
+				panWidth[v] = wd;
+				float pan = clamp(panOf[v] * wd, -1.f, 1.f);
+				float th = (pan + 1.f) * 0.25f * (float)M_PI;
+				panL[v] = std::cos(th); panR[v] = std::sin(th);
+			}
+			mixL += outv * panL[v];
+			mixR += outv * panR[v];
 		}
 
 		// ── body ─────────────────────────────────────────────────────────────

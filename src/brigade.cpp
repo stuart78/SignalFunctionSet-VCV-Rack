@@ -77,6 +77,8 @@ struct Brigade : Module {
 	};
 	static const int BG_VOICES = 64;
 	Voice voice[BG_VOICES];
+	sfs::Memo mHz, mQ, mUp, mDn, mSlow;
+	sfs::Memo2 mGa;
 	int nextVoice = 0;
 	float ratio = 1.f;            // one band, as a frequency ratio
 
@@ -201,16 +203,18 @@ struct Brigade : Module {
 			if (clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f))
 				advance(stride, trail);
 		} else {
-			float hz = 0.25f * std::pow(160.f, pv(RATE_PARAM, RATE_INPUT, 0.f, 1.f));
+			float hz = mHz(pv(RATE_PARAM, RATE_INPUT, 0.f, 1.f), [](float r) { return 0.25f * std::pow(160.f, r); });
 			clockPhase += hz / sr;
 			if (clockPhase >= 1.f) { clockPhase -= 1.f; advance(stride, trail); }
 		}
 
 		// ── analysis: where is the input gaining energy right now ───────────
-		float Q = 1.2f * std::pow(10.f, wKnob);
-		float aUp = 1.f - std::exp(-1.f / (0.002f * sr));
-		float aDn = 1.f - std::exp(-1.f / (0.060f * sr));
-		float aSlow = 1.f - std::exp(-1.f / (0.30f * sr));   // what counts as "standing"
+		// Knob-only values memoised (fastmath.hpp); the band filters' tan is
+		// memoised inside SVF::set, since their frequencies never move.
+		float Q = mQ(wKnob, [](float w) { return 1.2f * std::pow(10.f, w); });
+		float aUp = mUp(sr, [](float r) { return 1.f - std::exp(-1.f / (0.002f * r)); });
+		float aDn = mDn(sr, [](float r) { return 1.f - std::exp(-1.f / (0.060f * r)); });
+		float aSlow = mSlow(sr, [](float r) { return 1.f - std::exp(-1.f / (0.30f * r)); });   // what counts as "standing"
 		float frameMax = 0.f;
 		for (int k = 0; k < BG_BANDS; k++) {
 			float f = bandHz[k];
@@ -231,7 +235,7 @@ struct Brigade : Module {
 		// sample, which is the stepped sound; wound up it swoops there, and the
 		// swoop is what reads as movement. It is also what keeps a step from
 		// clicking, so its floor is short rather than zero.
-		float ga = 1.f - std::exp(-1.f / ((0.0015f + 0.35f * blur) * sr));
+		float ga = mGa(blur, sr, [](float b, float r) { return 1.f - std::exp(-1.f / ((0.0015f + 0.35f * b) * r)); });
 		float wet = 0.f;
 		int live = 0;
 		for (int i = 0; i < BG_VOICES; i++) {
@@ -241,7 +245,7 @@ struct Brigade : Module {
 			if (v.hz >= sr * 0.45f) { v.on = false; continue; }
 			v.phase += v.hz / sr;
 			v.phase -= std::floor(v.phase);
-			wet += v.amp * std::sin(2.f * (float)M_PI * v.phase);
+			wet += v.amp * SFS_SIN2PI(v.phase);   // -108 dB: dozens of these a sample
 			live++;
 			if (v.amp > frameMax) frameMax = v.amp;
 		}

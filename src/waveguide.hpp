@@ -21,6 +21,7 @@
 
 #include <cmath>
 #include <cstring>
+#include "fastmath.hpp"   // SVF::setFast
 
 namespace sfs {
 
@@ -45,9 +46,27 @@ static inline float onePoleDelay(float c, float w) {
 struct SVF {
 	float ic1 = 0.f, ic2 = 0.f;
 	float a1 = 0.f, a2 = 0.f, a3 = 0.f;
+	// The coefficients a set() last computed, and for what. Most callers set a
+	// filter every sample to a frequency that has not moved (Brigade's analysis
+	// bands never do), and each of those was a tan: memoised, it is a compare.
+	float setF = -1.f, setQ = -1.f, setSr = -1.f;
 	void set(float freq, float q, float sr) {
+		if (freq == setF && q == setQ && sr == setSr) return;
+		setF = freq; setQ = q; setSr = sr;
 		float f = freq < 20.f ? 20.f : (freq > sr * 0.45f ? sr * 0.45f : freq);
 		float g = std::tan((float)M_PI * f / sr);
+		coeffs(g, q);
+	}
+	// For a filter that really does move every sample (Helix's climb): tan from
+	// the polynomial sin and cos, relative error under 3e-5 up to 0.45 sr.
+	void setFast(float freq, float q, float sr) {
+		if (freq == setF && q == setQ && sr == setSr) return;
+		setF = freq; setQ = q; setSr = sr;
+		float f = freq < 20.f ? 20.f : (freq > sr * 0.45f ? sr * 0.45f : freq);
+		float p = 0.5f * f / sr;              // (pi f / sr) in cycles
+		coeffs(sfs::fastSin2Pi(p) / sfs::fastCos2Pi(p), q);
+	}
+	void coeffs(float g, float q) {
 		float k = 1.f / (q < 0.5f ? 0.5f : q);
 		a1 = 1.f / (1.f + g * (g + k));
 		a2 = g * a1;

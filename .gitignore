@@ -28,3 +28,4 @@ __pycache__/
 /h
 /h.cpp
 hv.cpp
+tools/perf/build/

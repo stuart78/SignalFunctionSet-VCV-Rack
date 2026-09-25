@@ -1,7 +1,9 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 
 
 struct Drift : Module {
+	sfs::Memo mFreq;   // the frequency knob's pow (fastmath.hpp)
 	enum ParamId {
 		PARAMSHAPE_PARAM,
 		PARAMSTABILITY_PARAM,
@@ -107,7 +109,7 @@ struct Drift : Module {
 		// Generate base waveforms - all bipolar ±1, perfectly phase-aligned
 		// All waveforms start at 0 when phase=0
 		
-		float sine = std::sin(phase * 2.f * M_PI);
+		float sine = SFS_SIN2PI(phase);   // was double sin, twice (2026-09-25): -108 dB
 		
 		// Triangle wave: starts at 0, goes to +1 at 0.25, back to 0 at 0.5, to -1 at 0.75, back to 0 at 1.0
 		float triangle;
@@ -129,7 +131,7 @@ struct Drift : Module {
 		
 		// Square wave: special handling to start at 0 and maintain symmetry
 		// Use a sine-based approach for smooth transitions that starts at 0
-		float square = (std::sin(phase * 2.f * M_PI) >= 0.f) ? 1.f : -1.f;
+		float square = (sine >= 0.f) ? 1.f : -1.f;
 		// Override the exact phase=0 case to ensure it starts at 0
 		if (phase < 0.001f || phase > 0.999f) {
 			square = 0.f;
@@ -175,7 +177,7 @@ struct Drift : Module {
 		stability = clamp(stability, 0.f, 1.f);
 
 		float freq = params[PARAMFREQUENCY_PARAM].getValue();
-		float actualFreq = std::pow(2.f, freq);
+		float actualFreq = mFreq(freq, [](float f) { return std::pow(2.f, f); });
 		
 		// Handle clock input
 		clockConnected = inputs[INFREQUENCY_INPUT].isConnected();
@@ -294,7 +296,7 @@ struct Drift : Module {
 				while (finalPhase >= 1.f) finalPhase -= 1.f;
 
 				// Subtle harmonic content based on Lorenz Z
-				harmonicContent = std::sin(finalPhase * 3.f * M_PI) * lorenzZ * instabilityAmount * 0.1f;
+				harmonicContent = SFS_SIN2PI(finalPhase * 1.5f) * lorenzZ * instabilityAmount * 0.1f;
 			}
 
 			float wave = generateWave(finalPhase, shape, i, args.sampleTime) * ampMod + harmonicContent;

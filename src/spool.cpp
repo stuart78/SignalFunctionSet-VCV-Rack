@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "dr_wav.h"        // implementation lives in phase.cpp; headers only here
@@ -66,6 +67,10 @@ struct LpTimeQuantity : ParamQuantity {
 };
 
 struct Spool : Module {
+	// Values that move only with a knob or the rate, and the fixed pans (fastmath.hpp).
+	sfs::Memo mSag, mSatN;
+	sfs::Memo2 mSatA;
+	float spPanL[8] = {0.f}, spPanR[8] = {0.f};
 	enum ParamId {
 		ENUMS(LEVEL_PARAM, SP_N),
 		ENUMS(REC_PARAM, SP_N),
@@ -166,6 +171,11 @@ struct Spool : Module {
 	float dispPos[SP_N][SP_POLY] = {}, dispEnv[SP_N][SP_POLY] = {};
 
 	Spool() {
+		for (int i = 0; i < SP_N; i++) {
+			float pan = ((float)i / (float)(SP_N - 1) * 2.f - 1.f) * 0.6f;
+			float th = (pan + 1.f) * (float)M_PI_4;
+			spPanL[i] = std::cos(th); spPanR[i] = std::sin(th);
+		}
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		for (int i = 0; i < SP_N; i++) {
 			configParam(LEVEL_PARAM + i, 0.f, 1.f, 0.8f,
@@ -371,7 +381,7 @@ struct Spool : Module {
 		float phA = hd.shPh;
 		float phB = phA + 0.5f; if (phB >= 1.f) phB -= 1.f;
 		// Hann pair: A carries the transport at phase 0.5, B at A's wrap.
-		float h = 0.5f - 0.5f * std::cos(2.f * (float)M_PI * phA);
+		float h = 0.5f - 0.5f * SFS_COS2PI(phA);   // -108 dB
 		float wA = pitched ? h : std::sqrt(h);
 		float wB = pitched ? (1.f - h) : std::sqrt(1.f - h);
 		double len = (double)t.len;
@@ -501,10 +511,10 @@ struct Spool : Module {
 		wowPh2 += 0.37f / sr; if (wowPh2 >= 1.f) wowPh2 -= 1.f;
 		flutPh += 17.3f / sr; if (flutPh >= 1.f) flutPh -= 1.f;
 		flutPh2 += 25.7f / sr; if (flutPh2 >= 1.f) flutPh2 -= 1.f;
-		float wow = (std::sin(2.f * (float)M_PI * wowPh) * 0.65f
-		           + std::sin(2.f * (float)M_PI * wowPh2) * 0.35f) * wowAmt * 0.040f;
-		float flut = (std::sin(2.f * (float)M_PI * flutPh) * 0.6f
-		            + std::sin(2.f * (float)M_PI * flutPh2) * 0.4f) * flutAmt * 0.016f;
+		float wow = (SFS_SIN2PI(wowPh) * 0.65f
+		           + SFS_SIN2PI(wowPh2) * 0.35f) * wowAmt * 0.040f;
+		float flut = (SFS_SIN2PI(flutPh) * 0.6f
+		            + SFS_SIN2PI(flutPh2) * 0.4f) * flutAmt * 0.016f;
 		// ── the motor under load ────────────────────────────────────────────
 		// Counted from what is SOUNDING, not from what is gated, so a chord that
 		// is still releasing is still dragging on the capstan. One note is the
@@ -524,7 +534,7 @@ struct Spool : Module {
 		// the load is how many notes are down, not how many tapes are in use.
 		float sagTarget = (sounding > 1)
 		                ? std::min(1.f, (float)(sounding - 1) / 7.f) : 0.f;
-		sagEnv += (sagTarget - sagEnv) * (1.f - std::exp(-1.f / (0.08f * sr)));
+		sagEnv += (sagTarget - sagEnv) * mSag(sr, [](float r) { return 1.f - std::exp(-1.f / (0.08f * r)); });
 		float sag = 1.f - sagEnv * params[SAG_PARAM].getValue() * 0.030f;
 
 		float speedErr = (1.f + wow + flut) * sag;
@@ -708,12 +718,12 @@ struct Spool : Module {
 				if (absolute && t.detOk) {
 					// Speed the tape until what it is sounding IS the note asked
 					// for. C4 at 0V, as everywhere else in Rack.
-					base = (dsp::FREQ_C4 * std::pow(2.f, want)) / t.detHz;
+					base = (dsp::FREQ_C4 * SFS_EXP2(want)) / t.detHz;   // 0.003 cents
 				} else {
 					// Relative, and also the fallback when nothing was detected:
 					// a percussive or noisy tape has no pitch to correct to, and
 					// guessing one would send the transport somewhere arbitrary.
-					base = std::pow(2.f, want);
+					base = SFS_EXP2(want);
 				}
 				base = clamp(base, 0.05f, 20.f);
 				// TIME-STRETCHED: the capstan runs at 1x, with its ramp, sag and
@@ -792,10 +802,8 @@ struct Spool : Module {
 			outputs[OUT_OUTPUT + i].setVoltage(out);
 			// Four tapes across the field, so a chord opens out rather than
 			// arriving in one place.
-			float pan = ((float)i / (float)(SP_N - 1) * 2.f - 1.f) * 0.6f;
-			float th = (pan + 1.f) * (float)M_PI_4;
-			mixL += out * std::cos(th);
-			mixR += out * std::sin(th);
+			mixL += out * spPanL[i];                  // fixed per tape, see the constructor
+			mixR += out * spPanR[i];
 		}
 
 		// ── tape saturation ─────────────────────────────────────────────────
@@ -805,11 +813,11 @@ struct Spool : Module {
 		// knob does not double as a volume control.
 		if (sat > 1e-4f) {
 			float drive = 1.f + sat * 6.f;
-			float nrm = 1.f / std::tanh(drive);
+			float nrm = mSatN(drive, [](float d) { return 1.f / std::tanh(d); });
 			mixL = std::tanh(mixL * 0.2f * drive) * nrm * 5.f;
 			mixR = std::tanh(mixR * 0.2f * drive) * nrm * 5.f;
 			float fc = 18000.f - 12000.f * sat;
-			float a = clamp(1.f - std::exp(-2.f * (float)M_PI * fc / sr), 0.f, 1.f);
+			float a = mSatA(fc, sr, [](float f, float r) { return clamp(1.f - std::exp(-2.f * (float)M_PI * f / r), 0.f, 1.f); });
 			satLp += (mixL - satLp) * a;
 			mixL = satLp;
 		}
