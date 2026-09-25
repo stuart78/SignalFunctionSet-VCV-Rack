@@ -66,11 +66,12 @@ selected one.
 
 If your sources are eight separate modules rather than one polyphonic one,
 place **PolyKit In** immediately to the left of Kit. It is a matrix of jacks:
-thirteen columns, one per Kit input (TRIG, V/OCT, VEL, X, Y and the eight CVs),
+fourteen columns, one per Kit input (TRIG, V/OCT, VEL, X, Y and the eight CVs)
+plus PEDAL, the only CV the hi-hat pedal has,
 by eight rows, one per instrument. Every cell is a mono jack for that
 instrument's input. A patched jack takes over that channel from Kit's own poly
 cable; an unpatched one leaves the poly cable in charge, so a poly trigger
-from Fill and a single hand-patched tension can coexist. PolyKit In is 33HP.
+from Fill and a single hand-patched tension can coexist. PolyKit In is 35HP.
 
 ## The one thing to know about the parameters
 

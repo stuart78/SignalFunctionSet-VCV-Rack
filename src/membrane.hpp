@@ -100,6 +100,54 @@ static inline const MembraneShapes& membraneShapes() {
 // direct-form biquad re-tuned under those conditions rings badly or blows up.
 // A rotation just changes its rate: the state stays exactly as valid as it was,
 // so there is no click and no stability question to answer.
+// sin and cos of w in [0, 3]: half-angle Taylor to x^11, then double-angle,
+// |error| < 1e-7 with relative accuracy kept near zero where the low modes
+// live. Ported from the MetaModule build; libm's sinf/cosf were 7% of Kit on
+// desktop, because a ringing drum re-tunes all 80 resonators every 32 samples
+// for the pitch bend.
+static inline void modeSinCos(float w, float& sw, float& cw) {
+	float h = 0.5f * w, h2 = h * h;
+	float sh = h * (1.f + h2 * (-1.f/6 + h2 * (1.f/120 + h2 * (-1.f/5040
+	         + h2 * (1.f/362880 + h2 * (-1.f/39916800))))));
+	float ch = 1.f + h2 * (-0.5f + h2 * (1.f/24 + h2 * (-1.f/720
+	         + h2 * (1.f/40320 + h2 * (-1.f/3628800 + h2 * (1.f/479001600))))));
+	sw = 2.f * sh * ch;
+	cw = 1.f - 2.f * sh * sh;
+}
+
+// One resonator per mode, as flat arrays so the per-sample loop vectorises
+// (an array of five-float structs did not: the stereo path ran scalar). The
+// decay is folded into the rotation, a = r cos w and b = r sin w, so a step is
+// two multiply-adds per component. lo[k].value() still reads a mode, as the
+// harnesses and the display expect.
+template <int N>
+struct ModeBank {
+	float re[N] = {0.f}, im[N] = {0.f};
+	float cw[N], sw[N], r[N], a[N], b[N];
+	ModeBank() { for (int k = 0; k < N; k++) { cw[k] = 1.f; sw[k] = 0.f; r[k] = 0.f; a[k] = b[k] = 0.f; } }
+	inline void setFreq(int k, float f, float sr) {
+		float w = 2.f * (float)M_PI * f / sr;
+		if (w > 3.0f) w = 3.0f;             // stay well short of Nyquist
+		modeSinCos(w, sw[k], cw[k]);
+		a[k] = r[k] * cw[k]; b[k] = r[k] * sw[k];
+	}
+	inline void setDecay(int k, float t60, float sr) {
+		if (t60 < 1e-4f) t60 = 1e-4f;
+		r[k] = std::exp(-6.907755f / (t60 * sr));   // 60 dB in t60 seconds
+		a[k] = r[k] * cw[k]; b[k] = r[k] * sw[k];
+	}
+	inline void step() {
+		for (int k = 0; k < N; k++) {
+			float x = re[k], y = im[k];
+			re[k] = a[k] * x - b[k] * y;
+			im[k] = b[k] * x + a[k] * y;
+		}
+	}
+	inline void clear() { for (int k = 0; k < N; k++) re[k] = im[k] = 0.f; }
+	struct Ref { const float* p; float value() const { return *p; } };
+	Ref operator[](int k) const { return Ref{&re[k]}; }
+};
+
 struct ModeOsc {
 	float re = 0.f, im = 0.f;
 	float cw = 1.f, sw = 0.f, r = 0.f;
@@ -107,7 +155,7 @@ struct ModeOsc {
 	inline void setFreq(float f, float sr) {
 		float w = 2.f * (float)M_PI * f / sr;
 		if (w > 3.0f) w = 3.0f;             // stay well short of Nyquist
-		cw = std::cos(w); sw = std::sin(w);
+		modeSinCos(w, sw, cw);
 	}
 	inline void setDecay(float t60, float sr) {
 		if (t60 < 1e-4f) t60 = 1e-4f;
@@ -211,9 +259,19 @@ struct SnareWires {
 // would be inventing physics the drum does not have.
 struct Drum {
 	static const int NM = MEMBRANE_NMODES;
-	ModeOsc lo[NM], hi[NM];        // the two coupled-mode branches per index
+	ModeBank<NM> lo, hi;           // the two coupled-mode branches per index
 	float gain[NM] = {0.f};
 	float t60lo[NM] = {0.f}, t60hi[NM] = {0.f};
+	// Memo keys (the MetaModule build's, now on desktop too). The layout is a
+	// function of the knobs; while a drum rings unattended only the bend moves,
+	// and that scales every mode by one factor, so it is a rescale from the
+	// unbent frequencies rather than a re-solve. modesGen counts re-solves, and
+	// the strike memo keys on it because its level match reads t60lo.
+	float modeKey[11] = {NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN};
+	float strikeKey[8] = {NAN, NAN, NAN, NAN, NAN, NAN, NAN, NAN};
+	float modeBend = NAN;
+	float wlo1[NM] = {0.f}, whi1[NM] = {0.f};
+	unsigned modesGen = 0;
 	float ratio[NM] = {0.f};
 	Mallet mallet;
 	SnareWires wires[2];
@@ -378,6 +436,22 @@ struct Drum {
 		const MembraneShapes& sh = membraneShapes();
 		const float j01 = MEMBRANE_MODES[0].j, j11 = MEMBRANE_MODES[1].j;
 		float bend0 = 1.f + bend * energy;
+		const float key[11] = {f0, air, stiff, couple, resoTune, decay, tone,
+		                       muffle, muffleAng, strikeAng, sr};
+		bool same = true;
+		for (int i = 0; i < 11; i++) if (key[i] != modeKey[i]) { same = false; modeKey[i] = key[i]; }
+		if (same) {
+			if (bend0 != modeBend) {
+				modeBend = bend0;
+				for (int k = 0; k < NM; k++) {
+					lo.setFreq(k, wlo1[k] * bend0, sr);
+					hi.setFreq(k, whi1[k] * bend0, sr);
+				}
+			}
+			return;
+		}
+		modeBend = bend0;
+		modesGen++;
 		for (int k = 0; k < NM; k++) {
 			const MembraneMode& M = MEMBRANE_MODES[k];
 			float base = M.j / j01;
@@ -410,8 +484,9 @@ struct Drum {
 			float disc = std::sqrt(std::max(0.f, 0.25f * (a - b) * (a - b) + K * K));
 			float wlo = std::sqrt(std::max(1.f, half - disc));
 			float whi = std::sqrt(std::max(1.f, half + disc));
-			lo[k].setFreq(wlo, sr);
-			hi[k].setFreq(whi, sr);
+			lo.setFreq(k, wlo, sr);
+			hi.setFreq(k, whi, sr);
+			wlo1[k] = wlo / bend0; whi1[k] = whi / bend0;
 
 			// Damping. High modes die first; the m = 0 monopoles dump energy
 			// into the room fastest, and air loading makes that worse -- which
@@ -438,8 +513,8 @@ struct Drum {
 			t /= (1.f + muffle * 9.f * ms * ms * align);
 			t60lo[k] = t;
 			t60hi[k] = t * 0.8f;
-			lo[k].setDecay(t60lo[k], sr);
-			hi[k].setDecay(t60hi[k], sr);
+			lo.setDecay(k, t60lo[k], sr);
+			hi.setDecay(k, t60hi[k], sr);
 		}
 	}
 
@@ -448,6 +523,14 @@ struct Drum {
 	// the angle enters.
 	// Call AFTER updateModes(): the tilt needs ratio[], which that computes.
 	void updateStrike() {
+		// A pure function of where the stick lands, where the mics are, the
+		// tilt, and the mode layout (the tilt reads ratio[], the level match
+		// t60lo[]); none of them move while a drum rings unattended.
+		const float key[8] = {strikeR, strikeAng, micR[0], micR[1], micAng[0], micAng[1],
+		                      tilt, (float)modesGen};
+		bool same = true;
+		for (int i = 0; i < 8; i++) if (key[i] != strikeKey[i]) { same = false; strikeKey[i] = key[i]; }
+		if (same) return;
 		const MembraneShapes& sh = membraneShapes();
 		float r0 = ratio[0] > 1e-6f ? ratio[0] : 1.f;
 		for (int k = 0; k < NM; k++) {
@@ -526,9 +609,12 @@ struct Drum {
 		float F = mallet.process(headDisp, dt) * fimp * beaterComp;
 
 		float sum[2] = {0.f, 0.f}, resoSum[2] = {0.f, 0.f}, disp = 0.f, ref = 0.f;
+		// hit, step, then read: three flat passes the compiler can vectorise
+		if (F != 0.f)
+			for (int k = 0; k < NM; k++) { lo.re[k] += F * gain[k]; hi.re[k] += F * gain[k] * 0.6f; }
+		lo.step(); hi.step();
 		for (int k = 0; k < NM; k++) {
-			if (F != 0.f) { lo[k].hit(F * gain[k]); hi[k].hit(F * gain[k] * 0.6f); }
-			float a = lo[k].process(), b = hi[k].process();
+			float a = lo.re[k], b = hi.re[k];
 			if (ST) {
 				float ab = a + b * 0.7f;
 				sum[0] += ab * tap[0][k]; resoSum[0] += b * tap[0][k];
@@ -595,7 +681,7 @@ struct Drum {
 	}
 
 	void clear() {
-		for (int k = 0; k < NM; k++) { lo[k].clear(); hi[k].clear(); }
+		lo.clear(); hi.clear();
 		mallet.reset();
 		for (int c = 0; c < 2; c++) wires[c].clear();
 		std::memset(dline, 0, sizeof dline);

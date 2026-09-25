@@ -17,6 +17,14 @@
 
 namespace sfs {
 
+// Four floats as one register. GCC and Clang both take this on every target
+// Rack builds for (x86 SSE, ARM NEON); the loops below are written in it
+// because left to itself the vectoriser went across blocks instead of points.
+typedef float hat4 __attribute__((vector_size(16)));
+static inline hat4 hat4load(const float* p) { hat4 v; std::memcpy(&v, p, sizeof v); return v; }
+static inline void hat4store(float* p, hat4 v) { std::memcpy(p, &v, sizeof v); }
+static inline hat4 hat4splat(float x) { hat4 v = {x, x, x, x}; return v; }
+
 struct Hat {
 	static const int MAXM = 192;   // explicit modes per plate (150 / 133 at Q1)
 	static const int NC = 8;       // contact points round the rim
@@ -62,9 +70,21 @@ struct Hat {
 		float pr[MAXM], pim[MAXM], re[MAXM], im[MAXM];
 		float phiS[MAXM], phiM[2][MAXM], phiC[NC][MAXM], phiCw[NC][MAXM];
 		float rim2[NA][MAXM], radW[2][MAXM], hi[MAXM];
+		// The contact shapes again, blocked four modes at a time: block b holds
+		// modes 4b..4b+3 for all eight points. One pass over these gives all
+		// eight displacements (or velocities), or applies all eight forces --
+		// where the [point][mode] layout took a pass per point per job, which
+		// was 64 passes a sample and most of Kit's CPU. Padding modes are zero.
+		hat4 cB[MAXM / 4][NC], cwB[MAXM / 4][NC];
+		// G[j][i] = sum over modes of phiC[j] * phiC[i]: how much a unit push at
+		// point i moves point j's velocity. It lets the contacts be applied in
+		// ONE pass while still seeing each other in order, as the sequential
+		// model does.
+		float G[NC][NC];
 	};
 	Plate top, bot;
 	float cth[NC], warp[NC];
+	float gapJ[NC] = {0};    // each point's gap for the pedal in force; set in control()
 
 	// field
 	float bf[NB], bw[NB], bE[NB], bSig[NB], bSigP[NB], bOut[NB], bNorm[NB], bPend[NB], cInj[NB];
@@ -73,6 +93,7 @@ struct Hat {
 	BQ bq[NB][2];
 	uint32_t nz[2] = {0x1234567u, 0x7654321u};
 	float phiRim2 = 0.25f, phiStr2 = 0.25f, phiMic2 = 0.25f;
+	float bAmp[NB] = {0};    // a band's output gain, sqrt(energy) in; set per control block
 	float eRef0 = 1.f, strikeScale0 = 1.f, cmax = 0.f;
 	float hpX[NC] = {0}, hpY[NC] = {0}, hpA = 0.5f;
 	int   ctlN = 0;
@@ -120,6 +141,7 @@ struct Hat {
 	}
 	void shapes(Plate& Pl, float rs, float ths) {
 		static const float micR[2] = {0.55f, 0.55f}, micT[2] = {0.9f, 2.3f};
+		std::memset(Pl.cB, 0, sizeof(Pl.cB)); std::memset(Pl.cwB, 0, sizeof(Pl.cwB));
 		for (int k = 0; k < Pl.n; k++) {
 			Pl.phiS[k] = shape(Pl.mi[k], Pl.ni[k], Pl.ph[k], rs, ths);
 			for (int c = 0; c < 2; c++) Pl.phiM[c][k] = shape(Pl.mi[k], Pl.ni[k], Pl.ph[k], micR[c], micT[c]);
@@ -128,7 +150,14 @@ struct Hat {
 				float s = shape(Pl.mi[k], Pl.ni[k], Pl.ph[k], 1.f, 2.f * (float)M_PI * a / NA);
 				Pl.rim2[a][k] = s * s;
 			}
+			for (int j = 0; j < NC; j++) Pl.cB[k >> 2][j][k & 3] = Pl.phiC[j][k];   // lane k&3
 		}
+		for (int j = 0; j < NC; j++)
+			for (int i = 0; i < NC; i++) {
+				double g = 0;
+				for (int k = 0; k < Pl.n; k++) g += (double)Pl.phiC[j][k] * Pl.phiC[i][k];
+				Pl.G[j][i] = (float)g;
+			}
 	}
 	// Frequencies, poles and everything that follows from them. fs = the
 	// frequency scale in force; mute anything the sample rate cannot carry.
@@ -144,7 +173,7 @@ struct Hat {
 			float g = std::exp(-sig * dt);
 			Pl.pr[k]  = on ? g * std::cos(Pl.w[k] * dt) : 0.f;
 			Pl.pim[k] = on ? -g * std::sin(Pl.w[k] * dt) : 0.f;
-			for (int j = 0; j < NC; j++) Pl.phiCw[j][k] = Pl.phiC[j][k] / Pl.w[k];
+			for (int j = 0; j < NC; j++) Pl.cwB[k >> 2][j][k & 3] = Pl.phiCw[j][k] = Pl.phiC[j][k] / Pl.w[k];
 			for (int c = 0; c < 2; c++) Pl.radW[c][k] = on ? radGain * Pl.phiM[c][k] * std::pow(fk / 1000.f, rx) * ref : 0.f;
 			Pl.hi[k] = fk >= FX * 0.5f ? 1.f : 0.f;
 		}
@@ -186,7 +215,7 @@ struct Hat {
 	}
 	void clearState() {
 		for (Plate* Pl : {&top, &bot}) for (int k = 0; k < Pl->n; k++) Pl->re[k] = Pl->im[k] = 0.f;
-		for (int b = 0; b < NB; b++) { bE[b] = bPend[b] = 0.f; bq[b][0].x1 = bq[b][0].x2 = bq[b][0].y1 = bq[b][0].y2 = 0.f; bq[b][1] = bq[b][0]; }
+		for (int b = 0; b < NB; b++) { bE[b] = bPend[b] = bAmp[b] = 0.f; bq[b][0].x1 = bq[b][0].x2 = bq[b][0].y1 = bq[b][0].y2 = 0.f; bq[b][1] = bq[b][0]; }
 		for (int b = 0; b < NB; b++) { BQ& q = bq[b][1]; q.x1 = q.x2 = q.y1 = q.y2 = 0.f; }
 		for (int j = 0; j < NC; j++) hpX[j] = hpY[j] = 0.f;
 		stickI = stickN = 0; eAll = 0.f; ctlN = 0;
@@ -256,6 +285,7 @@ struct Hat {
 		}
 		if (press) {
 			pressModes(top, PRESSD, true); pressModes(bot, PRESSD * 0.7f, false);
+			gaps();
 			pedDone = ped; mufDone = muffle;
 		}
 		if (modes) {
@@ -272,6 +302,8 @@ struct Hat {
 		     : 0.3f + 2.7f * (ped - 0.85f) / 0.15f;
 	}
 	float gapAt(int j) const { return gapG() + TILT * (1.f - std::cos(cth[j])) + warp[j]; }
+	// Only the pedal moves the gaps, so they are worked out when it does.
+	void gaps() { float g = gapG(); for (int j = 0; j < NC; j++) gapJ[j] = g + TILT * (1.f - std::cos(cth[j])) + warp[j]; }
 	void pressModes(Plate& Pl, float D, bool isTop) {
 		float g = gapG(), pen0[NA];
 		for (int a = 0; a < NA; a++) pen0[a] = std::max(0.f, -(g + TILT * (1.f - std::cos(2.f * (float)M_PI * a / NA))));
@@ -321,6 +353,29 @@ struct Hat {
 		float s = F * dt * Pl.invM; float* re = Pl.re;
 		for (int k = 0; k < Pl.n; k++) re[k] += s * phi[k];
 	}
+	// All eight points at once: x[j] = sum over modes of B[mode][j] * v[mode].
+	// Eight accumulators, one per point, each four modes wide.
+	static inline void dot8(const hat4 (*B)[NC], const float* v, int n, float* x) {
+		hat4 acc[NC];
+		for (int j = 0; j < NC; j++) acc[j] = hat4splat(0.f);
+		int nb = (n + 3) >> 2;
+		for (int b = 0; b < nb; b++) {
+			hat4 vb = hat4load(v + 4 * b);
+			for (int j = 0; j < NC; j++) acc[j] += B[b][j] * vb;
+		}
+		for (int j = 0; j < NC; j++) x[j] = (acc[j][0] + acc[j][1]) + (acc[j][2] + acc[j][3]);
+	}
+	// Apply a force at each of the eight points in one pass over the modes.
+	inline void push8(Plate& Pl, const float* F) {
+		hat4 s[NC];
+		for (int j = 0; j < NC; j++) s[j] = hat4splat(F[j] * dt * Pl.invM);
+		int nb = (Pl.n + 3) >> 2;
+		for (int b = 0; b < nb; b++) {
+			hat4 a = Pl.cB[b][0] * s[0];
+			for (int j = 1; j < NC; j++) a += Pl.cB[b][j] * s[j];
+			hat4store(Pl.re + 4 * b, hat4load(Pl.re + 4 * b) + a);
+		}
+	}
 	static inline void step(Plate& Pl) {
 		float* re = Pl.re; float* im = Pl.im; const float* pr = Pl.pr; const float* pi = Pl.pim;
 		for (int k = 0; k < Pl.n; k++) {
@@ -369,6 +424,8 @@ struct Hat {
 		for (int b = 0; b < NB; b++) {
 			bE[b] += bPend[b]; bPend[b] = 0.f;
 			bE[b] *= std::exp(-2.f * bSigP[b] * t);
+			// bE only changes here, so its square root need not be taken per sample
+			bAmp[b] = bE[b] > 0.f ? bNorm[b] * bOut[b] * std::sqrt(bE[b]) * SEAG : 0.f;
 		}
 	}
 
@@ -380,25 +437,59 @@ struct Hat {
 			push(top, top.phiS, -F);          // downward, onto the bottom plate
 			stickI++;
 		}
+		// ── the rim: the plate's own stiffening, and the two plates meeting ──
+		// Written as one gather (every point's displacement), a sequential
+		// decision per point, and one scatter (every point's force). The
+		// sequential model let point j see the velocity changes of the forces
+		// already applied this sample (the stiffening at points 0..j, contacts
+		// at 0..j-1); G reproduces exactly that, so this is the same model
+		// with a quarter of the memory traffic.
+		float xt[NC], xb[NC];
+		dot8(top.cwB, top.im, top.n, xt);
+		dot8(bot.cwB, bot.im, bot.n, xb);
+		float kt[NC], kb[NC], ct[NC] = {0.f}, cb[NC] = {0.f};
+		bool any = false;
 		for (int j = 0; j < NC; j++) {
-			float xt = disp(top, j), xb = disp(bot, j);
-			// the plate's own nonlinearity, as a stiffening spring at the rim
-			push(top, top.phiC[j], -K3 * xt * xt * xt);
-			push(bot, bot.phiC[j], -K3 * xb * xb * xb);
-			if (!contactOn) continue;
-			float g = gapAt(j);
-			float pen = (xb - xt) - g, pen0 = -g;
-			float F;
-			if (pen > 0.f) {
-				float dv = vel(bot, j) - vel(top, j);
-				float c = std::min(KC * pen * std::sqrt(pen) * 1e-3f, cmax);
-				F = hertz(pen) + c * dv - hertz(pen0);
-			} else F = -hertz(pen0);
-			// dynamic force about the pressed rest state; repulsive
-			if (F != 0.f) { push(top, top.phiC[j], F); push(bot, bot.phiC[j], -F); }
-			// only what changes faster than the field's cutoff reaches it
-			float hp = hpA * (hpY[j] + F - hpX[j]); hpX[j] = F; hpY[j] = hp;
-			if (hp != 0.f) { float J = hp * dt, J2 = J * J; for (int b = 0; b < NB; b++) bPend[b] += J2 * cInj[b]; }
+			xt[j] = -xt[j]; xb[j] = -xb[j];
+			// Below a rim movement of 0.003 gap units the stiffening is under
+			// 0.002% of the linear restoring force; skipping it there lets a
+			// quiet, open hat skip the scatter altogether.
+			kt[j] = std::fabs(xt[j]) > 0.003f ? -K3 * xt[j] * xt[j] * xt[j] : 0.f;
+			kb[j] = std::fabs(xb[j]) > 0.003f ? -K3 * xb[j] * xb[j] * xb[j] : 0.f;
+			any = any || kt[j] != 0.f || kb[j] != 0.f;
+		}
+		if (contactOn) {
+			float g[NC], pen[NC];
+			bool touching = false;
+			for (int j = 0; j < NC; j++) {
+				g[j] = gapJ[j]; pen[j] = (xb[j] - xt[j]) - g[j];
+				touching = touching || pen[j] > 0.f;
+			}
+			float vt[NC], vb[NC];
+			if (touching) { dot8(top.cB, top.re, top.n, vt); dot8(bot.cB, bot.re, bot.n, vb); }
+			const float st = dt * top.invM, sb = dt * bot.invM;
+			for (int j = 0; j < NC; j++) {
+				float pen0 = -g[j], F;
+				if (pen[j] > 0.f) {
+					float at = 0.f, ab = 0.f;
+					for (int i = 0; i <= j; i++) { at += top.G[j][i] * kt[i]; ab += bot.G[j][i] * kb[i]; }
+					for (int i = 0; i < j; i++)  { at += top.G[j][i] * ct[i]; ab += bot.G[j][i] * cb[i]; }
+					float dv = (vb[j] + sb * ab) - (vt[j] + st * at);
+					float c = std::min(KC * pen[j] * std::sqrt(pen[j]) * 1e-3f, cmax);
+					F = hertz(pen[j]) + c * dv - hertz(pen0);
+				} else F = -hertz(pen0);
+				// dynamic force about the pressed rest state; repulsive
+				ct[j] = F; cb[j] = -F;
+				any = any || F != 0.f;
+				// only what changes faster than the field's cutoff reaches it
+				float hp = hpA * (hpY[j] + F - hpX[j]); hpX[j] = F; hpY[j] = hp;
+				if (hp != 0.f) { float J = hp * dt, J2 = J * J; for (int b = 0; b < NB; b++) bPend[b] += J2 * cInj[b]; }
+			}
+		}
+		if (any) {
+			float ft[NC], fb[NC];
+			for (int j = 0; j < NC; j++) { ft[j] = kt[j] + ct[j]; fb[j] = kb[j] + cb[j]; }
+			push8(top, ft); push8(bot, fb);
 		}
 		step(top); step(bot);
 		if (++ctlN >= 16) { fieldControl(ctlN); ctlN = 0; }
@@ -410,8 +501,7 @@ struct Hat {
 		for (int c = 0; c < nch; c++) {
 			float s = 0.f;
 			for (int b = 0; b < NB; b++)
-				if (bE[b] > 0.f) s += bq[b][c].run(sh * common[b] + own * white(1)) * bNorm[b] * bOut[b] * std::sqrt(bE[b]);
-			s *= SEAG;
+				if (bAmp[b] > 0.f) s += bq[b][c].run(sh * common[b] + own * white(1)) * bAmp[b];
 			const float* wt = top.radW[c]; const float* wb = bot.radW[c];
 			for (int k = 0; k < top.n; k++) s += wt[k] * top.re[k];
 			for (int k = 0; k < bot.n; k++) s += wb[k] * bot.re[k];

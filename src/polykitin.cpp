@@ -2,8 +2,10 @@
 #include "polykit-messages.hpp"
 
 // ─── PolyKit In — per-instrument inputs for Kit, as a matrix of jacks ────────
-// Sits to the LEFT of a Kit. Thirteen columns by eight rows: every input Kit
-// has, for every instrument, as a mono jack. Where a poly cable says
+// Sits to the LEFT of a Kit. Fourteen columns by eight rows: every input Kit
+// has, for every instrument, as a mono jack, and the hi-hat PEDAL, which Kit
+// has no jack for. Inputs are numbered column by column, so the PEDAL column
+// (added 2026-09) takes the indices after the old 104 and saved cables stay put. Where a poly cable says
 // "channel N is instrument N", this says it with a patch cable per drum.
 
 struct PolyKitIn : Module {
@@ -15,7 +17,8 @@ struct PolyKitIn : Module {
 	static const char* colName(int col) {
 		static const char* N[PK_NCOL] = {"trigger", "V/oct", "velocity", "strike X", "strike Y",
 		                                 "size CV", "tension CV", "material CV", "air CV",
-		                                 "decay CV", "tone CV", "exciter CV", "muffle CV"};
+		                                 "decay CV", "tone CV", "exciter CV", "muffle CV",
+		                                 "hi-hat pedal CV"};
 		return N[col];
 	}
 
@@ -47,10 +50,10 @@ struct PolyKitIn : Module {
 };
 
 // EVERY NUMBER HERE IS READ OUT OF res/polykit-in.svg: the designer's guide
-// circles are the jack centres. Thirteen columns on an 11.85mm pitch, eight
-// rows on 13.54mm.
+// circles are the jack centres. Fourteen columns on an 11.85mm pitch, eight
+// rows on 13.54mm; 35 HP.
 static const float PKI_COLX[PK_NCOL] = {15.19f, 27.05f, 38.90f, 50.75f, 62.60f, 74.45f, 86.30f,
-                                    98.15f, 110.00f, 121.85f, 133.71f, 145.56f, 157.41f};
+                                    98.15f, 110.00f, 121.85f, 133.71f, 145.56f, 157.41f, 169.26f};
 static const float PKI_ROWY[PK_NCH]  = {20.36f, 33.90f, 47.45f, 60.99f, 74.54f, 88.08f, 101.62f, 115.17f};
 
 struct PolyKitInWidget : ModuleWidget {

@@ -110,7 +110,9 @@ Cost 3.1 us/sample, ~15% of a core per ringing hat, before any optimisation.
 instrument (`Kit::Inst::engine`). `tools/kit-hat-check.cpp` runs it against the
 harness case by case: every decay checkpoint within 3 dB, flatness within 0.05
 (they agree to about 2 dB and 0.01). 0.37-0.48 us/sample per ringing hat, from
-flat arrays the compiler vectorises. PEDAL took HIT's place on the panel.
+flat arrays the compiler vectorises; since 2026-09-24 the rim step is one
+gather/decide/scatter over blocked contact shapes with a Gram matrix keeping the
+sequential semantics, 0.19 us open and 0.31 us closed. PEDAL took HIT's place on the panel.
 Output gain: a closed hit peaks ~4.8 V, an open one ~2 V, because a closed hit
 is nearly all transient.
 

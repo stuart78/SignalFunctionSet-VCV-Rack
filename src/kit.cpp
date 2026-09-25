@@ -192,6 +192,11 @@ struct Kit : Module {
 		float lastVel = 0.6f, uiFlash = 0.f;
 		float level = 0.f;                   // peak follower, for the meters
 		int   ctl = 0;                       // control-rate countdown
+		// A quiet instrument only needs its knobs read for the screen, so it is
+		// read every 1024 samples, not 32; a strike zeroes ctl, so control()
+		// still runs on the sample it lands. ctlSpan is the interval just
+		// elapsed, for anything that integrates over it (the hat's pedal slew).
+		int   ctlSet = 32, ctlSpan = 32;
 		int   hold = 0;                      // samples to keep running after a strike
 		// QUIET means "not ringing": the mode bank is skipped entirely, so the
 		// cost of the module tracks how many drums are SOUNDING, not eight.
@@ -363,7 +368,11 @@ struct Kit : Module {
 			H.ring    = 0.25f * std::pow(16.f, pvc(c, DECAY_PARAM, DECAY_INPUT));
 			H.radTilt = 1.15f - 0.8f * pvc(c, TONE_PARAM, TONE_INPUT);
 			H.muffle  = pvc(c, MUFFLE_PARAM, MUFFLE_INPUT);
-			H.pedalT  = clamp(I.v[PEDAL_PARAM], 0.f, 1.f);
+			// PEDAL CV comes only through PolyKit In (Kit has no jack for it),
+			// +/-5 V over the whole knob like every other CV here
+			float ped = I.v[PEDAL_PARAM];
+			if (xp && xp->on[PK_PEDAL][c]) ped += xp->v[PK_PEDAL][c] * 0.2f;
+			H.pedalT  = clamp(ped, 0.f, 1.f);
 			float xcv = 0.f, ycv = 0.f;
 			xin(STRIKEX_INPUT, c, xcv); xin(STRIKEY_INPUT, c, ycv);
 			float x = clamp(I.v[STRIKEX_PARAM] + xcv * 0.2f, -1.f, 1.f);
@@ -372,7 +381,7 @@ struct Kit : Module {
 			H.strikeR   = clamp(r * 0.97f, 0.3f, 0.97f);
 			H.strikeAng = std::atan2(y, x);
 			H.outGain   = 4.8e-4f;     // closed peaks ~4.5 V, open ~2 V: a closed hit is nearly all transient
-			H.control(32);
+			H.control(I.ctlSpan);
 			drum.f0 = sfs::Hat::F2 * H.fscale;   // for the readout
 			I.dispR = r; I.dispA = H.strikeAng;
 			I.dispSize = size; I.dispTens = tens; I.dispAir = 0.f;
@@ -519,10 +528,17 @@ struct Kit : Module {
 				I.quiet = false;
 				// The mallet has a pre-contact gap and the energy follower is
 				// slow, so a fresh strike is held awake long enough to be heard.
-				I.hold = (int)(args.sampleRate * 0.25f);
+				// (The hat has no such gap -- its stick force starts at once --
+				// and a closed hat is 70 dB down by 0.11 s, so a quarter-second
+				// hold was mostly spent computing silence.)
+				I.hold = (int)(args.sampleRate * (I.engine == Inst::HAT ? 0.02f : 0.25f));
 				I.ctl = 0;
 			}
-			if (--I.ctl <= 0) { I.ctl = 32; control(c); }
+			if (--I.ctl <= 0) {
+				I.ctlSpan = I.ctlSet;
+				I.ctl = I.ctlSet = I.quiet ? 1024 : 32;
+				control(c);
+			}
 
 			float lvl = I.v[LEVEL_PARAM];
 			float L = 0.f, R = 0.f;
