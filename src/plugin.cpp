@@ -56,7 +56,7 @@ void init(Plugin* p) {
 	p->addModel(modelFlockIn);
 	p->addModel(modelCanon);
 	p->addModel(modelCount);
-	p->addModel(modelPeal);
+	p->addModel(modelCarillon);
 	p->addModel(modelWheel);
 
 	// Add modules here

@@ -1,7 +1,8 @@
-# Peal: a grid of bells joined by rods
+# Carillon: a set of bells joined by rods
 
-Design written 2026-09-22 and built hidden the same day; every item under "What to measure" passes in `tools/peal-harness.cpp`. A peal is a set of bells rung in
-sequence, which is what a ripple through the grid is.
+Design written 2026-09-22 and built hidden the same day; every item under "What to measure" passes in `tools/carillon-harness.cpp`. A carillon is a set of tuned bells
+played as one instrument, which is what a ripple through the grid is. (Called Peal until
+2026-09-25.)
 
 ## The idea
 
@@ -224,6 +225,89 @@ and the outputs on a plate: L, R, POLY.
 - **The grid fills the display**: the front row spans most of the width and
   the plane starts closer to the front edge, the display is 56 mm tall, and
   the pot row is eight across.
+
+## The fourth pass: Carillon (2026-09-25)
+
+Renamed from Peal, and six things changed. Where this section and the ones
+above disagree, this one is current.
+
+- **A bell IS a note.** Bell n is the semitone n - 12 from ROOT, 25 unique
+  semitones across two octaves, whatever the layout. V/OCT folds by octaves
+  into those two octaves and strikes that exact bell, felted or not. The old
+  Tonnetz fold left some semitones with no bell and gave others two, and the
+  V/OCT lookup took the NEAREST bell and skipped felted ones, so notes 5 and 6
+  of a Note sequence struck the same bell. Rods are stored by bell, so a
+  layout change keeps them joined to the same two notes. The harness strikes
+  all 49 notes from -24 to +24 at two roots and requires each to land on its
+  own bell.
+- **Layouts are physical, and a rod's length is its time.** Grid (a snake, so
+  consecutive steps are neighbours), Keyboard (naturals in front, sharps
+  behind, following the root), Ring, Spiral (low bells in the middle) and
+  Scatter (seeded). Each is a path of 25 positions with a tuning order laid
+  along it: by pitch, by fifths (a fixed path where every step is a fifth or
+  a fourth), or shuffled. The keyboard has no order, because a key's place is
+  its note. A crossing takes SPEED per NEIGHBOUR SPACING of rod (the median
+  nearest-neighbour distance of the layout) free-running, and with CLOCK
+  patched one pulse per spacing, rounded, at least one. So a rod laid across
+  the layout waits several beats and the layout becomes part of the rhythm.
+  Rod presets are built on the path and the pitches, so they mean the same
+  thing in every layout: a chain along the path, every bell to its
+  neighbours, a star from the middle, octaves, fifths.
+- **REACH is transmission, not a floor.** It was a floor below which nothing
+  crossed, so at its bottom a strike still went five bells and the knob only
+  moved tails too quiet to hear. Now it is the fraction of arriving energy
+  that crosses, 0.95 x REACH squared, split between the rods (energy is still
+  conserved), against a fixed floor of 2e-4. **Energy ripples outward**: it
+  leaves by every rod except the one it came in on, because sent back as well,
+  half of every crossing on a chain returned to where it had been and read as
+  an echo. Measured along the chain at full velocity: 1 / 4 / 7 / 16 / 25
+  bells at REACH 0 / .25 / .5 / .75 / 1.
+- **Circles again.** The hanging bells were tested at their feet, so the body
+  of a back-row bell covered the hit point of the bell in front of it, and
+  the top row's labels were drawn off the display. Now each bell is a circle
+  (larger for a lower note, smaller with depth, drawn back to front) that
+  fills orange when struck and throws a ring while it sounds; a felted bell is
+  hollow. The hit test picks the bell the pointer is most nearly central in,
+  and the note label drops below a bell that would clip the top. The harness
+  requires every bell to be hoverable at its own centre in every layout and
+  tuning order, and at every root on the keyboard.
+- **The bell sound, round one.** 17 partials from carillon bell data: hum,
+  prime, tierce, quint, nominal and the upper partials, with doublets on hum,
+  prime, tierce and nominal. Levels are strike levels as heard, so no
+  radiation tilt is applied to the bell (only the bar gets one, through
+  SHAPE). T60s at C4 run from 30 s on the hum to under a second on the
+  highest partial, so a bright clang settles onto a long, dark, beating hum
+  and tierce. The clapper noise is smaller and gone in a couple of
+  milliseconds. A bell below -90 dB of a full strike stops being computed.
+
+## The fifth pass: in tune, headroom, and a longer ring (2026-09-25)
+
+After the first listen to the fourth pass ("pitch is often a bit out of tune",
+"gets a bit distorted sometimes", and bell plates in an orchestral recording
+sustaining far longer than DAMP's floor allowed):
+
+- **SIZE transposed continuously**, so anywhere but 12 o'clock every bell was
+  out of tune with the rest of the patch (120 cents at 45%). It now moves
+  pitch in whole octaves (large bells / as cast / hand bells, in thirds of
+  the knob) and moves ring time continuously.
+- **The partials that set the heard pitch were sharp.** A bell's strike note
+  is the pitch implied by its nominal, twelfth and upper octave, and those
+  sat 34-74 cents sharp (4.10, 5.10, 6.12, 8.35), with every doublet's
+  second member sharp as well. The loud member of each doublet is now exact
+  and the weak one sits either side (prime -1.1 c, nominal +1.3 c), and the
+  twelfth, upper octave, 5th and 6th are within 8.6 cents of true. The minor
+  tierce stays: it is what a bell is, and it is also why bells sound
+  "out of tune" in a major chord (every note carries its own minor third).
+- **Distortion was the output clamp.** The mics' full inverse-distance law
+  made a front-row bell 2.4x louder than a middle one, and a front-row triad
+  at full velocity hit the 10 V clamp. The law is now half that in dB
+  (`1/sqrt(1+d)`, a 4.9 dB spread across the grid instead of 7.6), the output
+  gain is lower, and the outs are soft-clipped (linear to 6 V, asymptotic to
+  10) rather than clamped. That triad now peaks at 7.3 V in the knee.
+- **DAMP is a ring-time multiplier**, log-linear: 4x as cast at the bottom,
+  as cast at 27%, the old default's ring at the new default 36%, the old
+  maximum at the top. A middle C falls 60 dB in 97 s at DAMP 0, 16 s at the
+  default.
 
 ## Open questions
 
