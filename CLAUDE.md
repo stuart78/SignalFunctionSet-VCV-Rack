@@ -10,7 +10,7 @@ This is a VCV Rack plugin called "Signal Function Set" that provides modular syn
 2. **GSX** — Granular synthesis (Barry Truax GSX system, 1985-86)
 3. **Fugue** — 8-step harmonic deviation sequencer with three CV/gate voices
 4. **Fugue X** — Expander for Fugue: per-voice steps/range/sleep/probability
-5. **Phase** — Dual sample looper with sleep-based phase drift + live recording
+5. **Phase** — Dual sample looper with sleep-based phase drift + live recording; per-player LEVEL and DJ filter, POLY (A L/R, B L/R) and two-channel SYNC (loop-start triggers) outs
 6. **Overtone** — Additive VCO with 8 togglable harmonics, even/odd filter, binary-mask CV
 7. **Intone** — CHANT/FOF formant synthesis voice with vowel morphing
 8. **Tine** — Tunable 3rd-order pingable resonator (Gamelan Resonator circuit)
@@ -211,7 +211,7 @@ The build system uses the VCV Rack plugin framework via `$(RACK_DIR)/plugin.mk`.
 - `src/gsx.cpp` — GSX
 - `src/fugue.cpp` — Fugue (`src/harmonic-tiers.hpp` = its deviation tiers and consonance score, shared with Canon)
 - `src/fugue-expander.cpp` — Fugue X
-- `src/phase.cpp` — Phase
+- `src/phase.cpp` — Phase (`tools/phase-harness.cpp` = sync-out timing in every mode, level, DJ filter, poly out, and a default-settings render to compare against the previous commit)
 - `src/overtone.cpp` — Overtone
 - `src/intone.cpp` — Intone
 - `src/tine.cpp` — Tine
@@ -638,6 +638,16 @@ Each loop has a bipolar "sleep" parameter (-500ms to +500ms) and a mode switch:
 - **Type**: CKSS toggle switch
 - **Function**: Selects between Sleep mode (up) and Rotate mode (down) per loop
 
+##### 5. Level (trimpot, appended 2026-09)
+- **Range**: silent to +6 dB, square law (`gain = v²`, v 0..√2), default unity; reads in dB (`PhaseLevelQuantity`)
+- **Function**: per-player volume, asked for by a user balancing two samples
+
+##### 6. Filter (trimpot + CV, appended 2026-09)
+- **Range**: -1 (lowpass, 20 kHz down to 60 Hz) · 0 (off) · +1 (highpass, 20 Hz up to 8 kHz), exponential sweep; CV ±5 V = the whole range
+- **Function**: DJ-style filter (`DJFilter`, a TPT state-variable filter, so crossing the centre only swaps which output is read from the same state). Resonance rises from 0.707 to 1.3 away from the centre; within 5% of the centre the output crossfades to dry, since even a 20 kHz lowpass is not a wire. At the centre the output is the input exactly.
+
+Per player the chain is **loop → level → filter → pan**; `processLoop()` returns the loop's mono voltage and `process()` does the rest, so the POLY out can carry each player alone. At default settings the stereo out matches the pre-2026-09 build to −144 dB (`tools/phase-harness.cpp` with `-DPHASE_RENDER`).
+
 ### Inputs
 
 #### Per Loop (x2)
@@ -649,6 +659,7 @@ Each loop has a bipolar "sleep" parameter (-500ms to +500ms) and a mode switch:
 | CLK | Trigger | Jump playhead to next detected transient |
 | START | 0-10V | Loop start position (0-100% of sample) |
 | LEN | 0-10V | Loop length (0-100% of remaining sample after start) |
+| FILTER CV | ±5V | Added to the Filter knob, ±5V = the whole range |
 
 #### Global
 | Input | Range | Function |
@@ -661,6 +672,10 @@ Each loop has a bipolar "sleep" parameter (-500ms to +500ms) and a mode switch:
 |--------|----------|
 | LEFT | Stereo left mix of both loops |
 | RIGHT | Stereo right mix of both loops |
+| POLY | 4 channels: A L, A R, B L, B R, each after its level, filter and pan (together they sum to LEFT/RIGHT exactly) |
+| SYNC | 2 channels: a 1 ms trigger as A starts its loop, and as B does. It fires when the audio actually starts over: at the wrap, when a Sleep-mode silence ends, when an anti-click jump lands (1 ms after the wrap), on SYNC. Clock transient jumps are not starts. `LoopState::started/startPending` |
+
+Note that with VCA (anti-click) mode on, a Sleep-mode loop's period is its length **plus 1 ms**: the fade-out holds the last sample before the jump. Existing behaviour; the SYNC out reports it faithfully.
 
 ### Controls
 
@@ -738,27 +753,24 @@ On rising edge of CLK input, the playhead jumps to the next transient after the 
 - Eliminates clicks from playhead discontinuities
 - Implementation: fade-out (1ms) → execute jump → fade-in (1ms)
 
-### Panel Layout (20HP = 101.6mm wide)
+### Panel Layout (19HP = 96.52mm wide)
 
-All positions in mm, used with `mm2px()`:
+The panel is the designer's outlined art (no `sfs::PanelLabels`). The 2026-09 labels (LEVEL, FILTER, CV, POLY, SYNC) were outlined into it from the bundled Figtree, **interpolated halfway between Regular and SemiBold** (t = 0.45, the art is set in Medium, which the plugin does not ship), 7 art units, HarfBuzz kerning and −0.18 units of letter spacing: fitted against five of the art's own words to within 0.02 units a glyph. Art units are 2.835/mm (72 dpi) and the guides sit 0.55 units below the code's centres. All positions in mm, used with `mm2px()`:
 
 ```
-WAVEFORM DISPLAY: position (5.8, 14), size 90mm x 24mm
+WAVEFORM DISPLAY: position (2.54, 14), size 91.44mm x 24mm
 
-LOOP A:
-  Knobs  Y=50:    Sleep(15.24)   Speed(35.56)   Pan(55.88)
-  CVs    Y=62:    SleepCV(15.24) SpeedCV(35.56) PanCV(55.88)
-  Jacks  Y=50:    ClkA(76.2)     StartA(86.36)  LenA(96.52)
-  Switch Y=62:    ModeA(86.36)
+LOOP A (B is the same, 27.94mm lower):
+  Jacks  Y=50.8:  Clk(10.16)  Start(20.32)  Len(30.48)
+  Row    Y=63.5:  LEVEL trim(10.16)  FILTER trim(20.32)  FILTER CV(30.48)
+  Switch Y=53.34: Mode(43.18)
+  Knobs  Y=53.34: Drift(55.88)  Speed(73.66)  Pan(88.9)   Rogan1PWhite (the Mutable caps; 1P is the largest that clears SPEED's ticks)
+  CVs    Y=63.5:  Drift(55.88)  Speed(73.66)  Pan(88.9)
 
-LOOP B:
-  Knobs  Y=78:    Sleep(15.24)   Speed(35.56)   Pan(55.88)
-  CVs    Y=90:    SleepCV(15.24) SpeedCV(35.56) PanCV(55.88)
-  Jacks  Y=78:    ClkB(76.2)     StartB(86.36)  LenB(96.52)
-  Switch Y=90:    ModeB(86.36)
-
-BOTTOM ROW Y=110:
-  Play(15.24)  PlayGate(25.4)  Sync(45.72)  SyncCV(56)  Left(76.2)  Right(91.44)
+BOTTOM:
+  Y=106.68: Play(10.16)  Sync(20.32)  RecA(35.56)  Link(50.79)  RecB(66.03)
+  Y=116.84: PlayGate(10.16)  SyncCV(20.32)  GateA(35.56)  InA(45.72)  InB(55.88)  GateB(66.13)
+  Output plate: POLY(78.74, 104.5)  SYNC(88.9, 104.5)  L(78.74, 116.84)  R(88.9, 116.84)
 ```
 
 ### Implementation Details

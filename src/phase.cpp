@@ -141,6 +141,69 @@ struct LoopState {
 	double jumpTarget = -1.0;   // where to jump after fade-out completes
 	// Rotate mode: accumulated rotation offset in samples
 	double rotationOffset = 0.0;
+	// SYNC OUT: set on the sample the loop actually begins again (a wrap, a
+	// wake from sleep, a SYNC), and read by process(). A wrap in VCA mode is
+	// a scheduled jump that lands 1 ms later, and the trigger belongs to the
+	// landing, when the audio starts over, so the wrap only marks it pending.
+	bool startPending = false;
+	bool started = false;
+};
+
+
+// A DJ-style filter: one knob, centre is straight through, left sweeps a
+// lowpass down, right sweeps a highpass up. A TPT state-variable filter, so
+// crossing the centre only swaps which output is read from the same state and
+// nothing jumps. Resonance rises a little as the knob leaves the centre, the
+// small peak that makes a sweep audible as a sweep. Within 5% of the centre
+// the filtered signal crossfades with the dry one, since even a 20 kHz
+// lowpass is not a wire.
+struct DJFilter {
+	float ic1 = 0.f, ic2 = 0.f;
+	float a1 = 0.f, a2 = 0.f, a3 = 0.f, k = 1.f;
+	float setPos = 2.f, setSr = 0.f;
+	static float cutoff(float pos) {
+		return pos < 0.f ? 20000.f * std::pow(60.f / 20000.f, -pos)
+		                 : 20.f * std::pow(8000.f / 20.f, pos);
+	}
+	float process(float x, float pos, float sr) {
+		if (pos != setPos || sr != setSr) {
+			setPos = pos; setSr = sr;
+			float f = std::min(cutoff(pos), sr * 0.45f);
+			float g = std::tan((float)M_PI * f / sr);
+			float q = 0.707f + 0.6f * std::fabs(pos);
+			k = 1.f / q;
+			a1 = 1.f / (1.f + g * (g + k));
+			a2 = g * a1;
+			a3 = g * a2;
+		}
+		float v3 = x - ic2;
+		float v1 = a1 * ic1 + a2 * v3;
+		float v2 = ic2 + a2 * ic1 + a3 * v3;
+		ic1 = 2.f * v1 - ic1;
+		ic2 = 2.f * v2 - ic2;
+		float y = pos < 0.f ? v2 : x - k * v1 - v2;    // lowpass : highpass
+		float wet = std::min(std::fabs(pos) / 0.05f, 1.f);
+		return x + (y - x) * wet;
+	}
+};
+
+// LEVEL reads in dB. The pot is a square law up to +6 dB, so the top of its
+// travel is fine control around unity and the bottom is a fade to silence.
+struct PhaseLevelQuantity : ParamQuantity {
+	std::string getDisplayValueString() override {
+		float g = getValue() * getValue();
+		if (g < 1e-4f) return "-inf dB";
+		return string::f("%+.1f dB", 20.f * std::log10(g));
+	}
+};
+struct PhaseFilterQuantity : ParamQuantity {
+	std::string getDisplayValueString() override {
+		float v = getValue();
+		if (std::fabs(v) < 0.005f) return "off (straight through)";
+		float f = DJFilter::cutoff(v);
+		std::string hz = f >= 1000.f ? string::f("%.1f kHz", f / 1000.f) : string::f("%.0f Hz", f);
+		return (v < 0.f ? "lowpass " : "highpass ") + hz;
+	}
 };
 
 
@@ -341,6 +404,10 @@ struct Phase : Module {
 		REC_A_PARAM,
 		REC_B_PARAM,
 		REC_LINK_PARAM,  // link switch: when on, REC A and REC B trigger together
+		LEVEL_A_PARAM,   // appended 2026-09: per-player level, and the DJ filter
+		LEVEL_B_PARAM,
+		FILTER_A_PARAM,
+		FILTER_B_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -362,11 +429,15 @@ struct Phase : Module {
 		REC_A_GATE_INPUT,   // record gate
 		REC_B_INPUT,        // audio in for recording (normalled from REC_A_INPUT)
 		REC_B_GATE_INPUT,   // record gate (normalled from REC_A_GATE_INPUT)
+		FILTER_A_INPUT,     // appended 2026-09
+		FILTER_B_INPUT,
 		INPUTS_LEN
 	};
 	enum OutputId {
 		LEFT_OUTPUT,
 		RIGHT_OUTPUT,
+		POLY_OUTPUT,        // appended 2026-09: A L, A R, B L, B R
+		SYNC_OUTPUT,        // appended 2026-09: a trigger as A starts, as B starts
 		OUTPUTS_LEN
 	};
 	enum LightId {
@@ -384,6 +455,8 @@ struct Phase : Module {
 	RecState recA;
 	RecState recB;
 	dsp::SchmittTrigger syncTrigger;
+	DJFilter filterA, filterB;
+	dsp::PulseGenerator startPulseA, startPulseB;
 	bool sampleBExplicitlyLoaded = false;
 	bool playing = false;
 
@@ -445,6 +518,15 @@ struct Phase : Module {
 
 		configOutput(LEFT_OUTPUT, "Left");
 		configOutput(RIGHT_OUTPUT, "Right");
+
+		configParam<PhaseLevelQuantity>(LEVEL_A_PARAM, 0.f, std::sqrt(2.f), 1.f, "Level A");
+		configParam<PhaseLevelQuantity>(LEVEL_B_PARAM, 0.f, std::sqrt(2.f), 1.f, "Level B");
+		configParam<PhaseFilterQuantity>(FILTER_A_PARAM, -1.f, 1.f, 0.f, "Filter A (left lowpass, right highpass)");
+		configParam<PhaseFilterQuantity>(FILTER_B_PARAM, -1.f, 1.f, 0.f, "Filter B (left lowpass, right highpass)");
+		configInput(FILTER_A_INPUT, "Filter A CV (±5 V sweeps the whole knob)");
+		configInput(FILTER_B_INPUT, "Filter B CV (±5 V sweeps the whole knob)");
+		configOutput(POLY_OUTPUT, "Poly: A left, A right, B left, B right");
+		configOutput(SYNC_OUTPUT, "Poly sync: a trigger as A starts its loop, and as B does");
 
 		// Pre-allocate the record buffers once at construction.
 		// This avoids any allocation on the audio thread when recording starts.
@@ -1189,22 +1271,16 @@ struct Phase : Module {
 
 	// --- DSP ---
 
+	// Returns the loop's voltage, mono, before level, filter and pan (which
+	// process() applies, so the poly out can carry each player on its own).
 	float processLoop(LoopState& loop, SampleData& sd,
-	                   float sleepMs, float speed, float pan,
+	                   float sleepMs, float speed,
 	                   bool rotateMode, float sampleTime,
-	                   float& leftOut, float& rightOut,
 	                   bool recording = false, float monitorAudio = 0.f) {
 		// While recording, suppress loop playback and pass through the dry
-		// monitor signal at the buffer's current pan position. This lets the
-		// user hear what they're tracking without any feedback risk.
-		if (recording) {
-			float panNorm = (pan + 1.f) * 0.5f;
-			float leftGain = std::cos(panNorm * M_PI * 0.5f);
-			float rightGain = std::sin(panNorm * M_PI * 0.5f);
-			leftOut += monitorAudio * leftGain;
-			rightOut += monitorAudio * rightGain;
-			return monitorAudio;
-		}
+		// monitor signal. This lets the user hear what they're tracking
+		// without any feedback risk.
+		if (recording) return monitorAudio;
 
 		if (!sd.loaded || sd.length == 0) return 0.f;
 
@@ -1223,6 +1299,7 @@ struct Phase : Module {
 					loop.sleeping = false;
 					loop.sleepRemaining = 0.f;
 					loop.jumpTarget = -1.0; // clear target, now fade in
+					if (loop.startPending) { loop.started = true; loop.startPending = false; }
 				}
 			} else {
 				// Fading back in after jump
@@ -1285,8 +1362,10 @@ struct Phase : Module {
 			// Wrap playhead at loop boundary in either direction.
 			if (loop.playhead >= (double)regionEnd) {
 				loop.playhead = (double)regionStart + (loop.playhead - (double)regionEnd);
+				loop.started = true;
 			} else if (loop.playhead < (double)regionStart) {
 				loop.playhead = (double)regionEnd - ((double)regionStart - loop.playhead);
+				loop.started = true;
 			}
 
 			// Accumulate drift continuously (no discrete jumps)
@@ -1306,6 +1385,7 @@ struct Phase : Module {
 				loop.sleepRemaining -= sampleTime;
 				if (loop.sleepRemaining <= 0.f) {
 					loop.sleeping = false;
+					loop.started = true;
 					loop.playhead = (speed >= 0.f) ? (double)regionStart : (double)(regionEnd - 1);
 					if (vcaMode) {
 						loop.envelope = 0.f;
@@ -1368,8 +1448,10 @@ struct Phase : Module {
 						loop.sleepRemaining = sleepMs / 1000.f;
 					} else if (vcaMode) {
 						scheduleJump(loop, wrapTarget);
+						loop.startPending = true;
 					} else {
 						loop.playhead = wrapTarget;
+						loop.started = true;
 					}
 				}
 			}
@@ -1378,17 +1460,8 @@ struct Phase : Module {
 		// Apply VCA envelope
 		float env = vcaMode ? loop.envelope : 1.f;
 
-		// Equal-power panning: pan [-1, +1] mapped to [0, 1]
-		float panNorm = (pan + 1.f) * 0.5f;
-		float leftGain = std::cos(panNorm * M_PI * 0.5f);
-		float rightGain = std::sin(panNorm * M_PI * 0.5f);
-
 		// Scale to VCV audio level (±5V)
-		float output = sample * 5.f * env;
-		leftOut += output * leftGain;
-		rightOut += output * rightGain;
-
-		return sample;
+		return sample * 5.f * env;
 	}
 
 	// Schedule a jump: in VCA mode, fade out first; otherwise instant
@@ -1546,6 +1619,11 @@ struct Phase : Module {
 		if (!isPlaying && !isRecording(recA) && !isRecording(recB)) {
 			outputs[LEFT_OUTPUT].setVoltage(0.f);
 			outputs[RIGHT_OUTPUT].setVoltage(0.f);
+			outputs[POLY_OUTPUT].setChannels(4);
+			for (int c = 0; c < 4; c++) outputs[POLY_OUTPUT].setVoltage(0.f, c);
+			outputs[SYNC_OUTPUT].setChannels(2);
+			outputs[SYNC_OUTPUT].setVoltage(0.f, 0);
+			outputs[SYNC_OUTPUT].setVoltage(0.f, 1);
 			return;
 		}
 
@@ -1560,6 +1638,9 @@ struct Phase : Module {
 			double startB = (double)(size_t)(sampleB.loopStart * sampleB.length);
 			scheduleJump(loopA, startA);
 			scheduleJump(loopB, startB);
+			// the trigger goes out when the audio starts over, not now
+			if (vcaMode) { loopA.startPending = loopB.startPending = true; }
+			else { loopA.started = loopB.started = true; }
 		}
 
 		// Clock triggers - jump to transient
@@ -1634,8 +1715,6 @@ struct Phase : Module {
 		}
 
 		// Process both loops
-		float leftOut = 0.f;
-		float rightOut = 0.f;
 
 		bool rotateModeA = params[MODE_A_PARAM].getValue() < 0.5f;
 		bool rotateModeB = params[MODE_B_PARAM].getValue() < 0.5f;
@@ -1646,16 +1725,45 @@ struct Phase : Module {
 
 		// If not playing but recording, run the loop function only for monitor
 		// passthrough on the recording buffer. Don't advance/play the other buffer.
+		float voiceA = 0.f, voiceB = 0.f;
 		if (isPlaying || isRecording(recA))
-			processLoop(loopA, sampleA, sleepA, speedA, panA, rotateModeA, args.sampleTime, leftOut, rightOut,
-			            isRecording(recA), monitorA);
+			voiceA = processLoop(loopA, sampleA, sleepA, speedA, rotateModeA, args.sampleTime,
+			                     isRecording(recA), monitorA);
 		if (isPlaying || isRecording(recB))
-			processLoop(loopB, sampleB, sleepB, speedB, panB, rotateModeB, args.sampleTime, leftOut, rightOut,
-			            isRecording(recB), monitorB);
+			voiceB = processLoop(loopB, sampleB, sleepB, speedB, rotateModeB, args.sampleTime,
+			                     isRecording(recB), monitorB);
 
-		// Clamp output
-		outputs[LEFT_OUTPUT].setVoltage(clamp(leftOut, -10.f, 10.f));
-		outputs[RIGHT_OUTPUT].setVoltage(clamp(rightOut, -10.f, 10.f));
+		// Level, then the DJ filter, then the pan: per player, so the poly
+		// out carries each one on its own
+		float filtA = clamp(params[FILTER_A_PARAM].getValue() + inputs[FILTER_A_INPUT].getVoltage() * 0.2f, -1.f, 1.f);
+		float filtB = clamp(params[FILTER_B_PARAM].getValue() + inputs[FILTER_B_INPUT].getVoltage() * 0.2f, -1.f, 1.f);
+		float lvlA = params[LEVEL_A_PARAM].getValue(), lvlB = params[LEVEL_B_PARAM].getValue();
+		voiceA = filterA.process(voiceA * lvlA * lvlA, filtA, args.sampleRate);
+		voiceB = filterB.process(voiceB * lvlB * lvlB, filtB, args.sampleRate);
+		// equal-power pan, [-1, +1] onto a quarter circle
+		auto panGains = [](float pan, float& l, float& r) {
+			float a = (pan + 1.f) * 0.25f * (float)M_PI;
+			l = std::cos(a); r = std::sin(a);
+		};
+		float lA, rA, lB, rB;
+		panGains(panA, lA, rA);
+		panGains(panB, lB, rB);
+		float aL = voiceA * lA, aR = voiceA * rA, bL = voiceB * lB, bR = voiceB * rB;
+
+		outputs[LEFT_OUTPUT].setVoltage(clamp(aL + bL, -10.f, 10.f));
+		outputs[RIGHT_OUTPUT].setVoltage(clamp(aR + bR, -10.f, 10.f));
+		outputs[POLY_OUTPUT].setChannels(4);
+		outputs[POLY_OUTPUT].setVoltage(clamp(aL, -10.f, 10.f), 0);
+		outputs[POLY_OUTPUT].setVoltage(clamp(aR, -10.f, 10.f), 1);
+		outputs[POLY_OUTPUT].setVoltage(clamp(bL, -10.f, 10.f), 2);
+		outputs[POLY_OUTPUT].setVoltage(clamp(bR, -10.f, 10.f), 3);
+
+		// SYNC OUT: a 1 ms trigger per player as its loop starts over
+		if (loopA.started) { startPulseA.trigger(1e-3f); loopA.started = false; }
+		if (loopB.started) { startPulseB.trigger(1e-3f); loopB.started = false; }
+		outputs[SYNC_OUTPUT].setChannels(2);
+		outputs[SYNC_OUTPUT].setVoltage(startPulseA.process(args.sampleTime) ? 10.f : 0.f, 0);
+		outputs[SYNC_OUTPUT].setVoltage(startPulseB.process(args.sampleTime) ? 10.f : 0.f, 1);
 	}
 };
 
@@ -2044,18 +2152,24 @@ struct PhaseWidget : ModuleWidget {
 		addChild(display);
 
 		// --- Loop A controls ---
-		// Left side: CLK, START, LEN jacks (Y=53.34mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 53.34f)), module, Phase::CLOCK_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 53.34f)), module, Phase::START_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 53.34f)), module, Phase::END_A_INPUT));
+		// Left side: CLK, START, LEN jacks (Y=50.8mm, a tenth of an inch above
+		// the knob row so the labels of the row under them fit)
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 50.8f)), module, Phase::CLOCK_A_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 50.8f)), module, Phase::START_A_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 50.8f)), module, Phase::END_A_INPUT));
+		// LEVEL, FILTER and its CV under them, on the CV row (Y=63.5mm)
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(10.16f, 63.5f)), module, Phase::LEVEL_A_PARAM));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(20.32f, 63.5f)), module, Phase::FILTER_A_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 63.5f)), module, Phase::FILTER_A_INPUT));
 
 		// Mode switch A (Y=53.34mm)
 		addParam(createParamCentered<CKSS>(mm2px(Vec(43.18f, 53.34f)), module, Phase::MODE_A_PARAM));
 
-		// Knobs: Drift, Speed, Pan (Y=53.34mm)
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(55.88f, 53.34f)), module, Phase::SLEEP_A_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(73.66f, 53.34f)), module, Phase::SPEED_A_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(88.9f, 53.34f)), module, Phase::PAN_A_PARAM));
+		// Knobs: Drift, Speed, Pan (Y=53.34mm). White Rogans, the Mutable caps;
+		// Rogan1P is the largest that clears SPEED's tick marks.
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(55.88f, 53.34f)), module, Phase::SLEEP_A_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(73.66f, 53.34f)), module, Phase::SPEED_A_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(88.9f, 53.34f)), module, Phase::PAN_A_PARAM));
 
 		// CV inputs (Y=63.5mm)
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 63.5f)), module, Phase::SLEEP_A_INPUT));
@@ -2063,18 +2177,21 @@ struct PhaseWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(88.9f, 63.5f)), module, Phase::PAN_A_INPUT));
 
 		// --- Loop B controls ---
-		// Left side: CLK, START, LEN jacks (Y=81.28mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 81.28f)), module, Phase::CLOCK_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 81.28f)), module, Phase::START_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 81.28f)), module, Phase::END_B_INPUT));
+		// Left side: CLK, START, LEN jacks (Y=78.74mm), then LEVEL, FILTER, CV (Y=91.44mm)
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 78.74f)), module, Phase::CLOCK_B_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 78.74f)), module, Phase::START_B_INPUT));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 78.74f)), module, Phase::END_B_INPUT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(10.16f, 91.44f)), module, Phase::LEVEL_B_PARAM));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(20.32f, 91.44f)), module, Phase::FILTER_B_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 91.44f)), module, Phase::FILTER_B_INPUT));
 
 		// Mode switch B (Y=81.28mm)
 		addParam(createParamCentered<CKSS>(mm2px(Vec(43.18f, 81.28f)), module, Phase::MODE_B_PARAM));
 
 		// Knobs: Drift, Speed, Pan (Y=81.28mm)
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(55.88f, 81.28f)), module, Phase::SLEEP_B_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(73.66f, 81.28f)), module, Phase::SPEED_B_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(88.9f, 81.28f)), module, Phase::PAN_B_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(55.88f, 81.28f)), module, Phase::SLEEP_B_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(73.66f, 81.28f)), module, Phase::SPEED_B_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(88.9f, 81.28f)), module, Phase::PAN_B_PARAM));
 
 		// CV inputs (Y=91.44mm)
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 91.44f)), module, Phase::SLEEP_B_INPUT));
@@ -2109,9 +2226,12 @@ struct PhaseWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 116.84f)), module, Phase::REC_B_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(66.13f, 116.84f)), module, Phase::REC_B_GATE_INPUT));
 
-		// Stereo outputs (Y=116.84mm)
+		// Stereo outputs (Y=116.84mm), with POLY (A L, A R, B L, B R) and
+		// the two-channel SYNC above them on the same plate (Y=104.5mm)
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.74f, 116.84f)), module, Phase::LEFT_OUTPUT));
 		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.9f, 116.84f)), module, Phase::RIGHT_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.74f, 104.5f)), module, Phase::POLY_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.9f, 104.5f)), module, Phase::SYNC_OUTPUT));
 	}
 
 	// Drag-and-drop WAV files onto the module to load samples. Dropping two
