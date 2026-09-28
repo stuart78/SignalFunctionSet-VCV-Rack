@@ -207,7 +207,7 @@ struct WheelOsc {
 		// every sample for every voice whatever WAVE said: 2026-09-25), and the
 		// sine is the polynomial one (-108 dB).
 		float s = clamp(shape, 0.f, 1.f) * 3.f;
-		int seg = (int)s; if (seg > 2) seg = 2;
+		int seg = (int)s; if (seg > 2) seg = 2; if (seg < 0) seg = 0;   // a NaN shape must not index before w
 		float f = s - (float)seg;
 		float w[4] = {0.f, 0.f, 0.f, 0.f};
 		for (int i = seg; i <= seg + 1; i++) {

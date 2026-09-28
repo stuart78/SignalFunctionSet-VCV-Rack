@@ -15,6 +15,11 @@ panel_reticules.py reads each file's own viewBox/width_mm, so the unit is free.
     python3 tools/figma_panel_template.py --scale 1     # Rack units, for Illustrator
     python3 tools/figma_panel_template.py --from chime  # a module that already exists
     python3 tools/figma_panel_template.py --fixup res/new.svg
+    python3 tools/figma_panel_template.py --grid --from chime   # with the GUIDES grid layer
+
+The GUIDES layer (eighth/quarter/HP grid lines and numbering) is left OUT by
+default: the designer works from Figma's own layout grid and deletes it on
+arrival (2026-09-26). --grid puts it back.
 
 --fixup rewrites a Figma export's px header into the mm+viewBox form Rack and
 tools/panel_reticules.py both expect, and adds the empty Reticules layer. It
@@ -45,6 +50,9 @@ S = 4.0
 # component disappears underneath it, and takes any art drawn flush with it.
 # 2 puts every edge on the quarter grid itself, at up to 17% distortion.
 SNAP = 4
+
+# Whether exports carry the GUIDES grid layer. Off: see the docstring.
+GRID = False
 
 PANEL = "#f0f0f0"
 INK = "#231f20"
@@ -261,8 +269,7 @@ def panel_svg(hp_units):
         g("Background", [rect(0, 0, w, PANEL_H, PANEL)]),
         g("Reticules", ['<!-- owned by tools/panel_reticules.py, never hand-edited -->']),
         g("UI", ['<!-- artwork: plates, screens, marks -->']),
-        grid_layer(w),
-    ]
+    ] + ([grid_layer(w)] if GRID else [])
     return (svg_open(w, PANEL_H,
                      f"{hp_units}HP = {raw(hp_units * 5.08)}mm at {raw(S)}x: "
                      f"1HP = {raw(HP * S)}u, 1/4HP = {raw(Q * S)}u")
@@ -730,8 +737,7 @@ def module_svg(key):
         g("Plates", art or ['<!-- none: see PLATES in tools/panel_reticules.py -->']),
         g("Reticules", ret),
         g("Labels (mock)", lab),
-        grid_layer(w),
-    ]
+    ] + ([grid_layer(w)] if GRID else [])
     if not shared:
         audit.insert(0, "labels not mocked: this widget does not use sfs::PanelLabels")
     elif skipped:
@@ -934,6 +940,9 @@ if __name__ == "__main__":
         i = args.index("--snap")
         SNAP = int(args[i + 1])
         del args[i:i + 2]
+    if "--grid" in args:
+        args.remove("--grid")
+        GRID = True
     for flag, name in (("--round", "ROUND"), ("--gaps", "GAPS")):
         if flag in args:
             i = args.index(flag)

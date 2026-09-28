@@ -118,7 +118,7 @@ struct Canon : Module {
 	int  gateMode = 0;                    // 0 follows the input, 1 a 10 ms trigger
 
 	dsp::SchmittTrigger setTrig, resetTrig, learnTrig;
-	dsp::BooleanTrigger setBtn, resetBtn, learnBtn;
+	dsp::BooleanTrigger setBtn{}, resetBtn{}, learnBtn{};   // braced: cppcheck cannot see the SDK's own initialisers
 	uint32_t rng = 0xC0FFEEu;
 
 	Canon() {

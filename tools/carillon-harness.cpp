@@ -26,7 +26,11 @@ static double now() { return std::chrono::duration<double>(std::chrono::steady_c
 
 struct Run {
 	Carillon m; rack::engine::Module::ProcessArgs a; int64_t frame = 0;
-	Run() { a.sampleRate = SR; a.sampleTime = 1.f / SR; for (int i = 0; i < 64; i++) tick(); }
+	// The checks below are written against the grid's geometry (neighbours,
+	// the front-left bell, rod lengths), so pin it: a new module opens on the ring.
+	Run() { a.sampleRate = SR; a.sampleTime = 1.f / SR;
+		m.layout = PL_GRID; m.relayout(); m.presetRods(Carillon::ROD_PATH);
+		for (int i = 0; i < 64; i++) tick(); }
 	void tick() { a.frame = frame++; m.process(a); }
 	void run(float sec) { int n = (int)(sec * SR); for (int i = 0; i < n; i++) tick(); }
 	void runPeaks(float sec, float* pk) {
@@ -241,16 +245,53 @@ int main(int argc, char** argv) {
 		check(b1 < -0.2 && b2 > 0.2, string::f("front-left bell %d: balance %+.2f; the pair swapped: %+.2f (negative is left)", left, b1, b2));
 	}
 
-	printf("== in tune: SIZE moves whole octaves, and the partials that set the heard pitch are true ==\n");
+	printf("== in tune: SIZE never moves the pitch, the register does, SHAPE never moves a partial, and the partials that set the heard pitch are true ==\n");
 	{
-		float worst = 0.f; std::string row;
+		float worst = 0.f; float ringLo = 0.f, ringHi = 0.f;
+		auto t60 = [](const Carillon& m, int b, int k) { return -6.908f / (std::log(m.bell[b].decay[k]) * SR); };
 		for (float sz : {0.f, 0.2f, 0.4f, 0.5f, 0.6f, 0.8f, 1.f}) {
 			Run r; r.m.params[Carillon::SIZE_PARAM].setValue(sz); r.run(0.01f);
-			float semisFromC4 = 12.f * std::log2(r.m.bell[12].hz[2] / dsp::FREQ_C4);
-			float off = 100.f * std::fabs(semisFromC4 - std::round(semisFromC4 / 12.f) * 12.f);
-			worst = std::max(worst, off); row += string::f(" %+.0f", semisFromC4);
+			float cents = 1200.f * std::log2(r.m.bell[12].hz[2] / dsp::FREQ_C4);
+			worst = std::max(worst, std::fabs(cents));
+			if (sz == 0.f) ringLo = t60(r.m, 12, 2);
+			if (sz == 1.f) ringHi = t60(r.m, 12, 2);
 		}
-		check(worst < 0.1f, string::f("bell C at SIZE 0/.2/.4/.5/.6/.8/1 sits at%s semitones from C4, worst %.3f cents off an octave", row.c_str(), worst));
+		check(worst < 0.01f, string::f("bell C at SIZE 0/.2/.4/.5/.6/.8/1: worst %.4f cents from C4", worst));
+		check(std::fabs(ringHi / ringLo - 4.f) < 0.05f, string::f("SIZE is weight instead: the prime rings %.1f s at the bottom and %.1f s at the top (%.2fx)", ringLo, ringHi, ringHi / ringLo));
+		std::string row;
+		bool regOk = true;
+		for (int ro : {-1, 0, 1}) {
+			Run r; r.m.regOct = ro; r.run(0.01f);
+			float semis = 12.f * std::log2(r.m.bell[12].hz[2] / dsp::FREQ_C4);
+			row += string::f(" %+.2f", semis); regOk = regOk && std::fabs(semis - 12.f * ro) < 0.001f;
+		}
+		check(regOk, "the register menu, low/middle/high: bell C at" + row + " semitones from C4");
+		// SHAPE: the strong peaks of a struck bell must all be partials of one
+		// of the two tuned tables at every setting. The old frequency glide put
+		// them in between (the nominal passed 3.3x on its way to 5.4x).
+		int strays = 0; std::string rows;
+		for (float sh : {0.f, 0.25f, 0.5f, 0.75f, 1.f}) {
+			Run r; r.m.unmask = true; r.m.presetRods(Carillon::ROD_CLEAR); r.m.params[Carillon::SHAPE_PARAM].setValue(sh); r.run(0.01f);
+			r.m.strike(12, 4.f, -1);
+			const int N = 16384; std::vector<float> x(N);
+			for (int k = 0; k < 480; k++) r.tick();                     // past the clapper noise
+			for (int k = 0; k < N; k++) { r.tick(); x[k] = r.m.bell[12].out * (0.5f - 0.5f * std::cos(2.f * (float)M_PI * k / (N - 1))); }
+			rack::dsp::RealFFT fft(N); std::vector<float> sp(2 * N); fft.rfft(x.data(), sp.data());
+			std::vector<float> mag(N / 2); float mx = 0.f;
+			for (int k = 1; k < N / 2; k++) { mag[k] = std::sqrt(sp[2 * k] * sp[2 * k] + sp[2 * k + 1] * sp[2 * k + 1]); mx = std::max(mx, mag[k]); }
+			float f0 = r.m.bell[12].hz[2]; int n = 0, bad = 0;
+			for (int k = 2; k < N / 2 - 2; k++) {
+				if (mag[k] < mx * 0.1f || mag[k] < mag[k - 1] || mag[k] < mag[k + 1]) continue;   // peaks within 20 dB of the loudest
+				float f = k * SR / N, bestC = 1e9f;
+				for (int m = 0; m < PL_MODES; m++)
+					for (float rt : {PL_RATIO[m], PL_BAR_RATIO[m]}) bestC = std::min(bestC, std::fabs(1200.f * std::log2(f / (f0 * rt))));
+				n++; if (bestC > 25.f) bad++;     // a bin is 2.9 Hz, ~19 cents at C4
+			}
+			strays += bad; rows += string::f(" %d/%d", bad, n);
+		}
+		check(strays == 0, "SHAPE 0/.25/.5/.75/1, strong peaks off both tables:" + rows);
+		Carillon fresh;
+		check(fresh.layout == PL_RING, string::f("a new module opens on the %s layout", PL_LAYOUT_NAME[fresh.layout]));
 		// the strike note is implied by the nominal, twelfth and upper octave: level-weighted, those must agree with the prime
 		auto pairC = [](int a, int b, float harm) { float wa = std::pow(10.f, PL_DB[a] / 20.f), wb = std::pow(10.f, PL_DB[b] / 20.f);
 			return 1200.f * std::log2((PL_RATIO[a] * wa + PL_RATIO[b] * wb) / (wa + wb) / harm); };
@@ -318,8 +359,8 @@ int main(int argc, char** argv) {
 	for (int lay = 0; lay < PL_NLAYOUT; lay++)
 		for (int ord = 0; ord < (lay == PL_KEYS ? 1 : PL_NORDER); ord++) {
 			Carillon m; m.layout = lay; m.order = ord; m.relayout();
-			CarillonDisplay d; d.module = &m; d.box.size = mm2px(Vec(126.08f, 56.f));
-			CarillonView V(d.box.size.x, d.box.size.y);
+			CarillonDisplay d; d.module = &m; d.box.size = mm2px(Vec(PL_DISP_W, PL_DISP_H));
+			CarillonView V(d.box.size.x, d.box.size.y, &m);
 			int missed = 0, offscreen = 0; float worst = 0.f; std::string which;
 			for (int i = 0; i < PL_N; i++) {
 				float x, y, u, v; V.project(m.bell[i].u, m.bell[i].v, x, y); V.unproject(x, y, u, v);
@@ -333,8 +374,8 @@ int main(int argc, char** argv) {
 		}
 	for (int root = 0; root < 12; root++) {       // the keyboard follows the root
 		Carillon m; m.layout = PL_KEYS; m.root = root; m.relayout();
-		CarillonDisplay d; d.module = &m; d.box.size = mm2px(Vec(126.08f, 56.f));
-		CarillonView V(d.box.size.x, d.box.size.y);
+		CarillonDisplay d; d.module = &m; d.box.size = mm2px(Vec(PL_DISP_W, PL_DISP_H));
+		CarillonView V(d.box.size.x, d.box.size.y, &m);
 		int missed = 0;
 		for (int i = 0; i < PL_N; i++) { float x, y; V.project(m.bell[i].u, m.bell[i].v, x, y); if (d.bellAt(Vec(x, y)) != i) missed++; }
 		if (missed) check(false, string::f("keyboard at root %s: %d bells not hoverable", PL_NOTE[root], missed));

@@ -26,7 +26,8 @@
 #include <vector>
 
 static const int PL_N = 25;                      // bells: semitones -12 .. +12 from the root
-static const int PL_MODES = 17;                  // partials per bell, doublets included
+static const int PL_MODES = 17;                  // partials per set, doublets included
+static const int PL_NM = 2 * PL_MODES;           // a bell carries both sets: the bell's, then the bar's
 static const int PL_PAIRS = PL_N * PL_N;         // a rod may join ANY two bells; stored as a symmetric matrix
 static const int PL_POLY = 16;
 static const int PL_MAXEVENTS = 512;
@@ -99,6 +100,7 @@ static inline float carillonSpeedSec(float k) { return 4.f * std::pow(0.0025f, c
 // strike still went five bells. Squared, so the lower half is the part where
 // a ripple of two or three bells lives.
 static inline float carillonTrans(float k)    { float c = clamp(k, 0.f, 1.f); return 0.95f * c * c; }
+static const float PL_MICGAP = 0.5f;             // the default mics stand this far in front of the nearest bells
 static const float PL_FLOOR = 2e-4f;
 static const float PL_OUT_GAIN = 1.6f;           // a middle bell struck at full velocity peaks near 3.5 V             // an arrival below this is silent (-37 dB on a full strike) and stops
 
@@ -112,18 +114,24 @@ struct CarillonSpeedQ : ParamQuantity {
 		return s < 1.f ? string::f("%.0f ms per neighbour spacing", s * 1000.f) : string::f("%.2f s per neighbour spacing", s);
 	}
 };
-// SIZE moves the bells by WHOLE OCTAVES, and everything else about size
-// continuously. It used to transpose continuously too, so anywhere but 12
-// o'clock every bell was out of tune with the rest of the patch (120 cents
-// at 45%). A set of bells is cast to a pitch; what a bigger set changes, at
-// the same notes, is how long they ring and how heavy the clapper is.
-static inline int carillonSizeOct(float k) { return k < 1.f / 3.f ? 1 : (k < 2.f / 3.f ? 0 : -1); }
+// SIZE NEVER MOVES THE PITCH. It transposed continuously at first (120
+// cents off at 45%), then by whole octaves in thirds of the knob, and both
+// were the same fault: a knob a player sweeps retuned every bell. The notes
+// come from V/OCT and ROOT, the register from the menu (`regOct`), and SIZE
+// is the WEIGHT of the set at those notes -- how long the bells ring (0.5x
+// to 2x) and how heavy the clapper is (a longer contact, so a darker, slower
+// onset). A heavier casting of the same note is exactly that. (Octaves were
+// tried again afterwards and this was the better of the two.)
+static inline float carillonSizeRing(float k)    { return std::pow(2.f, 2.f * (clamp(k, 0.f, 1.f) - 0.5f)); }
+static inline float carillonSizeContact(float k) { return std::pow(2.f, 1.2f * (clamp(k, 0.f, 1.f) - 0.5f)); }
 struct CarillonSizeQ : ParamQuantity {
 	std::string getDisplayValueString() override {
-		static const char* reg[3] = {"large bells, C2 to C4", "bells as cast, C3 to C5", "hand bells, C4 to C6"};
-		return string::f("%.0f%%, %s", getValue() * 100.f, reg[carillonSizeOct(getValue()) + 1]);
+		float k = getValue();
+		const char* what = k < 0.3f ? "light bells" : (k > 0.7f ? "heavy bells" : "bells as cast");
+		return string::f("%s, ring %.2fx, clapper %.2fx", what, carillonSizeRing(k), carillonSizeContact(k));
 	}
 };
+static const char* PL_REGISTER_NAME[3] = {"Low (C2 to C4)", "Middle (C3 to C5)", "High (C4 to C6)"};
 // DAMP is a RING-TIME MULTIPLIER, log-linear across the knob: 4x the bell's
 // natural ring at the bottom (orchestral bell plates and tubular bells hang
 // free and ring for most of a minute; "no hand on it" was the old floor and
@@ -150,7 +158,9 @@ struct Carillon : Module {
 	               SHAPE_PARAM, BRIGHT_PARAM,                              // appended
 	               PARAMS_LEN };
 	enum InputId {
-		VOCT_INPUT, GATE_INPUT, VEL_INPUT, STRIKE_INPUT, BELL_INPUT, CLOCK_INPUT,
+		VOCT_INPUT, GATE_INPUT, VEL_INPUT,
+		STRIKE_INPUT, BELL_INPUT,        // retired in place (2026-09-27): inputs serialise by index; GATE + V/OCT do the job
+		CLOCK_INPUT,
 		SIZE_INPUT, DAMP_INPUT, REACH_INPUT, SPEED_INPUT, ROOT_INPUT, SCALE_INPUT,
 		SHAPE_INPUT, BRIGHT_INPUT,                                          // appended
 		INPUTS_LEN
@@ -160,9 +170,11 @@ struct Carillon : Module {
 
 	// ── a bell ──────────────────────────────────────────────────────────
 	struct Bell {
-		float re[PL_MODES] = {}, im[PL_MODES] = {};   // complex resonator state per partial
-		float cosw[PL_MODES] = {}, sinw[PL_MODES] = {}, decay[PL_MODES] = {};
-		float hz[PL_MODES] = {};
+		float re[PL_NM] = {}, im[PL_NM] = {};         // complex resonator state per partial, bell set then bar set
+		float cosw[PL_NM] = {}, sinw[PL_NM] = {}, decay[PL_NM] = {};
+		float hz[PL_NM] = {};
+		bool  setOn[2] = {false, false};              // which sets have been struck since it last rang out
+		float keyF0 = -1.f, keyT = -1.f, keySr = -1.f; // what the coefficients were last computed for
 		float semis = 0.f;                            // from the root: n - 12, always
 		bool  masked = false;                         // a felt on it
 		bool  quiet = true;                           // rung out: skipped until struck
@@ -172,7 +184,7 @@ struct Carillon : Module {
 		float clap = 0.f;                             // the clapper: a short, bright contact noise
 		float clapLp = 0.f;
 		float mallet = 0.f, malletT = 0.f, malletDur = 0.003f;   // the contact: force spread over a few ms, not a click
-		float malletW[PL_MODES] = {};
+		float malletW[PL_NM] = {};
 		float u = 0.f, v = 0.f;                       // where it stands on the plane
 	};
 	Bell bell[PL_N];
@@ -182,7 +194,8 @@ struct Carillon : Module {
 	void setRod(int a, int b, bool on) { if (a == b || a < 0 || b < 0) return; rodM[a * PL_N + b] = rodM[b * PL_N + a] = on; }
 	int  degree(int i) const { int d = 0; for (int j = 0; j < PL_N; j++) if (hasRod(i, j)) d++; return d; }
 	void clearRods() { for (int k = 0; k < PL_PAIRS; k++) rodM[k] = false; }
-	int   layout = PL_GRID, order = PL_ORD_PITCH;
+	int   layout = PL_RING, order = PL_ORD_PITCH;
+	int   regOct = 0;                                 // register: -1 low, 0 middle, +1 high (menu, saved)
 	int   path[PL_N];                                 // the bell at each step of the layout's path
 	float spacing = 1.f;                              // the layout's typical neighbour distance
 	int   layoutRoot = -1;                            // the root the keyboard was laid out for
@@ -195,11 +208,21 @@ struct Carillon : Module {
 	bool clocked = false;
 	long   pulseCount = 0;                            // pulses seen, so a crossing waits for the NEXT one
 	double lastPulse = -1.0, clockPeriod = 0.5;       // for the picture: how far along a rod an impulse is
-	dsp::SchmittTrigger clockTrig, strikeTrig;
+	dsp::SchmittTrigger clockTrig;
 	bool gateWas[PL_POLY] = {};
 
 	// mics on the plane, in grid units
-	float micU[2] = {-1.5f, 1.5f}, micV[2] = {-0.85f, -0.85f};
+	float micU[2] = {-1.5f, 1.5f}, micV[2] = {-0.5f, -0.5f};
+	bool  micsMoved = false;                         // dragged by the player: then a layout change leaves them alone
+	// the default pair: in front of the layout's nearest bells, a third of the
+	// way in from its sides
+	void defaultMics() {
+		float uLo = 1e9f, uHi = -1e9f, vLo = 1e9f;
+		for (int i = 0; i < PL_N; i++) { uLo = std::min(uLo, bell[i].u); uHi = std::max(uHi, bell[i].u); vLo = std::min(vLo, bell[i].v); }
+		float mid = 0.5f * (uLo + uHi), half = 0.5f * (uHi - uLo);
+		micU[0] = mid - 0.62f * half; micU[1] = mid + 0.62f * half;
+		micV[0] = micV[1] = vLo - PL_MICGAP;
+	}
 	float micDelay[2][PL_N][PL_MICDELAY] = {};        // per bell per mic, an arrival delay line
 	int   micHead = 0;
 	int   micLag[2][PL_N] = {};
@@ -212,26 +235,41 @@ struct Carillon : Module {
 	int root = 0;
 	sfs::BusScale sc;
 	float sizeK = 1.f, dampK = 0.f, transK = 0.2f, shapeK = 0.f, brightK = 0.5f;
-	float modeRatio[PL_MODES] = {}, modeAmp[PL_MODES] = {}, modeT60[PL_MODES] = {};   // the set in force, bell morphed toward bar
+	// SHAPE IS A CROSSFADE BETWEEN TWO SETS OF PARTIALS, NOT A GLIDE. It used
+	// to slide every partial's frequency from the bell's ratio to the bar's,
+	// and while both ends are in tune with the note, everything between was
+	// not: the nominal, which is where the ear takes a bell's pitch from,
+	// passed through 3.3 on its way from 2.0 to 5.4, and the heard pitch went
+	// with it. Now a bell carries both sets at their own frequencies and SHAPE
+	// sets how hard each is struck (equal power), so no partial is ever
+	// anywhere but in one of two tuned tables. A set that has not been struck
+	// since the bell last rang out is not computed.
+	float modeRatio[PL_NM] = {}, modeAmp[PL_NM] = {}, modeT60[PL_NM] = {};
+	float setGain[2] = {1.f, 0.f};                    // how hard each set is struck: cos/sin of SHAPE
 	void morph() {
 		// BRIGHT tilts the partials about the nominal: a soft mallet to a hard one
 		float tilt = (brightK - 0.5f) * 2.f;
-		for (int m = 0; m < PL_MODES; m++) {
-			modeRatio[m] = PL_RATIO[m] * std::pow(PL_BAR_RATIO[m] / PL_RATIO[m], shapeK);
-			float db = PL_DB[m] + (PL_BAR_DB[m] - PL_DB[m]) * shapeK;
+		for (int m = 0; m < PL_NM; m++) {
+			bool bar = m >= PL_MODES; int k = bar ? m - PL_MODES : m;
+			modeRatio[m] = bar ? PL_BAR_RATIO[k] : PL_RATIO[k];
+			float db = bar ? PL_BAR_DB[k] : PL_DB[k];
 			// The bell's table is as HEARD; the bar's is displacement, so the
 			// bar alone takes the radiation tilt (a struck body radiates its
 			// high modes more efficiently, roughly as the square root of
 			// frequency) -- without it a bar sat on its fundamental and was muffled.
-			float rad = 0.5f * shapeK + tilt;
+			float rad = (bar ? 0.5f : 0.f) + tilt;
 			modeAmp[m] = std::pow(10.f, db / 20.f) * std::pow(std::max(modeRatio[m], 0.5f) / 2.f, rad);
-			modeT60[m] = PL_T60[m] * std::pow(PL_BAR_T60[m] / PL_T60[m], shapeK);
+			modeT60[m] = bar ? PL_BAR_T60[k] : PL_T60[k];
 		}
+		setGain[0] = std::cos(shapeK * 0.5f * (float)M_PI);
+		setGain[1] = std::sin(shapeK * 0.5f * (float)M_PI);
+		if (setGain[0] < 1e-4f) setGain[0] = 0.f;
+		if (setGain[1] < 1e-4f) setGain[1] = 0.f;
 	}
 
 	Carillon() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam<CarillonSizeQ>(SIZE_PARAM, 0.f, 1.f, 0.5f, "Size (hand bells to a carillon: octaves for pitch, ring time and clapper weight in between)");
+		configParam<CarillonSizeQ>(SIZE_PARAM, 0.f, 1.f, 0.5f, "Size (the weight of the bells: how long they ring and how heavy the clapper; never the pitch)");
 		configParam<CarillonDampQ>(DAMP_PARAM, 0.f, 1.f, 0.36f, "Damp (free-hanging plates at the bottom, a hand on every bell at the top)");
 		configParam(SHAPE_PARAM, 0.f, 1.f, 0.f, "Shape (a cast bell to a metal bar)", "%", 0.f, 100.f);
 		configParam(BRIGHT_PARAM, 0.f, 1.f, 0.5f, "Bright (a soft clapper to a hard one, and the tilt of the partials)", "%", 0.f, 100.f);
@@ -245,10 +283,10 @@ struct Carillon : Module {
 		for (int i = 0; i < sfs::NUM_SCALES; i++) names.push_back(sfs::SCALES[i].longName);
 		configSwitch(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 1.f, "Scale (bells outside it are felted)", names);
 		configInput(VOCT_INPUT, "V/OCT (poly): strikes the bell of that note, folded by octaves into the two octaves round the root");
-		configInput(GATE_INPUT, "Gate (poly)");
+		configInput(GATE_INPUT, "Trigger / gate (poly): strikes the bell of the V/OCT on the same channel");
 		configInput(VEL_INPUT, "Velocity (poly, 0-10V): how much energy the strike delivers");
-		configInput(STRIKE_INPUT, "Strike trigger");
-		configInput(BELL_INPUT, "Bell (1V/oct) for the Strike trigger");
+		configInput(STRIKE_INPUT, "Strike (retired)");
+		configInput(BELL_INPUT, "Bell (retired)");
 		configInput(CLOCK_INPUT, "Clock: with it patched, a crossing is one pulse per neighbour spacing of rod");
 		configInput(SIZE_INPUT, "Size CV");
 		configInput(DAMP_INPUT, "Damp CV");
@@ -362,27 +400,34 @@ struct Carillon : Module {
 		std::sort(nn, nn + PL_N);
 		spacing = std::max(nn[PL_N / 2], 0.05f);
 		layoutRoot = root;
+		if (!micsMoved) defaultMics();
 		placeMics();
 	}
 	// a rod's length, in neighbour spacings: the unit a crossing is timed in
 	float rodLen(int a, int b) const { return std::hypot(bell[a].u - bell[b].u, bell[a].v - bell[b].v) / spacing; }
 	int   rodPulses(int a, int b) const { return std::max(1, (int)std::lround(rodLen(a, b))); }
 
-	// a bell's prime, in Hz: the root's C4 octave, moved by SIZE in whole octaves only
+	// a bell's prime, in Hz: the root's C4 octave, moved only by the register
 	float primeHz(int i) const {
-		return dsp::FREQ_C4 * std::pow(2.f, ((float)root + bell[i].semis) / 12.f + (float)carillonSizeOct(sizeK));
+		return dsp::FREQ_C4 * std::pow(2.f, ((float)root + bell[i].semis) / 12.f + (float)regOct);
 	}
 	void updateBell(int i) {
 		Bell& b = bell[i];
 		float f0 = primeHz(i);
 		// smaller bells decay faster: T60 scales with the prime's period, up to
 		// a point, and a bigger set rings longer at the same notes
-		float sizeT = clamp(261.6f / f0, 0.25f, 4.f) * std::pow(2.f, 1.4f * (sizeK - 0.5f));
+		float sizeT = clamp(261.6f / f0, 0.25f, 4.f) * carillonSizeRing(sizeK);
 		// DAMP: free-hanging at the bottom, a hand on the bell at the top (carillonRing)
 		float ring = carillonRing(dampK);
 		float damp = 1.f / ring;
 		if (b.masked) damp *= 8.f;
-		for (int m = 0; m < PL_MODES; m++) {
+		// The partials no longer depend on SHAPE, so the coefficients only
+		// move with the pitch, the ring time or the sample rate: skip the
+		// trig for a bell that has none of those changing.
+		float key = sizeT / damp;
+		if (f0 == b.keyF0 && key == b.keyT && sr == b.keySr) return;
+		b.keyF0 = f0; b.keyT = key; b.keySr = sr;
+		for (int m = 0; m < PL_NM; m++) {
 			float f = f0 * modeRatio[m];
 			b.hz[m] = f;
 			float w = 2.f * (float)M_PI * f / sr;
@@ -398,18 +443,23 @@ struct Carillon : Module {
 		Bell& b = bell[i];
 		float amp = std::sqrt(std::max(energy, 0.f));
 		if (b.masked) amp *= 0.2f;
-		for (int m = 0; m < PL_MODES; m++) {
-			float w = modeAmp[m];
-			if (from >= 0) {
+		for (int m = 0; m < PL_NM; m++) {
+			float g = setGain[m < PL_MODES ? 0 : 1];
+			float w = modeAmp[m] * g;
+			if (w != 0.f && from >= 0) {
+				// the sender's partials, as loud as its own sets are struck
 				float best = 0.f;
-				for (int p = 0; p < PL_MODES; p++) {
+				for (int p = 0; p < PL_NM; p++) {
+					float gp = setGain[p < PL_MODES ? 0 : 1];
+					if (gp == 0.f) continue;
 					float cents = 1200.f * std::log2(b.hz[m] / bell[from].hz[p]);
-					best = std::max(best, std::exp(-(cents * cents) / (2.f * 45.f * 45.f)));
+					best = std::max(best, gp * std::exp(-(cents * cents) / (2.f * 45.f * 45.f)));
 				}
 				w *= 0.15f + 0.85f * best;
 			}
 			b.malletW[m] = w;
 		}
+		for (int k = 0; k < 2; k++) if (setGain[k] > 0.f) b.setOn[k] = true;
 		// THE CONTACT, NOT A CLICK. An iron clapper stays on the bronze for a
 		// millisecond or so, longer on a big bell, and the force it delivers
 		// is a raised cosine over that time: a contact of T strikes almost
@@ -418,7 +468,8 @@ struct Carillon : Module {
 		// shortens the contact as well.
 		b.mallet = amp;
 		b.malletT = 0.f;
-		b.malletDur = clamp(0.0008f * 261.6f / std::max(b.hz[2], 40.f) * (2.4f - 2.2f * brightK) * (1.f - 0.85f * shapeK), 0.0001f, 0.006f);
+		b.malletDur = clamp(0.0008f * 261.6f / std::max(b.hz[2], 40.f) * (2.4f - 2.2f * brightK) * (1.f - 0.85f * shapeK)
+		                    * carillonSizeContact(sizeK), 0.0001f, 0.006f);
 		// the clapper's own contact noise: small, a few milliseconds, and a
 		// rod arrives with far less of it than a clapper does
 		b.clap = std::max(b.clap, amp * (from >= 0 ? 0.04f : 0.14f) * (0.3f + 0.9f * brightK));
@@ -575,11 +626,6 @@ struct Carillon : Module {
 			}
 			gateWas[c] = g;
 		}
-		if (strikeTrig.process(inputs[STRIKE_INPUT].getVoltage(), 0.1f, 1.f)) {
-			float semis = inputs[BELL_INPUT].getVoltage() * 12.f - (float)root;
-			float vel = inputs[VEL_INPUT].isConnected() ? clamp(inputs[VEL_INPUT].getVoltage() * 0.1f, 0.f, 1.f) : 0.8f;
-			strike(bellForSemis(semis), vel * vel * vel * 4.f, -1);
-		}
 
 		// ── energy arriving ───────────────────────────────────────────────
 		// Free-running, an event lands when its time comes. Clocked, it lands
@@ -618,7 +664,7 @@ struct Carillon : Module {
 				else force = b.mallet * (0.5f - 0.5f * std::cos((float)M_PI * 2.f * u)) / (b.malletDur * sr) * 2.f;
 				b.malletT += args.sampleTime;
 			}
-			for (int m = 0; m < PL_MODES; m++) {
+			for (int m = b.setOn[0] ? 0 : PL_MODES, mEnd = b.setOn[1] ? PL_NM : PL_MODES; m < mEnd; m++) {
 				if (force != 0.f) b.im[m] += force * b.malletW[m];
 				float re = b.re[m] * b.cosw[m] - b.im[m] * b.sinw[m];
 				float im = b.re[m] * b.sinw[m] + b.im[m] * b.cosw[m];
@@ -640,7 +686,8 @@ struct Carillon : Module {
 			// rung out: -90 dB on a full strike, and the contact long over
 			if (b.energy < 1e-9f && b.mallet <= 0.f && b.clap <= 1e-4f) {
 				b.quiet = true;
-				for (int m = 0; m < PL_MODES; m++) b.re[m] = b.im[m] = 0.f;
+				for (int m = 0; m < PL_NM; m++) b.re[m] = b.im[m] = 0.f;
+				b.setOn[0] = b.setOn[1] = false;
 				b.out = 0.f;
 			}
 			for (int k = 0; k < 2; k++) {
@@ -669,21 +716,27 @@ struct Carillon : Module {
 			if (hasRod(a, b)) { json_t* pr = json_array(); json_array_append_new(pr, json_integer(a)); json_array_append_new(pr, json_integer(b)); json_array_append_new(rods, pr); }
 		json_object_set_new(r, "rods", rods);
 		json_object_set_new(r, "layout", json_integer(layout));
+		json_object_set_new(r, "register", json_integer(regOct));
 		json_object_set_new(r, "order", json_integer(order));
 		json_object_set_new(r, "unmask", json_boolean(unmask));
 		json_t* mics = json_array();
 		for (int k = 0; k < 2; k++) { json_array_append_new(mics, json_real(micU[k])); json_array_append_new(mics, json_real(micV[k])); }
 		json_object_set_new(r, "mics", mics);
+		json_object_set_new(r, "micsMoved", json_boolean(micsMoved));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
 		if (json_t* j = json_object_get(r, "layout")) layout = clamp((int)json_integer_value(j), 0, PL_NLAYOUT - 1);
+		if (json_t* j = json_object_get(r, "register")) regOct = clamp((int)json_integer_value(j), -1, 1);
 		if (json_t* j = json_object_get(r, "order")) order = clamp((int)json_integer_value(j), 0, PL_NORDER - 1);
 		if (json_t* j = json_object_get(r, "unmask")) unmask = json_boolean_value(j);
+		// mics the player placed are kept; untouched ones follow the layout
+		micsMoved = false;
+		if (json_t* j = json_object_get(r, "micsMoved")) micsMoved = json_boolean_value(j);
 		if (json_t* mics = json_object_get(r, "mics"))
-			if (json_array_size(mics) == 4) for (int k = 0; k < 2; k++) {
-				micU[k] = clamp((float)json_real_value(json_array_get(mics, 2 * k)), -3.5f, 3.5f);
-				micV[k] = clamp((float)json_real_value(json_array_get(mics, 2 * k + 1)), -2.5f, 5.5f);
+			if (micsMoved && json_array_size(mics) == 4) for (int k = 0; k < 2; k++) {
+				micU[k] = clamp((float)json_real_value(json_array_get(mics, 2 * k)), -6.f, 6.f);
+				micV[k] = clamp((float)json_real_value(json_array_get(mics, 2 * k + 1)), -4.f, 12.f);
 			}
 		relayout();
 		// rods are stored by note; a patch from before the bells were notes
@@ -710,32 +763,69 @@ struct Carillon : Module {
 // The projection is a plane in perspective with a closed-form inverse, so
 // the hit-test is the same projection run backwards.
 // =============================================================================
+// Where the bell field sits on the faceplate, in mm: from under the title to
+// just above the trimpot labels (81.9 mm in the art).
+static const float PL_DISP_X = 3.0f, PL_DISP_Y = 11.0f, PL_DISP_W = 126.08f, PL_DISP_H = 68.5f;
 static const float PL_K = 0.16f;                 // foreshortening per unit of depth
-static const float PL_VBACK = 4.f, PL_VFRONT = -1.15f;  // the plane's visible depth range
+static const float PL_VFRONT = -1.15f;           // the depth the perspective is measured from (the view fits the rest)
+
+// THE VIEW FITS THE LAYOUT. A fixed framing made every layout share one
+// picture: a compact one (the keyboard, the ring) sat small in the middle over
+// an empty floor, and the ring centred a third of the way down. Now the depth
+// axis is fitted so the farthest bell sits near the top and the default mic
+// row near the foot, and the width so the widest bell reaches 44% of the way
+// out either side. It reads only the BELLS (and the layout's own mic row), so
+// dragging a mic never reframes the picture.
 
 struct CarillonView {
-	float w, h, cx, yFront, yBack, S;
-	CarillonView(float w_, float h_) : w(w_), h(h_) {
+	float w, h, cx, S, A, B, uMid;               // y = A + B * depthScale(v); x = cx + (u - uMid) * S * persp(v)
+	CarillonView(float w_, float h_, const Carillon* m = nullptr) : w(w_), h(h_) {
 		cx = w * 0.5f;
-		yFront = h * 0.97f; yBack = h * 0.09f;
-		S = w * 0.205f;                              // px per grid unit at the front
+		float uLo = -2.4f, uHi = 2.4f, vLo = 0.f, vHi = 4.f;
+		if (m) {
+			uLo = vLo = 1e9f; uHi = vHi = -1e9f;
+			for (int i = 0; i < PL_N; i++) {
+				uLo = std::min(uLo, m->bell[i].u); uHi = std::max(uHi, m->bell[i].u);
+				vLo = std::min(vLo, m->bell[i].v); vHi = std::max(vHi, m->bell[i].v);
+			}
+		}
+		uMid = 0.5f * (uLo + uHi);
+		float vMic = vLo - PL_MICGAP;
+		float wFar = depthScale(vHi), wMic = depthScale(vMic);
+		float yTop = h * 0.08f, yMic = h * 0.91f;
+		B = (yTop - yMic) / (wFar - wMic);
+		A = yTop - B * wFar;
+		// the widest reach of any bell, in front-scale units
+		float need = 0.f;
+		if (m) for (int i = 0; i < PL_N; i++) need = std::max(need, std::fabs(m->bell[i].u - uMid) * persp(m->bell[i].v));
+		else need = 2.4f * persp(vLo);
+		S = w * 0.44f / std::max(need, 0.2f);
+		// ...but no steeper than 0.7 px down per px across at the nearest
+		// bells. A layout shallow in depth (the keyboard's two rows, 1.8 apart)
+		// would otherwise be stretched into a near top-down view with its back
+		// row floating far behind; capped, it is centred instead. The others
+		// fit under the cap (0.52 to 0.68) and are unaffected.
+		float wNear = depthScale(vLo);
+		float steep = std::fabs(B) * PL_K * wNear * wNear / (S * persp(vLo));
+		if (steep > 0.7f) {
+			B *= 0.7f / steep;
+			A = 0.5f * (yTop + yMic) - B * 0.5f * (wFar + wMic);
+		}
 	}
 	float depthScale(float v) const { return 1.f / (1.f + PL_K * (v - PL_VFRONT)); }
 	// how big something at depth v is drawn, against the front
 	float persp(float v) const { return depthScale(v) / depthScale(PL_VFRONT); }
 	// plane (u across, v back) -> panel
 	void project(float u, float v, float& x, float& y) const {
-		float ws = depthScale(v), wb = depthScale(PL_VBACK);
-		x = cx + u * S * ws / depthScale(PL_VFRONT);
-		y = yFront - (yFront - yBack) * (1.f - ws / depthScale(PL_VFRONT)) / (1.f - wb / depthScale(PL_VFRONT));
+		x = cx + (u - uMid) * S * persp(v);
+		y = A + B * depthScale(v);
 	}
 	// panel -> plane
 	void unproject(float x, float y, float& u, float& v) const {
-		float w0 = depthScale(PL_VFRONT), wb = depthScale(PL_VBACK);
-		float ws = w0 * (1.f - (yFront - y) / (yFront - yBack) * (1.f - wb / w0));
-		ws = clamp(ws, wb * 0.5f, w0 * 1.5f);
+		float w0 = depthScale(PL_VFRONT);
+		float ws = clamp((y - A) / B, w0 * 0.05f, w0 * 3.f);
 		v = (1.f / ws - 1.f) / PL_K + PL_VFRONT;
-		u = (x - cx) / (S * ws / w0);
+		u = uMid + (x - cx) / (S * ws / w0);
 	}
 };
 // a bell's radius on the panel: larger for a lower note, smaller with distance,
@@ -779,7 +869,7 @@ struct CarillonDisplay : OpaqueWidget {
 	// back-row bell sat over the front bell's hit point and could not be hovered.
 	int bellAt(Vec p) const {
 		if (!module) return -1;
-		CarillonView V(box.size.x, box.size.y);
+		CarillonView V(box.size.x, box.size.y, module);
 		int best = -1; float bd = 1e9f;
 		for (int i = 0; i < PL_N; i++) {
 			float x, y; V.project(module->bell[i].u, module->bell[i].v, x, y);
@@ -791,7 +881,7 @@ struct CarillonDisplay : OpaqueWidget {
 	}
 	int micAt(Vec p) const {
 		if (!module) return -1;
-		CarillonView V(box.size.x, box.size.y);
+		CarillonView V(box.size.x, box.size.y, module);
 		for (int k = 0; k < 2; k++) {
 			float x, y; V.project(module->micU[k], module->micV[k], x, y);
 			if (std::hypot(p.x - x, p.y - y) < mm2px(2.2f)) return k;
@@ -821,10 +911,11 @@ struct CarillonDisplay : OpaqueWidget {
 		if (!module) return;
 		dragPos = e.pos;
 		if (dragMic >= 0) {
-			CarillonView V(box.size.x, box.size.y);
-			float u, v; V.unproject(e.pos.x, e.pos.y, u, v);
-			module->micU[dragMic] = clamp(u, -3.5f, 3.5f);
-			module->micV[dragMic] = clamp(v, -2.5f, 5.5f);
+			CarillonView V(box.size.x, box.size.y, module);
+			float u, v; V.unproject(clamp(e.pos.x, 0.f, box.size.x), clamp(e.pos.y, 0.f, box.size.y), u, v);
+			module->micU[dragMic] = clamp(u, -6.f, 6.f);
+			module->micV[dragMic] = clamp(v, -4.f, 12.f);
+			module->micsMoved = true;
 			return;
 		}
 		if (dragBell < 0) return;
@@ -840,7 +931,7 @@ struct CarillonDisplay : OpaqueWidget {
 			module->setRod(dragBell, end, !module->hasRod(dragBell, end));
 		} else if (!dragPainted) {
 			// a click strikes it, harder toward the top of the circle
-			CarillonView V(box.size.x, box.size.y);
+			CarillonView V(box.size.x, box.size.y, module);
 			float x, y; V.project(module->bell[dragBell].u, module->bell[dragBell].v, x, y);
 			float r = carillonRadius(V, *module, dragBell);
 			float vel = clamp(0.65f + 0.35f * (y - dragStart.y) / std::max(r, 1.f), 0.25f, 1.f);
@@ -853,20 +944,28 @@ struct CarillonDisplay : OpaqueWidget {
 		if (!module) { module = carillonPreview(); draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
-		CarillonView V(box.size.x, box.size.y);
+		CarillonView V(box.size.x, box.size.y, module);
 		nvgSave(vg); nvgScissor(vg, 0, 0, box.size.x, box.size.y);
 
-		// the surface: a faint grid of the plane the bells stand on
+		// the surface: a faint grid of the plane the bells stand on, filling the
+		// view from the foot to the top, so the plane recedes rather than
+		// ending in mid-air
 		nvgStrokeWidth(vg, 0.5f);
-		for (int g = -3; g <= 3; g++) {
+		float uA, vNear, uB, vFar, uL, uR, dummy;
+		V.unproject(V.cx, box.size.y, uA, vNear);
+		V.unproject(V.cx, 0.f, uB, vFar);
+		V.unproject(0.f, box.size.y, uL, dummy);
+		V.unproject(box.size.x, box.size.y, uR, dummy);
+		vFar = std::min(vFar, vNear + 30.f);
+		for (int g = (int)std::floor(uL) - 1; g <= (int)std::ceil(uR) + 1; g++) {
 			float x0, y0, x1, y1;
-			V.project((float)g, PL_VFRONT + 0.1f, x0, y0); V.project((float)g, PL_VBACK + 0.6f, x1, y1);
+			V.project((float)g, vNear, x0, y0); V.project((float)g, vFar, x1, y1);
 			nvgBeginPath(vg); nvgMoveTo(vg, x0, y0); nvgLineTo(vg, x1, y1);
 			nvgStrokeColor(vg, nvgTransRGBA(PL_LINE, 0x50)); nvgStroke(vg);
 		}
-		for (float v = PL_VFRONT + 0.1f; v <= PL_VBACK + 0.6f; v += 1.f) {
-			float x0, y0, x1, y1;
-			V.project(-3.f, v, x0, y0); V.project(3.f, v, x1, y1);
+		for (int vi = (int)std::ceil(vNear); vi <= (int)std::floor(vFar); vi++) {
+			float v = (float)vi, x0, y0, x1, y1;
+			V.project(uL - 50.f, v, x0, y0); V.project(uR + 50.f, v, x1, y1);
 			nvgBeginPath(vg); nvgMoveTo(vg, x0, y0); nvgLineTo(vg, x1, y1);
 			nvgStrokeColor(vg, nvgTransRGBA(PL_LINE, 0x50)); nvgStroke(vg);
 		}
@@ -974,50 +1073,41 @@ struct CarillonDisplay : OpaqueWidget {
 };
 
 // =============================================================================
-// Panel: 26HP. The bells on the faceplate, eight pots over their CVs, and the
-// transport row at the foot with the outputs on a plate.
+// Panel: 26HP, the designer's Figma export (2026-09-27), which carries its own
+// outlined labels -- so NO sfs::PanelLabels here: drawing them as well prints
+// every label twice, half a millimetre apart. Positions are read from the
+// art's guide circles (figma-panel skill); the art is the spec, including the
+// 0.17 mm by which each trimpot sits right of the jack under it.
 // =============================================================================
-static const float PL_PX[8] = {8.25f, 24.75f, 41.25f, 57.75f, 74.25f, 90.75f, 107.25f, 123.75f};
-static const float PL_PY = 76.f, PL_PCV = 88.f;
-static const float PL_FX[9] = {8.5f, 22.9f, 37.3f, 51.7f, 66.1f, 80.5f, 94.9f, 109.3f, 123.7f};
-static const float PL_FY = 117.f;
+static const float PL_PX[8]  = {10.96f, 26.71f, 42.45f, 58.20f, 73.94f, 89.69f, 105.43f, 121.18f};   // trimpots
+static const float PL_CVX[8] = {10.79f, 26.54f, 42.28f, 58.03f, 73.77f, 89.52f, 105.26f, 121.01f};   // their CVs
+static const float PL_PY = 87.99f, PL_PCV = 99.68f;
+static const float PL_FX[7] = {10.96f, 26.45f, 42.03f, 57.94f, 89.60f, 105.35f, 121.09f};   // TRIG V/OCT VEL CLOCK, then POLY LEFT RIGHT
+static const float PL_FY = 121.01f;
 
 struct CarillonWidget : ModuleWidget {
 	CarillonWidget(Carillon* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/carillon.svg")));
 
-		sfs::PanelLabels* lbl = new sfs::PanelLabels();
-		lbl->box.size = box.size;
-		addChild(lbl);
-		lbl->title(6.f, 8.f, "CARILLON");
-
 		CarillonDisplay* disp = new CarillonDisplay();
 		disp->module = module;
-		disp->box.pos  = mm2px(Vec(3.0f, 11.0f));   // to 67 mm; the pot labels sit at 71.6
-		disp->box.size = mm2px(Vec(126.08f, 56.0f));
+		disp->box.pos  = mm2px(Vec(PL_DISP_X, PL_DISP_Y));
+		disp->box.size = mm2px(Vec(PL_DISP_W, PL_DISP_H));
 		addChild(disp);
 
-		static const char* PN[8] = {"SIZE", "SHAPE", "BRIGHT", "DAMP", "REACH", "SPEED", "ROOT", "SCALE"};
 		static const int PP[8] = {Carillon::SIZE_PARAM, Carillon::SHAPE_PARAM, Carillon::BRIGHT_PARAM, Carillon::DAMP_PARAM, Carillon::REACH_PARAM, Carillon::SPEED_PARAM, Carillon::ROOT_PARAM, Carillon::SCALE_PARAM};
 		static const int PI[8] = {Carillon::SIZE_INPUT, Carillon::SHAPE_INPUT, Carillon::BRIGHT_INPUT, Carillon::DAMP_INPUT, Carillon::REACH_INPUT, Carillon::SPEED_INPUT, Carillon::ROOT_INPUT, Carillon::SCALE_INPUT};
 		for (int i = 0; i < 8; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(PL_PX[i], PL_PY)), module, PP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PL_PX[i], PL_PCV)), module, PI[i]));
-			lbl->pairDown(PL_PX[i], PL_PY, PL_PCV, PN[i]);
+			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PL_CVX[i], PL_PCV)), module, PI[i]));
 		}
-		static const char* FN[6] = {"V/OCT", "GATE", "VEL", "STRIKE", "BELL", "CLOCK"};
-		static const int FI[6] = {Carillon::VOCT_INPUT, Carillon::GATE_INPUT, Carillon::VEL_INPUT, Carillon::STRIKE_INPUT, Carillon::BELL_INPUT, Carillon::CLOCK_INPUT};
-		for (int i = 0; i < 6; i++) {
+		static const int FI[4] = {Carillon::GATE_INPUT, Carillon::VOCT_INPUT, Carillon::VEL_INPUT, Carillon::CLOCK_INPUT};
+		for (int i = 0; i < 4; i++)
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PL_FX[i], PL_FY)), module, FI[i]));
-			lbl->jack(PL_FX[i], PL_FY, FN[i]);
-		}
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[6], PL_FY)), module, Carillon::L_OUTPUT));
-		lbl->jackOnPlate(PL_FX[6], PL_FY, "L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[7], PL_FY)), module, Carillon::R_OUTPUT));
-		lbl->jackOnPlate(PL_FX[7], PL_FY, "R");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[8], PL_FY)), module, Carillon::POLY_OUTPUT));
-		lbl->jackOnPlate(PL_FX[8], PL_FY, "POLY");
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[4], PL_FY)), module, Carillon::POLY_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[5], PL_FY)), module, Carillon::L_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[6], PL_FY)), module, Carillon::R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {
@@ -1031,12 +1121,15 @@ struct CarillonWidget : ModuleWidget {
 		if (m->layout != PL_KEYS)
 			menu->addChild(createIndexSubmenuItem("Tuning order along the layout", on,
 				[=]() { return m->order; }, [=](int v) { m->order = clamp(v, 0, PL_NORDER - 1); m->relayout(); }));
+		std::vector<std::string> rn(PL_REGISTER_NAME, PL_REGISTER_NAME + 3);
+		menu->addChild(createIndexSubmenuItem("Register", rn,
+			[=]() { return m->regOct + 1; }, [=](int v) { m->regOct = clamp(v - 1, -1, 1); }));
 		menu->addChild(createBoolPtrMenuItem("Lift the felts (every bell sounds, whatever the key)", "", &m->unmask));
 		menu->addChild(createMenuLabel("Rods"));
 		static const char* RN[6] = {"A chain along the layout", "Every bell to its neighbours", "A star from the middle",
 		                            "Octaves", "Fifths", "Clear"};
 		for (int i = 0; i < 6; i++) { int idx = i; menu->addChild(createMenuItem(RN[i], "", [=]() { m->presetRods(idx); })); }
-		menu->addChild(createMenuItem("Reset mic positions", "", [=]() { m->micU[0] = -1.5f; m->micU[1] = 1.5f; m->micV[0] = m->micV[1] = -0.85f; m->placeMics(); }));
+		menu->addChild(createMenuItem("Reset mic positions", "", [=]() { m->micsMoved = false; m->defaultMics(); m->placeMics(); }));
 	}
 };
 

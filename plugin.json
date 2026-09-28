@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -551,13 +551,12 @@
     {
       "slug": "Canon",
       "name": "Canon",
-      "description": "Four arpeggiators reading one chord progression, wandering from it the way Fugue does.",
+      "description": "Four arpeggiators reading one chord progression, wandering from it as Fugue does.",
       "tags": [
         "Arpeggiator",
         "Sequencer",
         "Quantizer"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Count",
@@ -567,19 +566,17 @@
         "Clock generator",
         "Clock modulator",
         "Sequencer"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Carillon",
       "name": "Carillon",
-      "description": "A set of bells joined by rods you draw: velocity and reach decide how far a strike ripples.",
+      "description": "Bells joined by rods you draw: velocity and reach set how far a strike ripples.",
       "tags": [
         "Physical modeling",
         "Synth voice",
         "Polyphonic"
-      ],
-      "hidden": true
+      ]
     }
   ]
 }

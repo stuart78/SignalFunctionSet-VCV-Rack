@@ -64,30 +64,33 @@ struct Hat {
 	struct Plate {
 		int n = 0;
 		float mass = 1.f, invM = 1.f;
-		int   mi[MAXM], ni[MAXM];
-		float ph[MAXM], fref[MAXM], t60a[MAXM];
-		float f[MAXM], w[MAXM], sigA[MAXM];   // sigA: pressing + hand, 1/s
-		float pr[MAXM], pim[MAXM], re[MAXM], im[MAXM];
-		float phiS[MAXM], phiM[2][MAXM], phiC[NC][MAXM], phiCw[NC][MAXM];
-		float rim2[NA][MAXM], radW[2][MAXM], hi[MAXM];
+		// Every array is zeroed at construction: calibration fills them, but a
+		// Hat that is built and never calibrated must not carry stack garbage
+		// (the Library's static check, 2026-09).
+		int   mi[MAXM] = {}, ni[MAXM] = {};
+		float ph[MAXM] = {}, fref[MAXM] = {}, t60a[MAXM] = {};
+		float f[MAXM] = {}, w[MAXM] = {}, sigA[MAXM] = {};   // sigA: pressing + hand, 1/s
+		float pr[MAXM] = {}, pim[MAXM] = {}, re[MAXM] = {}, im[MAXM] = {};
+		float phiS[MAXM] = {}, phiM[2][MAXM] = {}, phiC[NC][MAXM] = {}, phiCw[NC][MAXM] = {};
+		float rim2[NA][MAXM] = {}, radW[2][MAXM] = {}, hi[MAXM] = {};
 		// The contact shapes again, blocked four modes at a time: block b holds
 		// modes 4b..4b+3 for all eight points. One pass over these gives all
 		// eight displacements (or velocities), or applies all eight forces --
 		// where the [point][mode] layout took a pass per point per job, which
 		// was 64 passes a sample and most of Kit's CPU. Padding modes are zero.
-		hat4 cB[MAXM / 4][NC], cwB[MAXM / 4][NC];
+		hat4 cB[MAXM / 4][NC] = {}, cwB[MAXM / 4][NC] = {};
 		// G[j][i] = sum over modes of phiC[j] * phiC[i]: how much a unit push at
 		// point i moves point j's velocity. It lets the contacts be applied in
 		// ONE pass while still seeing each other in order, as the sequential
 		// model does.
-		float G[NC][NC];
+		float G[NC][NC] = {};
 	};
 	Plate top, bot;
-	float cth[NC], warp[NC];
+	float cth[NC] = {}, warp[NC] = {};
 	float gapJ[NC] = {0};    // each point's gap for the pedal in force; set in control()
 
 	// field
-	float bf[NB], bw[NB], bE[NB], bSig[NB], bSigP[NB], bOut[NB], bNorm[NB], bPend[NB], cInj[NB];
+	float bf[NB] = {}, bw[NB] = {}, bE[NB] = {}, bSig[NB] = {}, bSigP[NB] = {}, bOut[NB] = {}, bNorm[NB] = {}, bPend[NB] = {}, cInj[NB] = {};
 	struct BQ { float b0 = 0, b2 = 0, a1 = 0, a2 = 0, x1 = 0, x2 = 0, y1 = 0, y2 = 0;
 		inline float run(float x) { float y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; } };
 	BQ bq[NB][2];

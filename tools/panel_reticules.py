@@ -536,7 +536,7 @@ NO_SCREEN_SLAB = {"wheel", "flock", "carillon"}
 # aimed at another panel, which is exactly the failure this set exists to stop.
 FINISHED = {"crystal", "chime", "loom", "slide", "slidex", "fill", "gravity", "key",
             "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin", "field",
-            "flock", "flockin", "canon", "count"}
+            "flock", "flockin", "canon", "count", "carillon"}
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

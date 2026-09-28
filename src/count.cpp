@@ -25,13 +25,17 @@ static const int CT_MAXSTEPS = 32;
 
 // DIV positions, x1 in the middle, with the odd ones (1.5, 3, 5) that make a
 // polyrhythm against the even ones rather than a subdivision of them.
-static const float CT_DIVS[] = {64, 32, 24, 16, 12, 8, 6, 5, 4, 3, 2, 1.5f, 1, 1.5f, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 64};
-static const int CT_NDIV = (int)(sizeof(CT_DIVS) / sizeof(CT_DIVS[0]));
+static const int CT_NDIV = 25;
+static const float CT_DIVS[CT_NDIV] = {64, 32, 24, 16, 12, 8, 6, 5, 4, 3, 2, 1.5f, 1, 1.5f, 2, 3, 4, 5, 6, 8, 12, 16, 24, 32, 64};
 static const int CT_UNITY = 12;
 // the output's pulses per beat
 static inline float ctRate(int d) {
-	d = clamp(d, 0, CT_NDIV - 1);
-	return (d < CT_UNITY) ? 1.f / CT_DIVS[d] : CT_DIVS[d];
+	// clamped in plain comparisons: cppcheck cannot see through clamp() and
+	// reported an index of 25 on a 25-element table
+	if (d < 0) d = 0;
+	if (d > CT_NDIV - 1) d = CT_NDIV - 1;
+	float v = CT_DIVS[d];
+	return (d < CT_UNITY) ? 1.f / v : v;
 }
 static inline std::string ctDivName(int d) {
 	d = clamp(d, 0, CT_NDIV - 1);

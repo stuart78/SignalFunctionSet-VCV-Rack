@@ -215,7 +215,7 @@ struct Kit : Module {
 		enum { HEAD, HAT };
 		int   engine = HEAD;
 		sfs::Hat hat;
-		int   hatSlot[sfs::Hat::MAXM];   // the membrane mode each top-plate mode is drawn as
+		int   hatSlot[sfs::Hat::MAXM] = {};   // the membrane mode each top-plate mode is drawn as
 		void useHat(float sampleRate) {
 			if (hat.ready && hat.sr == sampleRate) return;
 			hat.init(sampleRate);

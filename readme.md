@@ -28,6 +28,7 @@ Modules grouped by function:
 - [Kit](#kit): Struck membrane modelled mode by mode
   - [PolyKit In (Expander)](#polykit-in-expander): every input of every instrument as its own jack
 - [Wheel](#wheel): Hurdy-gurdy drone instrument, one wheel bowing six strings
+- [Carillon](#carillon): Twenty-five bells joined by rods you draw
 
 **Filters & Resonators**
 - [Band](#band): Harmonic bandpass bank (isolate individual harmonics)
@@ -41,10 +42,12 @@ Modules grouped by function:
 - [Arrange](#arrange): Song-form sequencer: 8 phrases, 4 per-instrument clock buses
 - [Meter](#meter): Time-signature-aware musical clock with swing
   - [Meter X (Expander)](#meter-x-expander): 24 PPQN, run gate, 1–128 bar triggers
+- [Count](#count): A narrow clock: six gate outputs, each a rate and a mask
 - [Beat](#beat): Per-voice pattern sequencer (8 patterns × 16 steps)
 - [Fill](#fill): Auto-playing 8-channel drum sequencer with a pressure engine
 - [Note](#note): Pitched CV/gate sequencer with 19 scales
 - [Chance](#chance): Generative melodic walk sequencer (8 seeded patterns)
+- [Canon](#canon): Four arpeggiators reading one chord progression
 - [Fugue](#fugue): 8-step harmonic deviation sequencer (3 voices)
   - [Fugue X (Expander)](#fugue-x-expander)
   - [MetaFugue](#metafugue)
@@ -248,12 +251,16 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 - **Live Recording**: Record into either loop directly via REC A/REC B + GATE inputs, with a LINK button to record both at once
 - **Waveform Display**: Dual waveform view with playhead, transient markers, loop handles, and rotation origin line
 - **VCA Anti-Click**: 1ms envelope on all discontinuities (enabled by default)
+- **Level and DJ filter per loop**: balance two samples, and sweep a lowpass or highpass from one knob; the screen shows the value while you turn them
+- **Poly and sync outputs**: each loop on its own stereo pair, and a trigger each time a loop starts over
 
 **Controls:**
 - **Drift** (-500 to +500 ms): Phase drift amount per loop cycle. In Sleep mode: positive = silence gap, negative = early restart. In Rotate mode: continuous speed offset.
 - **Speed** (-4x to +4x, default 1x): Playback speed and direction. Center = stopped.
 - **Pan** (-1 to +1): Per-loop stereo position with equal-power panning.
 - **Mode Switch** (SLP/ROT): Sleep or Rotate mode per loop.
+- **Level** (silent to +6 dB): Per-loop volume.
+- **Filter**: Per-loop DJ filter. Left sweeps a lowpass from 20 kHz down to 60 Hz, right a highpass from 20 Hz up to 8 kHz, and the center is straight through.
 - **PLAY / SYNC** buttons: Transport.
 - **REC A / LINK / REC B** latches: Arm one loop or both for recording.
 
@@ -262,6 +269,7 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 - **START A/B** (0–10V): Loop start position (0–100% of sample)
 - **END A/B** (0–10V): Loop end position
 - **Drift CV, Speed CV, Pan CV** (±5V): Per-loop parameter modulation
+- **Filter CV** (±5V): Sweeps the whole filter range
 - **PLAY GATE**: High (>=1V) = play, overrides button
 - **SYNC**: Trigger. Resets both loops to their start
 - **A IN / B IN**: Audio in for live recording
@@ -269,6 +277,8 @@ A dual sample looper inspired by Steve Reich's phase compositions. Two loops pla
 
 **Outputs:**
 - **Left / Right**: Stereo output pair
+- **Poly**: Four channels, A left, A right, B left, B right, each after its level, filter and pan
+- **Sync**: Two channels, a trigger as loop A starts over and one as loop B does
 
 **Context Menu:**
 - Load/Clear Sample A and B
@@ -496,6 +506,28 @@ A drone instrument after the hurdy-gurdy. One rosined wheel bows every string at
 
 See [docs/wheel-manual.md](docs/wheel-manual.md) for the full manual.
 
+#### Carillon
+
+<img src="screenshots/Carillon.png" alt="Carillon panel" height="320"> 
+
+Twenty-five tuned bells, one for every semitone of two octaves round the root, joined by rods you draw between them. Strike a bell and its energy travels down the rods to the bells it is joined to, and on from there, losing some at every crossing. How hard you strike and how much REACH lets through decide how far a strike ripples: one bell, a neighbour or two, or the whole set.
+
+**Features:**
+- **A bell is a note.** V/OCT strikes the bell of that note, folded by octaves into the two octaves, so a sequencer plays exactly the notes it sends. The Register menu moves the set between C2 to C4, C3 to C5 and C4 to C6.
+- **Draw the rods on the panel.** Drag from one bell to another to join them, drag again to cut the rod. Rods are stored by note, so they survive a change of layout. Presets lay a chain, neighbours, a star, octaves or fifths.
+- **A rod's length is its time.** A crossing takes SPEED per neighbour spacing of rod. With CLOCK patched it takes one pulse per neighbour spacing instead, so a long rod waits several beats and the layout itself becomes a rhythm.
+- **A rod carries the partials the bells share.** A bell a fifth away answers far louder than one a semitone away, so the tuning decides what every rod sounds like.
+- **Five layouts**: ring, grid, keyboard, spiral and scatter, each with a tuning order along it (by pitch, by fifths, or shuffled). The picture fills the panel whichever you choose.
+- **The key felts the bells, it does not retune them.** Bells outside ROOT and SCALE are struck quietly and die fast, but still pass energy along.
+- **A real bell.** Seventeen partials from carillon bell data, with the minor third that makes a bell a bell and pairs of partials a few cents apart that beat. SHAPE crossfades it toward a metal bar, SIZE is the weight of the bells (how long they ring and how heavy the clapper), and DAMP runs from a hand on every bell to four times the natural ring, for bell plates.
+- **Two microphones you drag on the plane** give the stereo image, from each bell's distance and arrival time.
+
+**Controls:** Size, Shape, Bright, Damp, Reach, Speed, Root, Scale.
+**Inputs:** Trig (poly), V/OCT (poly), Vel (poly), Clock, and a CV for every control.
+**Outputs:** Poly (the sixteen loudest bells), Left, Right.
+
+**Context menu:** Layout, tuning order, register, lift the felts, rod presets, reset mic positions.
+
 ### Filters & Resonators
 
 #### Band
@@ -690,6 +722,24 @@ An expander for Meter that covers the long game. Meter's own panel handles the m
 
 See [docs/meterx-manual.md](docs/meterx-manual.md) for the full manual.
 
+#### Count
+
+<img src="screenshots/Count.png" alt="Count panel" height="320"> 
+
+A narrow clock. Set a tempo (or patch a clock) and a number of STEPS, and each of the six outputs plays its own rate and its own mask over that cycle. The rate runs from /64 to x64, including 1.5, 3 and 5 each way, and the mask picks which of the output's own pulses sound: all, odd, even, pairs, threes, fours, front half, back half, three Euclidean patterns, bursts, the downbeat, or none. One knob for each, so six outputs are twelve knobs and no menus.
+
+**Features:**
+- **Each output counts its own pulses.** A x2 output runs the cycle twice as fast, so its mask repeats twice as often.
+- **Euclidean masks take their density from STEPS**, which is why there is no second selector.
+- **Locks to an external clock** at one pulse per beat, landing each beat exactly on the pulse.
+- **Rotate each cycle** (context menu) walks a mask round the bar; an offset shifts it once.
+
+**Controls:** BPM, Steps, and a Rate and Mask per output.
+**Inputs:** BPM CV, Steps CV, Clock, Reset.
+**Outputs:** Six gates.
+
+**Context menu:** Gate length (5 ms trigger or half the pulse), per-output rotation and offset.
+
 #### Beat
 
 <img src="screenshots/Beat.png" alt="Beat panel" height="320"> 
@@ -799,6 +849,26 @@ A generative melodic sequencer built on one idea: a melody is a *walk*. You don'
 **Outputs:** V/OCT, Gate, Harmony V/OCT, Harmony Gate.
 
 See [docs/chance-manual.md](docs/chance-manual.md) for the full manual.
+
+#### Canon
+
+<img src="screenshots/Canon.png" alt="Canon panel" height="320"> 
+
+Four arpeggiators reading one chord progression. Canon holds four chords (sets) and four channels; each channel plays the chord in force with its own pattern, octave and clock, and can wander from it the way Fugue does, choosing the most consonant of three candidates against what the other channels are playing.
+
+**Features:**
+- **Chords are stored as scale degrees**, so a progression follows ROOT and SCALE. A note chosen outside the scale is kept as a semitone from the root.
+- **Eight pattern families**: up, down, up-down, converge, diverge, pedal, random and as-played, over one or two octaves.
+- **WANDER strays to chord tones, extensions and colour notes**, never so far that the channels stop agreeing.
+- **Gates normal left to right**, so one clock runs all four channels until you patch another.
+- **LEARN writes a held poly chord into the current set.** Click a key on screen to add or remove a note; right-click a keyboard for voicings and copying.
+- **Twenty chord progressions** in the context menu.
+
+**Controls:** Root, Scale, Set, Next, Reset, Learn, and a Pattern, Wander and Octave per channel.
+**Inputs:** Root CV, Scale CV, Set, Set CV, Reset, Learn (poly), and a Gate, Pattern CV, Wander CV and Octave CV per channel.
+**Outputs:** A V/OCT and a Gate per channel.
+
+**Context menu:** Progressions, per-channel step offset, restart on set change, wander may rest.
 
 #### Fugue
 

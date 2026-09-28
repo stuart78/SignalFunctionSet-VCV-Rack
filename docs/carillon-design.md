@@ -88,9 +88,9 @@ twenty-five, and clear.
 ## Playing it
 
 Polyphonic V/OCT, GATE and VEL. Each note is quantised to the nearest bell and
-struck with its velocity; a mono VEL cable sets every voice. A STRIKE trigger
-input with a BELL CV (1 V per octave, the same quantisation) is the
-sequencer's way in.
+struck with its velocity; a mono VEL cable sets every voice. (A STRIKE trigger
+with a BELL CV was here too, and was removed on 2026-09-27: it did nothing a
+GATE and V/OCT pair does not. Its two input ids are retired in place.)
 
 ## Listening to it
 
@@ -109,8 +109,10 @@ treats the grid as sixteen voices.
 About 26 HP. The grid across the top, drawn on the faceplate, tall enough to
 read at the foreshortened angle.
 Under it a row: SIZE, DAMP, REACH, SPEED as pots over CVs, then ROOT and SCALE
-with their CVs. At the foot: V/OCT, GATE, VEL (poly), STRIKE, BELL, CLOCK,
-and the outputs on a plate: L, R, POLY.
+with their CVs. At the foot: V/OCT, GATE, VEL (poly), CLOCK, and the outputs
+on a plate: L, R, POLY. (The designer's panel, 2026-09-27, moved the rows down
+to give the bell field 68.5 mm instead of 56, labelled GATE as TRIG and led
+the foot row with it, and ordered the plate POLY, LEFT, RIGHT.)
 
 ## What to measure before believing it
 
@@ -308,6 +310,48 @@ sustaining far longer than DAMP's floor allowed):
   as cast at 27%, the old default's ring at the new default 36%, the old
   maximum at the top. A middle C falls 60 dB in 97 s at DAMP 0, 16 s at the
   default.
+
+## The sixth pass: SHAPE stops moving the pitch (2026-09-27)
+
+SHAPE slid every partial's frequency from the bell's ratio to the bar's. Both
+ends are in tune with the note, but everything between was not: the nominal,
+which is where the ear takes a bell's pitch from, passed through 3.3x on its
+way from 2.0x to 5.4x, and the heard pitch moved with it. A bell now carries
+both sets of partials at their own frequencies and SHAPE sets how hard each is
+struck (equal power, at the strike), so no partial is ever anywhere but in one
+of two tuned tables. A set not struck since the bell last rang out is not
+computed, and since the partials no longer depend on SHAPE the per-bell
+coefficients are cached on pitch, ring time and sample rate: 25 ringing bells
+cost 3.0% of a core against 3.2% before. The harness strikes a bell at SHAPE
+0, .25, .5, .75 and 1 and requires every peak within 20 dB of the loudest to
+sit on one of the tables; the glide failed 5 of 6 at every in-between setting.
+
+A consequence worth knowing: SHAPE now shapes the NEXT strike rather than the
+bell already ringing, as a different beater would.
+
+SIZE never moves the pitch. It transposed continuously at first, then by whole
+octaves in thirds of the knob, and both were one fault: a knob a player sweeps
+retuned every bell. Octaves were tried a second time the same day and lost.
+Pitch comes from V/OCT, ROOT and a **Register** menu item (low C2-C4, middle
+C3-C5, high C4-C6, saved), and SIZE is the weight of the set at those notes:
+ring time 0.5x to 2x and a heavier clapper (a longer contact, so a darker,
+slower onset). The harness requires bell C on C4 to 0.01 cents at every SIZE
+and the register to move it exactly 12 semitones. A new module opens on the
+**Ring** layout.
+
+## The view fits the layout (2026-09-27)
+
+With the designer's panel the bell field grew to 68.5 mm, and a fixed framing
+left it half used: the ring sat a third of the way down over an empty floor,
+and compact layouts sat small in the middle. The view is now fitted to the
+layout each frame from the bells alone: depth so the farthest bell sits near
+the top and the default mic row near the foot, width so the widest bell
+reaches 44% of the way out. It is capped at 0.7 px down per px across at the
+nearest bells, which leaves grid, ring, spiral and scatter untouched (0.52 to
+0.68) and stops the keyboard, whose two rows are only 1.8 apart, being
+stretched into a top-down view; it is centred instead. The default mics now
+stand half a unit in front of each layout's nearest bells and follow a layout
+change until the player drags one. The floor grid runs to the edges of the view.
 
 ## Open questions
 

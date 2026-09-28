@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"   // sfs::screenFontFace, for the LEVEL readout
 #include <osdialog.h>
 #include <thread>
 #include <atomic>
@@ -245,13 +246,21 @@ struct PhaseWaveformDisplay : Widget {
 	};
 	DragTarget dragTarget = NONE;
 	int dragCueIdx = -1;   // index into the dragged sample's transients
+	// LEVEL / FILTER readout: the knob values last drawn per player, when one
+	// last moved, and which (0 level, 1 filter)
+	float shownKnob[2][2] = {{-9.f, -9.f}, {-9.f, -9.f}};
+	double knobMovedAt[2] = {-1e9, -1e9};
+	int knobMoved[2] = {0, 0};
+	std::shared_ptr<Font> font;
 	Vec lastButtonPos;     // last left-press position (onDoubleClick carries none)
 
 	PhaseWaveformDisplay() {}
 
+	// `gain` is the player's LEVEL, so the waveform is drawn at the size it
+	// plays; it is clipped to the lane, which at +6 dB it can fill.
 	void drawWaveform(const DrawArgs& args, const std::vector<float>& mini, float x, float y, float w, float h,
 	                  float loopStart, float loopEnd, NVGcolor color,
-	                  float rotationNorm = 0.f) {
+	                  float rotationNorm = 0.f, float gain = 1.f) {
 		if (mini.empty()) return;
 		int n = (int)mini.size();
 
@@ -293,7 +302,7 @@ struct PhaseWaveformDisplay : Widget {
 				srcIdx = loopStartIdx + ((relIdx + rotOffset) % loopLen);
 			}
 			float px = x + (float)i / (float)n * w;
-			float amp = mini[srcIdx] * h * 0.45f;
+			float amp = std::min(mini[srcIdx] * gain * h * 0.45f, h * 0.5f);
 			if (i == 0) {
 				nvgMoveTo(args.vg, px, midY - amp);
 			} else {
@@ -308,7 +317,7 @@ struct PhaseWaveformDisplay : Widget {
 				srcIdx = loopStartIdx + ((relIdx + rotOffset) % loopLen);
 			}
 			float px = x + (float)i / (float)n * w;
-			float amp = mini[srcIdx] * h * 0.45f;
+			float amp = std::min(mini[srcIdx] * gain * h * 0.45f, h * 0.5f);
 			nvgLineTo(args.vg, px, midY + amp);
 		}
 		nvgClosePath(args.vg);
@@ -2036,8 +2045,9 @@ void PhaseWaveformDisplay::drawLayer(const DrawArgs& args, int layer) {
 		if (module->params[Phase::MODE_A_PARAM].getValue() < 0.5f && module->sampleA.length > 0) {
 			rotNormA = (float)(module->loopA.rotationOffset / (double)module->sampleA.length);
 		}
+		float lvlA = module->params[Phase::LEVEL_A_PARAM].getValue();
 		drawWaveform(args, module->sampleA.waveformMini, 0, 0, w, halfH,
-		             module->sampleA.loopStart, module->sampleA.loopEnd, colorA, rotNormA);
+		             module->sampleA.loopStart, module->sampleA.loopEnd, colorA, rotNormA, lvlA * lvlA);
 		drawTransients(args, module->sampleA.transients, module->sampleA.length, 0, 0, w, halfH, transientColorA);
 
 		// Origin line: in rotate mode, shows where the original loop start
@@ -2078,8 +2088,9 @@ void PhaseWaveformDisplay::drawLayer(const DrawArgs& args, int layer) {
 		if (module->params[Phase::MODE_B_PARAM].getValue() < 0.5f && module->sampleB.length > 0) {
 			rotNormB = (float)(module->loopB.rotationOffset / (double)module->sampleB.length);
 		}
+		float lvlB = module->params[Phase::LEVEL_B_PARAM].getValue();
 		drawWaveform(args, module->sampleB.waveformMini, 0, halfH, w, halfH,
-		             module->sampleB.loopStart, module->sampleB.loopEnd, colorB, rotNormB);
+		             module->sampleB.loopStart, module->sampleB.loopEnd, colorB, rotNormB, lvlB * lvlB);
 		drawTransients(args, module->sampleB.transients, module->sampleB.length, 0, halfH, w, halfH, transientColorB);
 
 		// Origin line for B
@@ -2109,6 +2120,43 @@ void PhaseWaveformDisplay::drawLayer(const DrawArgs& args, int layer) {
 		// Loop handles
 		drawHandle(args, module->sampleB.loopStart, 0, halfH, w, halfH, handleColorB, true);
 		drawHandle(args, module->sampleB.loopEnd, 0, halfH, w, halfH, handleColorB, false);
+	}
+
+	// LEVEL / FILTER readout: while one of a player's two knobs moves, its
+	// lane names the value, and it fades out a second after the knob stops.
+	// The knob, not the CV: a patched filter CV moves all the time and would
+	// hold the readout up over the waveform. The first frame only records the
+	// values, so opening a patch does not flash the readouts.
+	double now = system::getTime();
+	if (!font || font->handle < 0) font = sfs::screenFontFace();
+	for (int k = 0; k < 2; k++) {
+		const int ids[2] = {Phase::LEVEL_A_PARAM + k, Phase::FILTER_A_PARAM + k};
+		for (int j = 0; j < 2; j++) {
+			float v = module->params[ids[j]].getValue();
+			if (shownKnob[k][j] > -9.f && v != shownKnob[k][j]) { knobMovedAt[k] = now; knobMoved[k] = j; }
+			shownKnob[k][j] = v;
+		}
+		double t = now - knobMovedAt[k];
+		float alpha = t < 0.8 ? 1.f : (float)std::max(0.0, 1.0 - (t - 0.8) / 0.4);
+		if (alpha <= 0.f || !font || font->handle < 0) continue;
+		std::string txt = std::string(knobMoved[k] == 0 ? "LEVEL " : "FILTER ") + (k == 0 ? "A  " : "B  ")
+		                + module->paramQuantities[ids[knobMoved[k]]]->getDisplayValueString();
+		size_t paren = txt.find(" (straight through)");     // the tooltip's gloss; the screen just says off
+		if (paren != std::string::npos) txt.erase(paren);
+		sfs::screenFont(args.vg, font);
+		nvgTextAlign(args.vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+		float bounds[4];
+		float tx = w - mm2px(2.f), ty = k * halfH + halfH * 0.5f;
+		nvgTextBounds(args.vg, tx, ty, txt.c_str(), NULL, bounds);
+		float pad = mm2px(1.f);
+		nvgBeginPath(args.vg);
+		nvgRoundedRect(args.vg, bounds[0] - pad, bounds[1] - pad * 0.6f, bounds[2] - bounds[0] + 2 * pad, bounds[3] - bounds[1] + 1.2f * pad, mm2px(0.8f));
+		nvgFillColor(args.vg, nvgRGBAf(0.06f, 0.06f, 0.12f, 0.85f * alpha));
+		nvgFill(args.vg);
+		NVGcolor c = k == 0 ? handleColorA : handleColorB;
+		c.a = alpha;
+		nvgFillColor(args.vg, c);
+		nvgText(args.vg, tx, ty, txt.c_str(), NULL);
 	}
 
 	Widget::drawLayer(args, layer);
