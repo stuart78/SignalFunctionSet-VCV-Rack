@@ -738,7 +738,7 @@ A narrow clock. Set a tempo (or patch a clock) and a number of STEPS, and each o
 **Inputs:** BPM CV, Steps CV, Clock, Reset.
 **Outputs:** Six gates.
 
-**Context menu:** Gate length (5 ms trigger or half the pulse), per-output rotation and offset.
+**Context menu:** Gate length (a gate of half the pulse by default, or a 5 ms trigger), per-output rotation and offset.
 
 #### Beat
 

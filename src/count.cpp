@@ -127,7 +127,10 @@ struct Count : Module {
 		dsp::PulseGenerator trig;
 	};
 	Out out[CT_N];
-	int gateMode = 0;                        // 0 = 5 ms trigger, 1 = half the pulse period
+	// 0 = 5 ms trigger, 1 = half the pulse period. Gates by default (2.22.1):
+	// a gate drives an envelope's sustain and still clocks anything edge-
+	// triggered. Saved patches keep the mode they were saved with.
+	int gateMode = 1;
 	// external clock, one pulse per beat
 	dsp::SchmittTrigger clockTrig, resetTrig;
 	double extPeriod = 0.0;                  // seconds between the last two pulses
