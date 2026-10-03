@@ -59,4 +59,5 @@ extern Model* modelFlockIn;
 extern Model* modelCanon;
 extern Model* modelCount;
 extern Model* modelCarillon;
+extern Model* modelStrata;
 extern Model* modelWheel;

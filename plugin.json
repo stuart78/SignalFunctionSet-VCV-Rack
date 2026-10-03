@@ -577,6 +577,16 @@
         "Synth voice",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Strata",
+      "name": "Strata",
+      "description": "A wavetable voice you travel through: WaveStack tables as a volume, sequenced and shaped.",
+      "tags": [
+        "Oscillator",
+        "Polyphonic"
+      ],
+      "hidden": true
     }
   ]
 }

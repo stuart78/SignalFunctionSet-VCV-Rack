@@ -476,6 +476,7 @@ PLATES = {
     "count": [],
     # the three outputs at the foot
     "carillon": [(87.5, 110.5, 43.5, 13.5)],
+    "strata": [(45.4, 103.5, 72.2, 15.5)],
     "canon": [],
     "brigade": [(41.0, 103.5, 39.0, 13.0)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -518,6 +519,7 @@ MODULES = {
     "canon":   ("Canon",   "src/canon.cpp",   "res/canon.svg",   {"CN_CH": 4}),
     "count":   ("Count",   "src/count.cpp",   "res/count.svg",   {"CT_N": 6}),
     "carillon":    ("Carillon",    "src/carillon.cpp",    "res/carillon.svg",    {}),
+    "strata":      ("Strata",      "src/strata.cpp",      "res/strata.svg",      {}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),

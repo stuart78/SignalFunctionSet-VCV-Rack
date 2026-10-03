@@ -92,6 +92,13 @@ rather than retuning them, two draggable mics give the stereo out, and the
 sixteen loudest bells go to a poly out. Screenless, drawn on the faceplate as
 Wheel and Flock are.
 
+### Strata: a wavetable voice you travel through
+Built hidden 2026-10-02, see `docs/strata-design.md`. Plays what WaveStack
+builds. A volume of frames (columns x rows x layers, from a WaveStack 3D export:
+WAV plus a `wt3d` grid chunk), navigated by X/Y/Z, sequenced as waypoints with a
+rate-based glide between them, morphed by crossfade or spectrally, conformed at
+load and shaped live (WARP, FOLD, TILT, SYNC). The screen is WaveStack's 3D view.
+
 ### Tide (working name): public data as a modulation source
 Banked 2026-09. A player for real-world time series, where the patch's clock
 sets how fast the world goes by: SPAN is real time per bar (a day, a year, a
