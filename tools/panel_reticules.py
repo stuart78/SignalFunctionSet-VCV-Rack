@@ -476,7 +476,7 @@ PLATES = {
     "count": [],
     # the three outputs at the foot
     "carillon": [(87.5, 110.5, 43.5, 13.5)],
-    "strata": [(45.4, 103.5, 72.2, 15.5)],
+    "strata": [(45.4, 110.0, 72.2, 15.5)],
     "canon": [],
     "brigade": [(41.0, 103.5, 39.0, 13.0)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so

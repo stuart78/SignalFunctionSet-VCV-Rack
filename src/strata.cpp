@@ -152,6 +152,22 @@ struct StrataDown2 {
 	}
 };
 
+// CRUSH: a mid-tread quantiser of step d, and its antiderivative for ADAA.
+// F is even and, between steps, a straight line: n(n-1)/2 whole steps under
+// the staircase up to the last edge, then n steps' height across the rest
+static inline float stCrushQ(float x, float d) { return d * std::round(x / d); }
+static inline double stCrushF(double x, double d) {
+	double a = std::fabs(x), n = std::round(a / d);
+	return d * d * n * (n - 1.0) * 0.5 + n * d * (a - d * (n - 0.5));
+}
+// SHUFFLE's coin: an integer hash, so a seed gives the same shuffle every time
+static inline uint32_t stHash(uint32_t x) {
+	x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+	return x;
+}
+static const int ST_SHUF_K = 6;                  // up to 2^6 = 64 pieces
+static const float ST_SHUF_MIN = 6.f;            // samples: no piece shorter (see the voice)
+
 struct StrataBl {
 	float naive[ST_BLL] = {}, corr[ST_BLL] = {};
 	int pos = 0;
@@ -388,12 +404,16 @@ struct Strata : Module {
 	enum ParamId {
 		FREQ_PARAM, FM_PARAM, X_PARAM, Y_PARAM, Z_PARAM, GLIDE_PARAM,
 		WARP_PARAM, FOLD_PARAM, TILT_PARAM, SYNC_PARAM,
+		RATE_PARAM, START_PARAM, ROTX_PARAM, ROTY_PARAM, ROTZ_PARAM,
+		CRUSH_PARAM, SHUFFLE_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
 		VOCT_INPUT, FM_INPUT, X_INPUT, Y_INPUT, Z_INPUT, GLIDE_INPUT,
 		WARP_INPUT, FOLD_INPUT, TILT_INPUT, SYNC_INPUT,
 		HARD_INPUT, CLOCK_INPUT, RESET_INPUT,
+		RATE_INPUT, START_INPUT, ROTX_INPUT, ROTY_INPUT, ROTZ_INPUT,
+		CRUSH_INPUT, SHUFFLE_INPUT,
 		INPUTS_LEN
 	};
 	enum OutputId { OUT_OUTPUT, X_OUTPUT, Y_OUTPUT, Z_OUTPUT, STEP_OUTPUT, LEFT_OUTPUT, RIGHT_OUTPUT, OUTPUTS_LEN };
@@ -432,6 +452,7 @@ struct Strata : Module {
 		float hpState = 0.f;
 		float dcX = 0.f, dcY = 0.f;                   // the output's DC blocker
 		double foldX = 0.0;                           // the folder's last input, for its antiderivative
+		double crushX = 0.0;                          // the crusher's, the same
 		StrataUp2 up1, up2;                           // the folder's x4: 1x to 2x, then 2x to 4x
 		StrataDown2 dn1, dn2;
 		dsp::SchmittTrigger hard;
@@ -448,6 +469,49 @@ struct Strata : Module {
 	// count. Dragged on the screen; saved.
 	float lis[2][3] = {{-0.7f, 0.f, -0.8f}, {0.7f, 0.f, -0.8f}};
 	void resetListeners() { lis[0][0] = -0.7f; lis[0][1] = 0.f; lis[0][2] = -0.8f; lis[1][0] = 0.7f; lis[1][1] = 0.f; lis[1][2] = -0.8f; }
+	// ROT X/Y/Z turn the dragged pair about the centre of the cube (vertical
+	// first, then X, then depth); lisNow is where they are heard from
+	float rot[3] = {0.f, 0.f, 0.f}, rotCS[6] = {1.f, 0.f, 1.f, 0.f, 1.f, 0.f};
+	float lisNow[2][3] = {{-0.7f, 0.f, -0.8f}, {0.7f, 0.f, -0.8f}};
+	void rotate(const float* in, float* out) const {
+		float x = in[0], y = in[1], z = in[2], t;
+		t = x * rotCS[2] + z * rotCS[3]; z = -x * rotCS[3] + z * rotCS[2]; x = t;     // vertical
+		t = y * rotCS[0] - z * rotCS[1]; z = y * rotCS[1] + z * rotCS[0]; y = t;     // X
+		t = x * rotCS[4] - y * rotCS[5]; y = x * rotCS[5] + y * rotCS[4]; x = t;     // depth
+		out[0] = x; out[1] = y; out[2] = z;
+	}
+	void unrotate(const float* in, float* out) const {
+		float x = in[0], y = in[1], z = in[2], t;
+		t = x * rotCS[4] + y * rotCS[5]; y = -x * rotCS[5] + y * rotCS[4]; x = t;
+		t = y * rotCS[0] + z * rotCS[1]; z = -y * rotCS[1] + z * rotCS[0]; y = t;
+		t = x * rotCS[2] - z * rotCS[3]; z = x * rotCS[3] + z * rotCS[2]; x = t;
+		out[0] = x; out[1] = y; out[2] = z;
+	}
+	// SHUFFLE: level k cuts the cycle into 2^k pieces and reorders them,
+	// permTab[k][piece] = where that piece reads from. The order is a tree:
+	// at each depth every piece's two halves swap or not by a coin seeded from
+	// the halves' place, so level k+1 only reorders INSIDE level k's pieces and
+	// turning the knob up deepens one scramble rather than jumping between
+	// unrelated ones. The first cut always swaps, so the first step is heard.
+	uint8_t permTab[ST_SHUF_K + 1][1 << ST_SHUF_K] = {};
+	uint32_t shufSeed = 0x5eed2026u, permSeed = 0u;
+	void buildPerms() {
+		for (int K = 0; K <= ST_SHUF_K; K++)
+			for (int i = 0; i < (1 << K); i++) {
+				int out = 0;
+				for (int j = 1; j <= K; j++) {
+					int bit = (i >> (K - j)) & 1, prefix = i >> (K - j + 1);
+					int flip = j == 1 ? 1 : (int)(stHash(shufSeed ^ (uint32_t)j * 0x9e3779b9u ^ (uint32_t)prefix * 0x85ebca6bu) & 1u);
+					out = (out << 1) | (bit ^ flip);
+				}
+				permTab[K][i] = (uint8_t)out;
+			}
+		permSeed = shufSeed;
+	}
+	// what the screen shows of SHUFFLE and CRUSH
+	int shownShK = 0; float shownShF = 0.f, shownCrush = 0.f;
+	// the read the screen shows: RATE's span and START's offset, in frames
+	float shownSpan = 1.f, shownOff = 0.f;
 	// the screen's view, saved; the default is turned a little off square so
 	// the table reads as a cube rather than as a flat face
 	static constexpr float YAW0 = -0.45f, PITCH0 = 0.5f;
@@ -467,6 +531,14 @@ struct Strata : Module {
 		configParam(FOLD_PARAM, 0.f, 1.f, 0.f, "Fold", "%", 0.f, 100.f);
 		configParam(TILT_PARAM, -1.f, 1.f, 0.f, "Tilt (darker to brighter)", "%", 0.f, 100.f);
 		configParam(SYNC_PARAM, 0.f, 1.f, 0.f, "Sync (internal ratio, 1x to 8x)", "x", 0.f, 7.f, 1.f);
+		// the corruption: a cycle reading the wrong stretch of the table
+		configParam(RATE_PARAM, -1.f, 1.f, 0.f, "Read rate (frames a cycle reads; 1x is correct)", "x", 4.f);
+		configParam(START_PARAM, 0.f, 1.f, 0.f, "Read start (offset along the table)", "% of a frame", 0.f, 100.f);
+		configParam(CRUSH_PARAM, 0.f, 1.f, 0.f, "Bit crush", "%", 0.f, 100.f);
+		configParam(SHUFFLE_PARAM, 0.f, 1.f, 0.f, "Shuffle (the cycle cut into finer pieces, reordered)", "%", 0.f, 100.f);
+		configParam(ROTX_PARAM, -1.f, 1.f, 0.f, "Listeners: turn about the X axis", "°", 0.f, 180.f);
+		configParam(ROTY_PARAM, -1.f, 1.f, 0.f, "Listeners: turn about the vertical", "°", 0.f, 180.f);
+		configParam(ROTZ_PARAM, -1.f, 1.f, 0.f, "Listeners: turn about the depth axis", "°", 0.f, 180.f);
 		configInput(VOCT_INPUT, "V/OCT (poly)");
 		configInput(FM_INPUT, "FM (poly)");
 		configInput(X_INPUT, "X CV (poly, 1V per cell)");
@@ -477,6 +549,13 @@ struct Strata : Module {
 		configInput(FOLD_INPUT, "Fold CV");
 		configInput(TILT_INPUT, "Tilt CV");
 		configInput(SYNC_INPUT, "Sync CV");
+		configInput(RATE_INPUT, "Read rate CV (±5 V = the whole range)");
+		configInput(START_INPUT, "Read start CV (1 V = a tenth of a frame)");
+		configInput(CRUSH_INPUT, "Bit crush CV (±5 V = the whole range)");
+		configInput(SHUFFLE_INPUT, "Shuffle CV (±5 V = the whole range)");
+		configInput(ROTX_INPUT, "Listener X turn CV (±5 V = ±180°)");
+		configInput(ROTY_INPUT, "Listener vertical turn CV (±5 V = ±180°)");
+		configInput(ROTZ_INPUT, "Listener depth turn CV (±5 V = ±180°)");
 		configInput(HARD_INPUT, "Hard sync (poly): restarts the cycle");
 		configInput(CLOCK_INPUT, "Clock: on to the next waypoint (click frames on the screen to set them)");
 		configInput(RESET_INPUT, "Reset: back to the first waypoint");
@@ -794,6 +873,32 @@ struct Strata : Module {
 		float hpA = 1.f - std::exp(-2.f * (float)M_PI * 1500.f * args.sampleTime);
 		float foldGain = stFoldGain(fold);
 		shownKnee = knee; shownRatio = ratio; shownFold = fold;
+		// RATE / START: the read corrupted. A cycle reads `span` frames of the
+		// table as one stream (frames in file order, wrapping at the end),
+		// starting `off` frames along, so it neither starts nor ends where a
+		// frame does. 1x and 0 are the correct read, exactly.
+		float rateV = clamp(params[RATE_PARAM].getValue() + inputs[RATE_INPUT].getVoltage() * 0.2f, -1.f, 1.f);
+		float span = std::fabs(rateV) < 1e-4f ? 1.f : std::pow(4.f, rateV);
+		float off = clamp(params[START_PARAM].getValue() + inputs[START_INPUT].getVoltage() * 0.1f, 0.f, 1.f);
+		bool corrupt = span != 1.f || off != 0.f;
+		shownSpan = span; shownOff = off;
+		// SHUFFLE: level shK at weight 1 - shF, the next finer level at shF
+		if (permSeed != shufSeed) buildPerms();
+		float shL = clamp(params[SHUFFLE_PARAM].getValue() + inputs[SHUFFLE_INPUT].getVoltage() * 0.2f, 0.f, 1.f) * ST_SHUF_K;
+		// CRUSH: 12 bits down to 1, the step continuous so the knob sweeps
+		float crushV = clamp(params[CRUSH_PARAM].getValue() + inputs[CRUSH_INPUT].getVoltage() * 0.2f, 0.f, 1.f);
+		float crushD = crushV > 0.f ? 2.f / std::pow(2.f, 1.f + 11.f * (1.f - crushV)) : 0.f;
+		shownCrush = crushD;
+		hfMul *= span;                                // a longer read packs more into a cycle
+		// the listeners, turned
+		{
+			const int RI[3] = {ROTX_INPUT, ROTY_INPUT, ROTZ_INPUT}, RP[3] = {ROTX_PARAM, ROTY_PARAM, ROTZ_PARAM};
+			for (int a = 0; a < 3; a++) {
+				float r = clamp(params[RP[a]].getValue() + inputs[RI[a]].getVoltage() * 0.2f, -1.f, 1.f) * (float)M_PI;
+				if (r != rot[a]) { rot[a] = r; rotCS[2 * a] = std::cos(r); rotCS[2 * a + 1] = std::sin(r); }
+			}
+			for (int k = 0; k < 2; k++) rotate(lis[k], lisNow[k]);
+		}
 		// WARP spends unequal time either side of zero and FOLD is not
 		// symmetric about it, so either can leave DC on the output; a 2 Hz
 		// blocker takes it off (measured: warp 0.8 put DC 14 dB under the signal)
@@ -849,8 +954,11 @@ struct Strata : Module {
 
 			int fx[2] = {x0, x1}, fy[2] = {y0, y1}, fz[2] = {z0, z1};
 			float wxs[2] = {1.f - wx, wx}, wys[2] = {1.f - wy, wy}, wzs[2] = {1.f - wz, wz};
-			// the blended frame at frame phase q: the eight corners at two mip levels
-			auto frame = [&](float q) {
+			// the blended frame `sh` frames along the table from the point (in
+			// file order, wrapping), at frame phase q: the eight corners at two
+			// mip levels. sh is only ever non-zero while RATE or START corrupt
+			// the read
+			auto frameS = [&](int sh, float q) {
 				float s = 0.f;
 				for (int iz = 0; iz < 2; iz++) {
 					if (wzs[iz] <= 0.f) continue;
@@ -861,6 +969,7 @@ struct Strata : Module {
 							float w = wzy * wxs[ix];
 							if (w <= 0.f) continue;
 							int f = T->index(fx[ix], fy[iy], fz[iz]);
+							if (sh) { f = (f + sh) % T->frames; if (f < 0) f += T->frames; }
 							float a = readLevel(T->level(f, k0), ST_LEN[k0], q);
 							if (kf > 0.f) a += (readLevel(T->level(f, k1), ST_LEN[k1], q) - a) * kf;
 							s += w * a;
@@ -872,62 +981,150 @@ struct Strata : Module {
 			// WARP: slave phase to frame phase, a slope of wLo before the knee and wHi after
 			float wLo = 0.5f / knee, wHi = 0.5f / (1.f - knee);
 			auto warpOf = [&](float p) { return p < knee ? p * wLo : 0.5f + (p - knee) * wHi; };
+			auto unwarp = [&](float q) { return q < 0.5f ? q / wLo : knee + (q - 0.5f) / wHi; };
 			auto slaveOf = [&](double ph) { float p = (float)ph * ratio; return p - std::floor(p); };
-			// the frame's slope per unit of frame phase, across one table step
+			// a frame's slope per unit of its own phase, across one table step
 			float hq = 1.f / (float)ST_LEN[k0];
-			auto dframe = [&](float q) {
+			auto dAt = [&](int sh, float q) {
 				float u = q + hq, l = q - hq;
-				return (frame(u - std::floor(u)) - frame(l - std::floor(l))) * (0.5f / hq);
+				return (frameS(sh, u - std::floor(u)) - frameS(sh, l - std::floor(l))) * (0.5f / hq);
 			};
-			// the output's slope per sample, from the slave's
-			float dps = ratio * (float)inc;
-			// HARD sync: the cycle restarts now, a step and a change of slope
+			// The read as a stream: u = off + q * span frames along. A value or a
+			// slope taken from the RIGHT of u belongs to frame floor(u); from the
+			// left, to the frame that ends there (except at the start of the read,
+			// which has no left). Uncorrupted (off 0, span 1) these are exactly
+			// the frame and its slope.
+			auto valR = [&](float u) { float fl = std::floor(u); return frameS((int)fl, u - fl); };
+			auto valL = [&](float u) { if (u - off < 1e-6f) return valR(u); float sh = std::ceil(u) - 1.f; return frameS((int)sh, u - sh); };
+			auto dR = [&](float u) { float fl = std::floor(u); return dAt((int)fl, u - fl); };
+			auto dL = [&](float u) { if (u - off < 1e-6f) return dR(u); float sh = std::ceil(u) - 1.f; return dAt((int)sh, u - sh); };
+			// SHUFFLE's level for this voice. Like the mips, the finest cuts give
+			// way on a high note: a piece shorter than ST_SHUF_MIN samples is a
+			// seam inside a sample, which no correction can band-limit (measured
+			// -28 dB of alias at 1760 Hz with 64 pieces, under half a sample each)
+			float shLv = shL;
+			{
+				float perPiece = 1.f / std::max(ratio * (float)inc * std::max(wLo, wHi) * ST_SHUF_MIN, 1e-9f);
+				shLv = std::min(shLv, std::max(std::log2(perPiece), 0.f));
+			}
+			int shK = std::min((int)shLv, ST_SHUF_K);
+			float shF = shK == ST_SHUF_K ? 0.f : shLv - shK;
+			bool shuffled = shK > 0 || shF > 0.f;
+			if (c == 0) { shownShK = shK; shownShF = shF; }
+			// SHUFFLE: frame phase q to where level k reads it; `left` takes the
+			// piece that ENDS at q rather than the one that starts there
+			auto mapQ = [&](int k, float q, bool left) {
+				if (k == 0) return q;
+				int n = 1 << k;
+				float x = q * n;
+				int i = left ? (int)std::ceil(x) - 1 : (int)std::floor(x);
+				i = clamp(i, 0, n - 1);
+				return ((float)permTab[k][i] + (x - (float)i)) / (float)n;
+			};
+			// the read at frame phase q from either side, and its slope per unit
+			// of q: SHUFFLE's levels, then RATE/START's stream. A position on a
+			// frame boundary is snapped to it, so its two sides are told apart
+			auto streamU = [&](int k, float q, bool left) {
+				float u = off + mapQ(k, q, left) * span;
+				if (corrupt) { float r = std::round(u); if (std::fabs(u - r) < 1e-5f) u = r; }
+				return u;
+			};
+			auto readQ = [&](float q, bool left) {
+				float a = 0.f;
+				if (shF < 1.f) { float u = streamU(shK, q, left); a += (1.f - shF) * (left ? valL(u) : valR(u)); }
+				if (shF > 0.f) { float u = streamU(shK + 1, q, left); a += shF * (left ? valL(u) : valR(u)); }
+				return a;
+			};
+			auto slopeQ = [&](float q, bool left) {
+				float a = 0.f;
+				if (shF < 1.f) { float u = streamU(shK, q, left); a += (1.f - shF) * (left ? dL(u) : dR(u)); }
+				if (shF > 0.f) { float u = streamU(shK + 1, q, left); a += shF * (left ? dL(u) : dR(u)); }
+				return a * span;
+			};
+			// the slave's phase per sample
+			float sps = ratio * (float)inc;
+			// a seam at frame phase q, between warp slopes wl (before) and wr
+			// (after): a step and a change of slope, from the read either side
+			auto seam = [&](float qr, float ql, float wl, float wr, float& h, float& d) {
+				h = readQ(qr, false) - readQ(ql, true);
+				d = (slopeQ(qr, false) * wr - slopeQ(ql, true) * wl) * sps;
+			};
+			bool bent = knee != 0.5f, seamy = bent || corrupt || shuffled;
+			// HARD sync: the cycle restarts now
 			if (inputs[HARD_INPUT].isConnected() && v.hard.process(inputs[HARD_INPUT].getPolyVoltage(c), 0.1f, 1.f)) {
-				float pb = slaveOf(v.phase), qb = warpOf(pb);
-				float h = frame(0.f) - frame(qb);
-				float d = inc > 0.0 ? (dframe(0.f) * wLo - dframe(qb) * (pb < knee ? wLo : wHi)) * dps : 0.f;
+				float pb = slaveOf(v.phase), h, d;
+				seam(0.f, warpOf(pb), pb < knee ? wLo : wHi, wLo, h, d);
+				if (!(inc > 0.0)) d = 0.f;
 				v.phase = 0.0;
 				v.bl.add(0.f, h, d);
 			}
 			// Everything else this sample does to the waveform's corners, each
-			// at its exact sub-sample position: the slave wrapping and passing
-			// the knee are changes of slope (only while WARP bends it), and the
-			// master wrapping under a ratio that is not whole restarts the slave.
-			// Reverse travel (through-zero FM) goes uncorrected.
+			// at its exact sub-sample position: the slave wrapping, the knee,
+			// SHUFFLE's cuts, the read crossing a frame boundary, and the master
+			// wrapping under a ratio that is not whole, which restarts the slave.
+			// Found lazily, only where this sample actually goes, since SHUFFLE
+			// alone can put 64 cuts in a cycle. Reverse travel (through-zero FM)
+			// goes uncorrected.
 			double a0 = v.phase;
 			v.phase += inc;
 			bool masterWrap = v.phase >= 1.0;
-			if (inc > 0.0) {
-				bool bent = knee != 0.5f;
-				float dWrap = bent ? dframe(0.f) * (wLo - wHi) * dps : 0.f;
-				float dKnee = bent ? dframe(0.5f) * (wHi - wLo) * dps : 0.f;
-				// master phase runs a0 -> a0 + inc; segment 2 is after its wrap
+			if (inc > 0.0 && seamy) {
 				for (int seg = 0; seg < (masterWrap ? 2 : 1); seg++) {
 					double m0 = seg ? 0.0 : a0, m1 = seg ? v.phase - 1.0 : std::min(v.phase, 1.0);
 					double base = seg ? 1.0 : 0.0;
-					double u0 = m0 * ratio, u1 = m1 * ratio;
-					if (bent) {
-						for (double m = std::floor(u0); m <= u1; m += 1.0) {
-							double ev[2] = {m, m + knee};
-							float dd[2] = {dWrap, dKnee};
-							for (int e = 0; e < 2; e++) {
-								if (!(ev[e] > u0 && ev[e] <= u1)) continue;
-								float at = (float)((base + ev[e] / ratio - a0) / inc) - 1.f;
-								v.bl.add(clamp(at, -0.999999f, 0.f), 0.f, dd[e]);
+					double s0 = m0 * ratio, s1 = m1 * ratio;      // the slave, unwrapped
+					auto place = [&](double sl, float h, float d) {
+						float at = (float)((base + sl / ratio - a0) / inc) - 1.f;
+						v.bl.add(clamp(at, -0.999999f, 0.f), h, d);
+					};
+					for (double m = std::floor(s0); m <= s1; m += 1.0) {
+						// the slave wrapping into cycle m (not the restart at the
+						// start of segment 2, which is the master's)
+						if (m > s0) { float h, d; seam(0.f, 1.f, wHi, wLo, h, d); place(m, h, d); }
+						// inside cycle m: the critical frame phases in (qa, qb]
+						float pa = (float)std::max(s0 - m, 0.0), pb = (float)std::min(s1 - m, 1.0);
+						if (!(pb > pa)) continue;
+						float qa = warpOf(pa), qb = pb >= 1.f ? 1.f : warpOf(pb);
+						float cq[40]; int nc = 0;
+						auto addQ = [&](float q) { if (q > qa && q <= qb && q < 1.f && nc < 40) cq[nc++] = q; };
+						if (bent) addQ(0.5f);
+						if (shuffled) {
+							int nf = 1 << (shF > 0.f ? shK + 1 : shK);
+							for (int i = (int)std::floor(qa * nf) + 1; i <= (int)std::floor(qb * nf) && i < nf; i++) addQ((float)i / nf);
+						}
+						if (corrupt)
+							for (int L = shK; L <= shK + 1; L++) {
+								if ((L == shK && shF >= 1.f) || (L > shK && shF <= 0.f)) continue;
+								int n = 1 << L;
+								for (int i = (int)std::floor(qa * n); i <= std::min((int)std::floor(qb * n), n - 1); i++) {
+									float g = L ? (float)permTab[L][i] : 0.f;
+									// u = off + (g + q n - i) / n * span crosses k at
+									float ua = off + (g + std::max(qa * n - i, 0.f)) / n * span;
+									float ub = off + (g + std::min(qb * n - i, 1.f)) / n * span;
+									for (float k = std::floor(ua) + 1.f; k <= ub && nc < 40; k += 1.f)
+										addQ(((k - off) / span * n - g + i) / n);
+								}
 							}
+						// in order, once each
+						for (int x = 1; x < nc; x++) for (int y = x; y > 0 && cq[y] < cq[y - 1]; y--) std::swap(cq[y], cq[y - 1]);
+						for (int x = 0; x < nc; x++) {
+							if (x && cq[x] - cq[x - 1] < 1e-7f) continue;
+							float q = cq[x], h, d;
+							seam(q, q, q <= 0.5f ? wLo : wHi, q < 0.5f ? wLo : wHi, h, d);
+							place(m + unwarp(q), h, d);
 						}
 					}
 				}
-				if (masterWrap && ratio != std::floor(ratio)) {
-					float at = (float)((1.0 - a0) / inc) - 1.f;
-					float pb = ratio - std::floor(ratio), qb = warpOf(pb);
-					float h = frame(0.f) - frame(qb);
-					float d = (dframe(0.f) * wLo - dframe(qb) * (pb < knee ? wLo : wHi)) * dps;
-					v.bl.add(clamp(at, -0.999999f, 0.f), h, d);
-				}
+			}
+			if (inc > 0.0 && masterWrap && ratio != std::floor(ratio)) {
+				float at = (float)((1.0 - a0) / inc) - 1.f;
+				float pb = ratio - std::floor(ratio), h, d;
+				seam(0.f, warpOf(pb), pb < knee ? wLo : wHi, wLo, h, d);
+				v.bl.add(clamp(at, -0.999999f, 0.f), h, d);
 			}
 			v.phase -= std::floor(v.phase);
-			float s = v.bl.process(frame(warpOf(slaveOf(v.phase))));
+			float qNow = warpOf(slaveOf(v.phase));
+			float s = v.bl.process(corrupt || shuffled ? readQ(qNow, false) : frameS(0, qNow));
 			// TILT up: a one-pole high shelf
 			if (hiBoost > 0.f) { v.hpState += (s - v.hpState) * hpA; s += hiBoost * (s - v.hpState); }
 			// FOLD at four times the rate, each 4x sample anti-aliased by the
@@ -954,6 +1151,13 @@ struct Strata : Module {
 							z4[k] = plain + (ad - plain) * adaa;
 						}
 						v.foldX = x;
+						// CRUSH after the fold, at 4x and by its antiderivative too:
+						// the staircase's mean over the line from the last input
+						double y = z4[k], dy = y - v.crushX;
+						if (crushD > 0.f)
+							z4[k] = std::fabs(dy) > 1e-7 ? (float)((stCrushF(y, crushD) - stCrushF(v.crushX, crushD)) / dy)
+							                             : stCrushQ((float)(0.5 * (y + v.crushX)), crushD);
+						v.crushX = y;
 					}
 					y2[j] = v.dn2.process(z4[0], z4[1]);
 				}
@@ -968,7 +1172,7 @@ struct Strata : Module {
 				float wx = stWorldX(v.px, T->cols), wy = stWorldY(v.pz, T->layers), wz = stWorldZ(v.py, T->rows);
 				float g[2];
 				for (int k = 0; k < 2; k++) {
-					float dx = wx - lis[k][0], dy = T->layers > 1 ? wy - lis[k][1] : 0.f, dz = wz - lis[k][2];
+					float dx = wx - lisNow[k][0], dy = T->layers > 1 ? wy - lisNow[k][1] : 0.f, dz = wz - lisNow[k][2];
 					g[k] = 1.f / (1.f + 1.5f * (dx * dx + dy * dy + dz * dz));
 				}
 				v.gL += (g[0] - v.gL) * gSlew; v.gR += (g[1] - v.gR) * gSlew;
@@ -1017,6 +1221,7 @@ struct Strata : Module {
 			json_array_append_new(li, p);
 		}
 		json_object_set_new(r, "listeners", li);
+		json_object_set_new(r, "shuffleSeed", json_integer((json_int_t)shufSeed));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
@@ -1027,6 +1232,7 @@ struct Strata : Module {
 		b("normalize", conform.normalize); b("removeDC", conform.removeDC); b("align", conform.align); b("squareUp", squareUp);
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_real_value(j);
 		if (json_t* j = json_object_get(r, "camPitch")) camPitch = clamp((float)json_real_value(j), -1.5f, 1.5f);
+		if (json_t* j = json_object_get(r, "shuffleSeed")) shufSeed = (uint32_t)json_integer_value(j);
 		if (json_t* li = json_object_get(r, "listeners"))
 			for (int k = 0; k < 2 && k < (int)json_array_size(li); k++)
 				for (int a = 0; a < 3; a++)
@@ -1107,8 +1313,8 @@ struct StrataDisplay : OpaqueWidget {
 	// how the mix hears it there
 	void lisWorld(int k, float& x, float& y, float& z) const {
 		const StrataTable* T = module->table;
-		x = module->lis[k][0]; z = module->lis[k][2];
-		y = T && T->layers > 1 ? module->lis[k][1] : 0.f;
+		x = module->lisNow[k][0]; z = module->lisNow[k][2];
+		y = T && T->layers > 1 ? module->lisNow[k][1] : 0.f;
 	}
 	int lisAt(Vec p) const {
 		if (!module) return -1;
@@ -1145,14 +1351,31 @@ struct StrataDisplay : OpaqueWidget {
 		Strata::axisCells(v0.px, T.cols, Strata::WRAP_CLAMP, x0, x1, wx);
 		Strata::axisCells(v0.py, T.rows, Strata::WRAP_CLAMP, y0, y1, wy);
 		Strata::axisCells(v0.pz, T.layers, Strata::WRAP_CLAMP, z0, z1, wz);
-		auto frame = [&](float q) {
+		auto frameS = [&](int sh, float q) {
 			float s = 0.f;
 			for (int c = 0; c < 8; c++) {
 				float wgt = ((c & 1) ? wx : 1.f - wx) * ((c & 2) ? wy : 1.f - wy) * ((c & 4) ? wz : 1.f - wz);
 				if (wgt <= 0.f) continue;
-				s += wgt * Strata::readLevel(T.level(T.index((c & 1) ? x1 : x0, (c & 2) ? y1 : y0, (c & 4) ? z1 : z0), 3), ST_LEN[3], q);
+				int f = T.index((c & 1) ? x1 : x0, (c & 2) ? y1 : y0, (c & 4) ? z1 : z0);
+				if (sh) { f = (f + sh) % T.frames; if (f < 0) f += T.frames; }
+				s += wgt * Strata::readLevel(T.level(f, 3), ST_LEN[3], q);
 			}
 			return s;
+		};
+		auto frame = [&](float q) { return frameS(0, q); };
+		// the read as the voice makes it: RATE frames of the table from START
+		float span = module->shownSpan, off = module->shownOff;
+		int shK = module->shownShK; float shF = module->shownShF, crushD = module->shownCrush;
+		auto readLvl = [&](int k, float q) {
+			if (k) { int n = 1 << k, i = clamp((int)(q * n), 0, n - 1); q = (module->permTab[k][i] + (q * n - i)) / n; }
+			float u = off + q * span, fl = std::floor(u);
+			return frameS((int)fl, u - fl);
+		};
+		auto readAt = [&](float q) {
+			float a = 0.f;
+			if (shF < 1.f) a += (1.f - shF) * readLvl(shK, q);
+			if (shF > 0.f) a += shF * readLvl(shK + 1, q);
+			return a;
 		};
 		float knee = module->shownKnee, ratio = module->shownRatio, fold = module->shownFold;
 		float cy = by + bh / 2.f, amp = bh * 0.42f;
@@ -1173,8 +1396,9 @@ struct StrataDisplay : OpaqueWidget {
 			float p = t * ratio; p -= std::floor(p);
 			if (k == P && ratio == std::floor(ratio)) p = 0.f;   // a whole ratio ends where it began
 			float q = p < knee ? 0.5f * p / knee : 0.5f + 0.5f * (p - knee) / (1.f - knee);
-			float s = frame(q);
+			float s = readAt(q);
 			if (fold > 0.f) s = stFold(s * stFoldGain(fold));
+			if (crushD > 0.f) s = stCrushQ(s, crushD);
 			float X = bx + t * bw, Y = cy - clamp(s, -1.2f, 1.2f) * amp;
 			if (k == 0) nvgMoveTo(vg, X, Y); else nvgLineTo(vg, X, Y);
 		}
@@ -1267,14 +1491,20 @@ struct StrataDisplay : OpaqueWidget {
 			StrataView V = view();
 			float a = e.mouseDelta.x / z / V.sx, b = -e.mouseDelta.y / z / V.sx;
 			float cy = std::cos(V.yaw), sy = std::sin(V.yaw), cp = std::cos(V.pitch), sp = std::sin(V.pitch);
-			float* L = module->lis[dragLis];
 			bool lift = (APP->window->getMods() & RACK_MOD_MASK) == GLFW_MOD_SHIFT && module->table && module->table->layers > 1;
-			if (lift) L[1] = clamp(L[1] + b / std::max(std::fabs(cp), 0.2f), -1.f, 1.f);
+			float w[3] = {0.f, 0.f, 0.f}, base[3];
+			if (lift) w[1] = b / std::max(std::fabs(cp), 0.2f);
 			else {
 				float bb = b / (std::fabs(sp) < 0.2f ? std::copysign(0.2f, sp) : sp);
-				L[0] = clamp(L[0] + a * cy - bb * sy, -1.f, 1.f);
-				L[2] = clamp(L[2] + a * sy + bb * cy, -1.f, 1.f);
+				w[0] = a * cy - bb * sy;
+				w[2] = a * sy + bb * cy;
 			}
+			// the move is made where the listener is heard, after ROT X/Y/Z;
+			// the dragged position is the one before them
+			module->unrotate(w, base);
+			float* L = module->lis[dragLis];
+			for (int i = 0; i < 3; i++) L[i] = clamp(L[i] + base[i], -1.f, 1.f);
+			module->rotate(L, module->lisNow[dragLis]);
 			return;
 		}
 		if (dragDist < 3.f) return;
@@ -1477,7 +1707,7 @@ struct StrataDisplay : OpaqueWidget {
 			std::string note;
 			bool clk = module->inputs[Strata::CLOCK_INPUT].isConnected();
 			if (dragLis >= 0) {
-				const float* L = module->lis[dragLis];
+				const float* L = module->lisNow[dragLis];
 				note = string::f("%s  x %.2f  depth %.2f", dragLis ? "R" : "L", L[0], L[2]);
 				if (T.layers > 1) note += string::f("  height %.2f  (shift: height)", L[1]);
 			} else if (module->nSteps == 0 && clk) note = "click frames to set waypoints for CLOCK";
@@ -1502,7 +1732,10 @@ struct StrataDisplay : OpaqueWidget {
 // transport row at the foot with the outputs on a plate.
 // =============================================================================
 static const float ST_PX[10] = {9.5f, 20.9f, 32.3f, 43.7f, 55.1f, 66.5f, 77.9f, 89.3f, 100.7f, 112.1f};
-static const float ST_PY = 76.f, ST_PCV = 88.f, ST_FY = 113.f;
+// two rows of trimpot-over-jack pairs under a 47 mm screen, then the foot
+static const float ST_PY = 67.f, ST_PCV = 79.f, ST_PY2 = 92.f, ST_PCV2 = 104.f, ST_FY = 119.5f;
+// row 2 sits in row 1's columns 1-4 and 8-10
+static const float ST_PX2[7] = {9.5f, 20.9f, 32.3f, 43.7f, 89.3f, 100.7f, 112.1f};
 // the foot: three inputs, then seven outputs at 10.16 mm on the plate
 static const float ST_OX[7] = {51.0f, 61.16f, 71.32f, 81.48f, 91.64f, 101.8f, 111.96f};
 
@@ -1518,7 +1751,7 @@ struct StrataWidget : ModuleWidget {
 		StrataDisplay* disp = new StrataDisplay();
 		disp->module = module;
 		disp->box.pos = mm2px(Vec(3.0f, 11.0f));
-		disp->box.size = mm2px(Vec(115.92f, 56.0f));
+		disp->box.size = mm2px(Vec(115.92f, 47.0f));
 		addChild(disp);
 
 		static const char* PN[10] = {"FREQ", "FM", "X", "Y", "Z", "GLIDE", "WARP", "FOLD", "TILT", "SYNC"};
@@ -1530,6 +1763,18 @@ struct StrataWidget : ModuleWidget {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(ST_PX[i], ST_PY)), module, PP[i]));
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX[i], ST_PCV)), module, PI[i]));
 			lbl->pairDown(ST_PX[i], ST_PY, ST_PCV, PN[i]);
+		}
+		// row 2: the read corrupted (RATE, START, CRUSH, SHUFFLE) on the left,
+		// the listeners' turns on the right over the L/R outs they move
+		static const char* PN2[7] = {"RATE", "START", "CRUSH", "SHUFFLE", "ROT X", "ROT Y", "ROT Z"};
+		static const int PP2[7] = {Strata::RATE_PARAM, Strata::START_PARAM, Strata::CRUSH_PARAM, Strata::SHUFFLE_PARAM,
+		                           Strata::ROTX_PARAM, Strata::ROTY_PARAM, Strata::ROTZ_PARAM};
+		static const int PI2[7] = {Strata::RATE_INPUT, Strata::START_INPUT, Strata::CRUSH_INPUT, Strata::SHUFFLE_INPUT,
+		                           Strata::ROTX_INPUT, Strata::ROTY_INPUT, Strata::ROTZ_INPUT};
+		for (int i = 0; i < 7; i++) {
+			addParam(createParamCentered<Trimpot>(mm2px(Vec(ST_PX2[i], ST_PY2)), module, PP2[i]));
+			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX2[i], ST_PCV2)), module, PI2[i]));
+			lbl->pairDown(ST_PX2[i], ST_PY2, ST_PCV2, PN2[i]);
 		}
 		static const char* FN[3] = {"HARD", "CLOCK", "RESET"};
 		static const int FI[3] = {Strata::HARD_INPUT, Strata::CLOCK_INPUT, Strata::RESET_INPUT};
@@ -1604,6 +1849,7 @@ struct StrataWidget : ModuleWidget {
 		menu->addChild(createIndexPtrSubmenuItem("X", {"Clamp", "Wrap"}, &m->wrap[0]));
 		menu->addChild(createIndexPtrSubmenuItem("Y", {"Clamp", "Wrap"}, &m->wrap[1]));
 		menu->addChild(createIndexPtrSubmenuItem("Z", {"Clamp", "Wrap"}, &m->wrap[2]));
+		menu->addChild(createMenuItem("New shuffle order", "", [=]() { m->shufSeed = stHash(m->shufSeed + 0x9e3779b9u); }));
 		menu->addChild(createMenuLabel("Stereo"));
 		menu->addChild(createMenuItem("Reset the listeners", "", [=]() { m->resetListeners(); }));
 	}

@@ -173,6 +173,76 @@ int main() {
 		      string::f("first column leans left by %.1f dB, last column right by %.1f dB (want > 6)", lr[0][0] - lr[0][1], lr[1][1] - lr[1][0]));
 	}
 
+	printf("== the read corrupted: RATE and START ==\n");
+	{
+		// START at a whole frame reads the NEXT frame in file order, cleanly
+		writeWav(tmpDir + "/vol2.wav", table(12), 2048, 2048, 3, 2, 2);
+		Run r; r.m.conform.normalize = false; r.load({tmpDir + "/vol2.wav"});
+		r.m.params[Strata::FREQ_PARAM].setValue(-2.f);
+		r.m.params[Strata::START_PARAM].setValue(1.f);
+		float pk = r.peak(0.07f);
+		check(std::fabs(pk - amp(1)) < amp(1) * 0.01f, string::f("START one frame on reads the next frame: %.4f (want %.4f)", pk, amp(1)));
+		// RATE 2x: two frames a cycle, so the second harmonic leads
+		r.m.params[Strata::START_PARAM].setValue(0.f);
+		r.m.params[Strata::RATE_PARAM].setValue(0.5f);
+		r.run(0.3f);
+		const int N = 48000; std::vector<float> x(N);
+		for (int i = 0; i < N; i++) { r.tick(); x[i] = r.m.outputs[Strata::OUT_OUTPUT].getVoltage(0); }
+		float f0 = dsp::FREQ_C4 / 4.f;
+		auto mag = [&](float f) { double re = 0, im = 0; for (int i = 0; i < N; i++) { re += x[i] * std::cos(2 * M_PI * f * i / SR); im += x[i] * std::sin(2 * M_PI * f * i / SR); } return std::sqrt(re * re + im * im); };
+		double h1 = mag(f0), h2 = mag(2 * f0);
+		check(h2 > 2 * h1, string::f("RATE 2x puts two frames in a cycle: harmonic 2 is %.1f dB over the fundamental", 20 * std::log10(h2 / std::max(h1, 1e-9))));
+	}
+
+	printf("== SHUFFLE and CRUSH ==\n");
+	{
+		// the first cut swaps the halves: a sine frame comes back inverted, exactly
+		writeWav(tmpDir + "/sine.wav", table(4), 2048, 2048, 2, 2, 1);
+		Run a, b;
+		a.m.conform.normalize = false; b.m.conform.normalize = false;
+		a.load({tmpDir + "/sine.wav"}); b.load({tmpDir + "/sine.wav"});
+		b.m.params[Strata::SHUFFLE_PARAM].setValue(1.f / 6.f);
+		a.run(0.1f); b.run(0.1f);
+		double err = 0, ref = 0;
+		for (int i = 0; i < 4800; i++) { a.tick(); b.tick(); float x = a.m.outputs[Strata::OUT_OUTPUT].getVoltage(0), y = b.m.outputs[Strata::OUT_OUTPUT].getVoltage(0); err += (x + y) * (x + y); ref += x * x; }
+		check(err < ref * 1e-4, string::f("SHUFFLE's first level swaps the halves (a sine comes back inverted): residual %.1f dB", 10 * std::log10(err / ref + 1e-30)));
+		// the order is the seed's: the same seed plays the same, a new one does not
+		auto render = [](uint32_t seed) {
+			Run r; r.m.shufSeed = seed; r.m.params[Strata::X_PARAM].setValue(0.6f); r.m.params[Strata::SHUFFLE_PARAM].setValue(1.f);
+			r.run(0.05f); std::vector<float> o(2000);
+			for (float& v : o) { r.tick(); v = r.m.outputs[Strata::OUT_OUTPUT].getVoltage(0); }
+			return o;
+		};
+		std::vector<float> s1 = render(7), s2 = render(7), s3 = render(8);
+		double d12 = 0, d13 = 0;
+		for (size_t i = 0; i < s1.size(); i++) { d12 += std::fabs(s1[i] - s2[i]); d13 += std::fabs(s1[i] - s3[i]); }
+		check(d12 == 0 && d13 > 1, string::f("a seed gives the same order every time, a new seed a new one (%.3f, %.1f)", d12, d13));
+		// CRUSH at the top is a few levels: the output's distinct values collapse
+		Run c; c.m.conform.normalize = false; c.load({tmpDir + "/sine.wav"});
+		c.m.params[Strata::FREQ_PARAM].setValue(-3.f);
+		c.m.params[Strata::CRUSH_PARAM].setValue(1.f);
+		c.run(0.3f);
+		float lo = 1e9f, hi = -1e9f; int mid = 0;
+		for (int i = 0; i < 9600; i++) { c.tick(); float v = c.m.outputs[Strata::OUT_OUTPUT].getVoltage(0) / 5.f; lo = std::min(lo, v); hi = std::max(hi, v); if (std::fabs(v) > 0.2f && std::fabs(v) < 0.8f) mid++; }
+		check(mid < 9600 / 10, string::f("CRUSH at 1 bit: the wave sits on its steps (%d of 9600 samples between them)", mid));
+	}
+
+	printf("== the listeners turn about the centre ==\n");
+	{
+		double lr[2];
+		Run r;
+		r.m.outputs[Strata::LEFT_OUTPUT].channels = 1; r.m.outputs[Strata::RIGHT_OUTPUT].channels = 1;
+		r.m.params[Strata::X_PARAM].setValue(0.f); r.m.params[Strata::Y_PARAM].setValue(0.5f);
+		r.m.params[Strata::ROTY_PARAM].setValue(1.f);          // half a turn: the pair swaps sides
+		r.run(0.2f);
+		double sl = 0, sr = 0;
+		for (int i = 0; i < 4800; i++) { r.tick(); float L = r.m.outputs[Strata::LEFT_OUTPUT].getVoltage(), R = r.m.outputs[Strata::RIGHT_OUTPUT].getVoltage(); sl += L * L; sr += R * R; }
+		lr[0] = 10 * std::log10(sl + 1e-12); lr[1] = 10 * std::log10(sr + 1e-12);
+		check(lr[1] - lr[0] > 6, string::f("half a turn about the vertical: the first column now leans right by %.1f dB", lr[1] - lr[0]));
+		float back[3]; r.m.unrotate(r.m.lisNow[0], back);
+		check(std::fabs(back[0] - r.m.lis[0][0]) < 1e-5f && std::fabs(back[2] - r.m.lis[0][2]) < 1e-5f, "unrotate undoes rotate (so a drag lands where the pointer is)");
+	}
+
 	printf("== the glide: rate mode takes time in proportion to distance, time mode does not ==\n");
 	for (int mode : {Strata::GLIDE_RATE, Strata::GLIDE_TIME}) {
 		Run r; r.m.glideMode = mode;
@@ -234,6 +304,67 @@ int main() {
 			printf("  info  at %4.0f Hz: plain %.1f dB   warp 0.8 %.1f dB   sync 4.5x %.1f dB   fold 0.5 %.1f dB   fold 1 %.1f dB\n", f, p, w, s, fo, alias(0.f, 0.f, f, 1.f));
 		}
 		check(worst < -50, string::f("plain, warp and sync stay under -50 dB from 110 to 1760 Hz: worst %.1f dB", worst));
+		// the corrupted read: every seam goes through the same BLEP/BLAMP
+		auto aliasC = [](float rate, float start, float f0) {
+			Run r;
+			r.m.params[Strata::X_PARAM].setValue(1.f);
+			r.m.params[Strata::FREQ_PARAM].setValue(std::log2(f0 / dsp::FREQ_C4));
+			r.m.params[Strata::RATE_PARAM].setValue(rate); r.m.params[Strata::START_PARAM].setValue(start);
+			r.run(0.05f);
+			const int N = 32768; std::vector<float> x(N), sp(2 * N);
+			for (int i = 0; i < N; i++) {
+				r.tick();
+				double t = 2.0 * M_PI * i / (N - 1);
+				x[i] = (float)(r.m.outputs[Strata::OUT_OUTPUT].getVoltage(0) * (0.35875 - 0.48829 * std::cos(t) + 0.14128 * std::cos(2 * t) - 0.01168 * std::cos(3 * t)));
+			}
+			rack::dsp::RealFFT fft(N); fft.rfft(x.data(), sp.data());
+			double harm = 0, rest = 0;
+			for (int k = 2; k < N / 2; k++) {
+				double p = sp[2 * k] * sp[2 * k] + sp[2 * k + 1] * sp[2 * k + 1];
+				float f = k * SR / N, nearest = std::round(f / f0) * f0;
+				if (f < f0 * 0.5f) continue;
+				if (f > 20000.f) break;
+				if (std::fabs(f - nearest) < 6 * SR / N && nearest > 0) harm += p; else rest += p;
+			}
+			return 10.0 * std::log10(rest / harm);
+		};
+		double cw = -999;
+		for (float f : {110.f, 440.f, 1760.f}) {
+			double a = aliasC(0.3f, 0.37f, f), b = aliasC(-0.4f, 0.6f, f);
+			cw = std::max({cw, a, b});
+			printf("  info  at %4.0f Hz: RATE 1.5x START 37%% %.1f dB   RATE 0.57x START 60%% %.1f dB\n", f, a, b);
+		}
+		check(cw < -45, string::f("the corrupted read stays under -45 dB from 110 to 1760 Hz: worst %.1f dB", cw));
+		auto aliasS = [](float shuffle, float crush, float f0) {
+			Run r;
+			r.m.params[Strata::X_PARAM].setValue(1.f);
+			r.m.params[Strata::FREQ_PARAM].setValue(std::log2(f0 / dsp::FREQ_C4));
+			r.m.params[Strata::SHUFFLE_PARAM].setValue(shuffle); r.m.params[Strata::CRUSH_PARAM].setValue(crush);
+			r.run(0.05f);
+			const int N = 32768; std::vector<float> x(N), sp(2 * N);
+			for (int i = 0; i < N; i++) {
+				r.tick();
+				double t = 2.0 * M_PI * i / (N - 1);
+				x[i] = (float)(r.m.outputs[Strata::OUT_OUTPUT].getVoltage(0) * (0.35875 - 0.48829 * std::cos(t) + 0.14128 * std::cos(2 * t) - 0.01168 * std::cos(3 * t)));
+			}
+			rack::dsp::RealFFT fft(N); fft.rfft(x.data(), sp.data());
+			double harm = 0, rest = 0;
+			for (int k = 2; k < N / 2; k++) {
+				double p = sp[2 * k] * sp[2 * k] + sp[2 * k + 1] * sp[2 * k + 1];
+				float f = k * SR / N, nearest = std::round(f / f0) * f0;
+				if (f < f0 * 0.5f) continue;
+				if (f > 20000.f) break;
+				if (std::fabs(f - nearest) < 6 * SR / N && nearest > 0) harm += p; else rest += p;
+			}
+			return 10.0 * std::log10(rest / harm);
+		};
+		double sw = -999;
+		for (float f : {110.f, 440.f, 1760.f}) {
+			double a = aliasS(0.6f, 0.f, f), b = aliasS(1.f, 0.f, f), c = aliasS(0.f, 0.5f, f), d = aliasS(0.f, 1.f, f);
+			sw = std::max({sw, a, b});
+			printf("  info  at %4.0f Hz: SHUFFLE 60%% %.1f dB   SHUFFLE 100%% %.1f dB   CRUSH 50%% %.1f dB   CRUSH 100%% %.1f dB\n", f, a, b, c, d);
+		}
+		check(sw < -45, string::f("SHUFFLE's cuts stay under -45 dB from 110 to 1760 Hz: worst %.1f dB", sw));
 	}
 
 	printf("== cost: 16 voices between grid points, percent of one core ==\n");

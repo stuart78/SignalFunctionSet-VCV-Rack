@@ -248,3 +248,38 @@ both stay (decided 2026-10-02). Strata reuses Wave's band-limited mipmap code.
   at each listener (d in world units, the cube 2 wide), slewed 5 ms, summed and
   soft-clipped. A one-layer table is a plane. Measured: the first column leans
   6.2 dB left, the last 6.2 dB right, with the listeners at their defaults.
+
+## Third round (2026-10-03): a second row
+
+- **RATE and START corrupt the read.** The table is read as one stream of
+  frames in file order (wrapping at its end); a cycle reads RATE frames' worth
+  (4^rate: 0.25x to 4x, 1x correct) starting START frames along (0 to 1). It is
+  the classic wavetable error of loading with the wrong frame size, as a
+  control: the cycle neither starts nor ends where a frame does, and a long read
+  crosses into the next frames. Each seam is a step and a slope change and goes
+  through the BLEP/BLAMP corrector at its sub-sample position, so the result is
+  measured at -50 to -81 dB off-harmonic (110 to 1760 Hz). At 1x and 0 every
+  formula reduces to the old read, and the old measurements are unchanged.
+- **ROT X / Y / Z** turn the listener pair about the centre of the cube, applied
+  after the dragged positions (vertical, then X, then depth). Half a turn about
+  the vertical swaps the image: measured, the first column then leans 6 dB right.
+- **Panel**: the screen gives up 9 mm (47 mm) for a second row of trimpot over
+  jack pairs. Row 2 uses five of row 1's columns: RATE and START under FREQ and
+  FM, the turns on the right over the L/R outputs.
+
+## Fourth round (2026-10-03): CRUSH and SHUFFLE
+
+- **CRUSH**: bit depth, 12 bits down to 1 with the step continuous, after FOLD
+  at 4x and anti-aliased by its antiderivative (the staircase integrates to a
+  line between edges). Measured -57 to -71 dB off-harmonic.
+- **SHUFFLE**: the cycle cut into 2, 4 ... 64 pieces and reordered, crossfading
+  between levels. The order is a tree of coin flips seeded from the patch (each
+  depth swaps the halves of each piece or not; the first cut always swaps), so a
+  finer level only reorders inside the coarser level's pieces and the knob
+  deepens one scramble instead of jumping between unrelated ones. "New shuffle
+  order" re-rolls the seed. Swapping the halves of a sine returns the inverted
+  sine to -82 dB.
+- Every cut is a seam through the BLEP/BLAMP corrector, found lazily per sample.
+  A cut shorter than a sample cannot be band-limited (64 pieces at 1760 Hz
+  measured -28 dB), so **the finest levels give way on high notes**, the way the
+  mips thin harmonics: no piece shorter than 6 samples. After that, -58 to -75 dB.
