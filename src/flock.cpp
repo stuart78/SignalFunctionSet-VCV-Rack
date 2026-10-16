@@ -811,9 +811,15 @@ struct Flock : Module {
 			if (leadCall && nActive > 0) { bird[0].callT = 0.f; bird[0].sylAt = 0; leadDue = true; }
 		}
 		gateWas = gate;
+		// The floor applies to the RELEASE only: the take-off's first step is
+		// sampleTime / 0.15, which is 1.4e-4 at 48k but 6.9e-5 at 96k, so a
+		// floor on both branches zeroed it every sample and Flock was silent
+		// at any rate above about 66 kHz.
 		if (gate) flight += (1.f - flight) * std::min(1.f, args.sampleTime / 0.15f);
-		else      flight *= std::exp(-args.sampleTime / rel);
-		if (flight < 1e-4f) flight = 0.f;
+		else {
+			flight *= std::exp(-args.sampleTime / rel);
+			if (flight < 1e-4f) flight = 0.f;
+		}
 
 		if (startleTrig.process(inputs[STARTLE_INPUT].getVoltage(), 0.1f, 1.f)
 		 || startleBtn.process(params[STARTLE_PARAM].getValue(), 0.1f, 0.9f))
