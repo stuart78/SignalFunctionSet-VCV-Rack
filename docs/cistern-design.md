@@ -503,3 +503,31 @@ in a low cistern stays coherent instead of smearing.
 0.3 to 0.4 whatever the humidity. Fort Worden's 4 kHz decay goes 1.5 s, 2.9,
 4.3, 5.2, 5.6 s at 10, 30, 50, 70, 90%; 500 Hz stays near 21 s. In a room this
 large the air, not the walls, decides the treble.
+
+## Round 10: distance (2026-10-17)
+
+From a screenshot: sources dragged ~150 m down Leake Street, and the readout
+said T60 0.1 s in every band. Two things.
+
+**A bug: the decay was measured from the first source.** Dragged to the
+tunnel's open end, its rays left through the opening on the first trip.
+Decay is a property of the room, now always measured from the room's own
+reference point (its default source, which scales with SIZE): 7.9 s at
+500 Hz from there, 1.7 s near the end, 0.1 s at the opening.
+
+**Distance, made musical by default** (menu: Distance, Musical / True). With
+true distance a source 150 m away is a faint, dull arrival 437 ms late
+under the reverb: physically right, not much to play. Out to 25 m nothing
+changes; beyond, extra distance counts logarithmically
+(`musicalDistance()`: 25 + 20 ln(1 + (d - 25)/20)), so 150 m is heard as 65 m
+and 300 m as 79 m, still later, softer and duller the further it goes. It is
+applied by pulling a source's whole arrival pattern in by the same excess
+(every path's delay, its 1/r^2 and its air loss), so the response keeps its
+shape and no source is moved through a wall. Measured (spaces harness): 150 m
+arrives at 188 ms musical against 437 ms true (d / c exactly), 7.6 dB louder.
+
+What remains unrealistic about distance: the late tail is one even field (a
+real 300 m tunnel is not evenly reverberant along its length), sound does not
+bend round corners beyond what scattering gives, and the early window stops at
+0.9 s. Listening: `handoff/cistern/listening/distance/` (near, far musical,
+far true).

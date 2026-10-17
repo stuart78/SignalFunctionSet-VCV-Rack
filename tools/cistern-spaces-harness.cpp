@@ -119,6 +119,30 @@ int main(int argc, char** argv) {
 		for (int k = 0; k < NB; k++) std::printf("  %.0f Hz %.1f s (Eyring %.1f)", BAND_HZ[k], t60[k], ey[k]);
 		std::printf("\n  mean free path: rays %.2f m, 4V/S %.2f m\n", mfp, c.meanFreePath());
 	}
+	std::printf("== distance, musical and true (Leake Street, a source 150 m down the tunnel)\n");
+	{
+		int id = -1; for (int k = 0; k < NSPACES; k++) if (std::string(SPACES[k].slug) == "leake") id = k;
+		Space s; std::string err; makeSpace(id, "res/spaces", s, err);
+		// the farthest point down the tunnel from the listener, up to 150 m
+		V3 far = s.lis; double best = 0;
+		for (double dx = -150; dx <= 150; dx += 0.5) for (double dz = -40; dz <= 40; dz += 1) {
+			V3 q = s.lis + V3(dx, 0, dz); double d = (q - s.lis).len();
+			if (d <= 150 && d > best && s.inside(q)) { best = d; far = q; }
+		}
+		double arr[2], lvl[2];
+		for (int t = 0; t < 2; t++) {
+			BuildParams bp; bp.scatter = 0.5; bp.trueDistance = t == 1; bp.rays = 40000;
+			auto T = trace(s, bp, SR, &far, 1, s.lis);
+			auto P = assemble(*T, 1.0);
+			int first = 1 << 30; double e = 0;
+			for (const Tap& tp : P->taps) if (tp.delay < first) { first = tp.delay; e = tp.g[0][1] * tp.g[0][1] + tp.g[1][1] * tp.g[1][1]; }
+			arr[t] = first / SR; lvl[t] = 10 * std::log10(e + 1e-30);
+		}
+		std::printf("  source %.0f m away: first arrival %.0f ms musical, %.0f ms true; %+.1f dB louder musical\n", best, arr[0] * 1000, arr[1] * 1000, lvl[0] - lvl[1]);
+		CHECK(std::fabs(arr[1] - best / C_SOUND) < 0.01, "true distance arrives at d / c (%.0f ms against %.0f)", arr[1] * 1000, best / C_SOUND * 1000);
+		CHECK(std::fabs(arr[0] - musicalDistance(best) / C_SOUND) < 0.01, "musical distance arrives as from %.0f m (%.0f ms)", musicalDistance(best), arr[0] * 1000);
+		CHECK(musicalDistance(20) == 20 && musicalDistance(300) > musicalDistance(150), "nothing changes within 25 m, and further still sounds further");
+	}
 	for (int id = 0; id < NSPACES; id++) {
 		const SpaceInfo& I = SPACES[id];
 		std::printf("== %s\n", I.name);

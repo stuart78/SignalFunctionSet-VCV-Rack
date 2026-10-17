@@ -2,7 +2,7 @@
 //
 //   clang++ -O2 -std=c++17 -Isrc tools/cistern-render.cpp -o /tmp/cistern-render
 //   /tmp/cistern-render in.wav out.wav [--space cistern] [--mix 0.5] [--scatter x]
-//                       [--tail 30] [--decay 1] [--wet] [--impulse]
+//                       [--tail 30] [--decay 1] [--wet] [--impulse] [--far D] [--true-distance]
 // (run from the repository: scans load from res/spaces). --impulse ignores the
 // input and renders the room's impulse response. Two sources, one per input
 // channel, placed as the module places them by default.
@@ -22,7 +22,8 @@ using namespace cistern;
 
 int main(int argc, char** argv) {
 	if (argc < 3) { std::fprintf(stderr, "usage: %s in.wav out.wav [--mix 0.5] [--scatter x] [--tail 30] [--decay 1] [--wet]\n", argv[0]); return 2; }
-	double mix = 0.5, tail = 30, decay = 1, scatter = 0.5; bool wetOnly = false, impulse = false;   // scatter as the panel defaults it
+	double mix = 0.5, tail = 30, decay = 1, scatter = 0.5; bool wetOnly = false, impulse = false, trueDist = false;
+	double farM = 0;                                     // --far D: the sources moved D metres from the listener (as far as the room allows)   // scatter as the panel defaults it
 	std::string slug = "cistern";
 	for (int i = 3; i < argc; i++) {
 		std::string a = argv[i];
@@ -30,6 +31,8 @@ int main(int argc, char** argv) {
 		if (a == "--mix") mix = next(); else if (a == "--tail") tail = next(); else if (a == "--decay") decay = next();
 		else if (a == "--scatter") scatter = next(); else if (a == "--wet") wetOnly = true;
 		else if (a == "--impulse") impulse = true;
+		else if (a == "--true-distance") trueDist = true;
+		else if (a == "--far") farM = next();
 		else if (a == "--space" && i + 1 < argc) slug = argv[++i];
 		else { std::fprintf(stderr, "unknown option %s\n", a.c_str()); return 2; }
 	}
@@ -43,11 +46,20 @@ int main(int argc, char** argv) {
 	if (id < 0) { std::fprintf(stderr, "no space %s\n", slug.c_str()); return 2; }
 	Space s; std::string err;
 	if (!makeSpace(id, "res/spaces", s, err)) { std::fprintf(stderr, "%s\n", err.c_str()); return 1; }
-	BuildParams bp; bp.scatter = scatter;
-	V3 face = s.src - s.lis; face.y = 0; face = face.norm();
-	V3 side(face.z, 0, -face.x), src[2] = {s.src, s.src};
+	BuildParams bp; bp.scatter = scatter; bp.trueDistance = trueDist;
+	// the sources' midpoint: the space's default, or --far D metres from the
+	// listener along the same line (the room's reference point, which the decay
+	// is measured from, stays where it is)
+	V3 mid = s.src;
+	if (farM > 0) {
+		V3 dir = (s.src - s.lis).norm();
+		for (double t = 0; t <= farM; t += 0.25) { V3 q = s.lis + dir * t; if (s.inside(q)) mid = q; else if (t > 5) break; }
+		std::printf("sources %.0f m from the listener\n", (mid - s.lis).len());
+	}
+	V3 face = mid - s.lis; face.y = 0; face = face.norm();
+	V3 side(face.z, 0, -face.x), src[2] = {mid, mid};
 	for (double half : {1.5, 0.8, 0.3}) {
-		V3 a = s.src - side * half, b = s.src + side * half;
+		V3 a = mid - side * half, b = mid + side * half;
 		if (s.inside(a) && s.inside(b)) { src[0] = a; src[1] = b; break; }
 	}
 	auto T = trace(s, bp, sr, src, 2, s.lis);
