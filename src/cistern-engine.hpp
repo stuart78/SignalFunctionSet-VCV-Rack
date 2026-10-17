@@ -695,7 +695,22 @@ struct BuildParams {
 	double tempC = 20, rh = 50, decayScale = 1.0;
 	double scatter = -1;                                   // >= 0 overrides the space's roughness (the panel's control)
 	int rays = 100000; uint64_t seed = 1;                  // 0.3 s on the worker for the cistern, per source
+	bool trueDistance = false;                             // else far sources are pulled in (musicalDistance)
 };
+
+// Distance, made musical. Out to DIST_NEAR metres a source is where it is;
+// beyond, the extra distance counts logarithmically (DIST_K a factor of e), so
+// a source 150 m off arrives as from 65 m and one 300 m off as from 79 m:
+// still later, softer and duller the further it goes, but still in the room
+// with you. True distance in a 300 m tunnel is a faint dull arrival half a
+// second late, buried in the reverb: right, and not much to play with. Applied
+// by pulling a source's whole arrival pattern in by the same excess (every
+// path, its delay, its 1/r^2 and its air loss), so the room's response keeps
+// its shape and no source is moved through a wall to do it.
+static const double DIST_NEAR = 25.0, DIST_K = 20.0;
+inline double musicalDistance(double d) {
+	return d <= DIST_NEAR ? d : DIST_NEAR + DIST_K * std::log(1.0 + (d - DIST_NEAR) / DIST_K);
+}
 
 // render bands from octave bands (energy means)
 inline void toRender(const double e[NB], double out[RB]) {
@@ -762,15 +777,15 @@ static const SpaceInfo SPACES[] = {
 	{"cistern",    "Dan Harpole Cistern",           nullptr, "", M_SEALED_CONCRETE, M_SEALED_CONCRETE, M_SEALED_CONCRETE, 0.5, makeCistern},
 	{"houston",    "Buffalo Bayou Cistern",         nullptr, "", M_WATER, M_BOARD_CONCRETE, M_BOARD_CONCRETE, 0.4, makeHouston},
 	{"basilica",   "Basilica Cistern, Istanbul",    nullptr, "", M_WATER, M_PLASTER, M_BRICK, 0.4, makeBasilica},
-	{"pantheon",   "The Pantheon",                  "pantheon.bin",   "\"The Pantheon Interior\" by artfletch, CC BY 4.0", M_PEWS, M_MARBLE, M_COFFERED, 0.5},
-	{"hintze",     "Hintze Hall",                   "hintze.bin",     "\"Hintze Hall\" by artfletch, CC BY 4.0", M_FURNISHED, M_STONE, M_PLASTER, 0.4},
-	{"leake",      "Leake Street Tunnel",           "leake.bin",      "\"Leake Street Graffiti Tunnel\" by artfletch, CC BY 4.0", M_ROUGH_CONCRETE, M_BRICK, M_BRICK, 0.4},
-	{"oldchurch",  "Old Church",                    "oldchurch.bin",  "\"Old church modeling - Interior Scene\" by Aurélien Martel, CC BY 4.0", M_PEWS, M_STONE, M_WOOD, 0.4},
-	{"undercroft", "Lincoln's Inn Undercroft",      "undercroft.bin", "\"Lincoln's Inn Chapel Undercroft\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5},
-	{"bartless",   "St Bartholomew-the-Less",       "bartless.bin",   "\"St Bartholomew-the-Less Interior\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_LATH, 0.4},
-	{"stourton",   "St Peter, Stourton",            "stourton.bin",   "\"Church Of St Peter Stourton\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_WOOD, 0.4},
-	{"mosque",     "Mosque of the Tree, Jordan",    "mosque.bin",     "\"Mosque of Tree of Al Buqayawiyya, Jordan\" by SJoudeh, CC BY 4.0", M_CARPET, M_ROUGH_STONE, M_ROUGH_STONE, 0.5},
-	{"salt",       "Salt Tower, Lower Room",        "salt.bin",       "\"Salt Tower Lower Room\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5},
+	{"pantheon",   "The Pantheon",                  "pantheon.bin",   "\"The Pantheon Interior\" by artfletch, CC BY 4.0", M_PEWS, M_MARBLE, M_COFFERED, 0.5, nullptr},
+	{"hintze",     "Hintze Hall",                   "hintze.bin",     "\"Hintze Hall\" by artfletch, CC BY 4.0", M_FURNISHED, M_STONE, M_PLASTER, 0.4, nullptr},
+	{"leake",      "Leake Street Tunnel",           "leake.bin",      "\"Leake Street Graffiti Tunnel\" by artfletch, CC BY 4.0", M_ROUGH_CONCRETE, M_BRICK, M_BRICK, 0.4, nullptr},
+	{"oldchurch",  "Old Church",                    "oldchurch.bin",  "\"Old church modeling - Interior Scene\" by Aurélien Martel, CC BY 4.0", M_PEWS, M_STONE, M_WOOD, 0.4, nullptr},
+	{"undercroft", "Lincoln's Inn Undercroft",      "undercroft.bin", "\"Lincoln's Inn Chapel Undercroft\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
+	{"bartless",   "St Bartholomew-the-Less",       "bartless.bin",   "\"St Bartholomew-the-Less Interior\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_LATH, 0.4, nullptr},
+	{"stourton",   "St Peter, Stourton",            "stourton.bin",   "\"Church Of St Peter Stourton\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_WOOD, 0.4, nullptr},
+	{"mosque",     "Mosque of the Tree, Jordan",    "mosque.bin",     "\"Mosque of Tree of Al Buqayawiyya, Jordan\" by SJoudeh, CC BY 4.0", M_CARPET, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
+	{"salt",       "Salt Tower, Lower Room",        "salt.bin",       "\"Salt Tower Lower Room\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
 };
 static const int NSPACES = (int)(sizeof(SPACES) / sizeof(SPACES[0]));
 
@@ -811,8 +826,14 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 	// in a 300 m tunnel the source can be further away than the mixing time
 	// reaches, and the early window then held nothing at all, not even the
 	// direct path
-	double dmax = 0;
-	for (int k = 0; k < nsrc; k++) dmax = std::max(dmax, (srcs[k] - lis).len());
+	// how far each source's paths are pulled in (none with true distance)
+	double excess[NSRC] = {0, 0}, dmax = 0;
+	for (int k = 0; k < nsrc; k++) {
+		double d = (srcs[k] - lis).len();
+		double de = bp.trueDistance ? d : musicalDistance(d);
+		excess[k] = d - de;
+		dmax = std::max(dmax, de);
+	}
 	P->tMix = std::min(0.9, std::max(std::max(0.04, std::min(0.3, 0.002 * std::sqrt(s.volume))), dmax / C_SOUND + 0.06));
 	double m[NB]; for (int b = 0; b < NB; b++) m[b] = airM(BAND_HZ[b], bp.tempC, bp.rh);
 
@@ -844,8 +865,8 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 		const V3& src = srcs[k];
 		// the direct sound, exact
 		{
-			V3 v = src - lis; double dist = std::max(0.3, v.len());
-			double g[2]; earGains(v * (1.0 / dist), g);
+			V3 v = src - lis; double dist = std::max(0.3, v.len() - excess[k]);
+			double g[2]; earGains(v * (1.0 / std::max(1e-6, v.len())), g);
 			int bin = (int)(dist / C_SOUND / binSec);
 			if (bin < nbins) {
 				double eb[NB], er[RB];
@@ -861,7 +882,7 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 			V3 o = src, d = randDir(rng);
 			double en[NB]; for (int b = 0; b < NB; b++) en[b] = 1.0;
 			double travelled = 0;
-			for (int bounce = 0; bounce < 400 && travelled < maxLen; bounce++) {
+			for (int bounce = 0; bounce < 400 && travelled < maxLen + excess[k]; bounce++) {
 				double t; V3 n; int mat;
 				if (!intersect(s, o, d, t, n, mat)) break;
 				// the receiver: closest approach on this segment, after the first bounce
@@ -871,11 +892,13 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 					if (tc > 0 && tc < t) {
 						double miss = (w - d * tc).len();
 						if (miss < rr) {
-							double L = travelled + tc;
+							double Lt = travelled + tc, L = Lt - excess[k];   // the path as heard: pulled in
 							int bin = (int)(L / C_SOUND / binSec);
 							if (bin < nbins) {
 								double eb[NB], er[RB];
-								for (int b = 0; b < NB; b++) eb[b] = en[b] * std::exp(-m[b] * L);
+								// the ray density gives 1/Lt^2; the pulled-in path is heard at 1/L^2
+								double pull = (Lt * Lt) / (L * L);
+								for (int b = 0; b < NB; b++) eb[b] = en[b] * std::exp(-m[b] * L) * pull;
 								toRender(eb, er);
 								double g[2]; earGains(d * -1.0, g);
 								// N rays through a sphere of radius rr at distance L carry rr²/(4L²) of
@@ -1003,6 +1026,11 @@ inline void solve(double A[EQ_N][EQ_N], double b[EQ_N], double x[EQ_N]) {
 // never cut. New decay filters apply at once (a change of a fraction of a dB a
 // pass); new line lengths are GLIDED to, LEN_GLIDE samples per sample, which
 // is a 9-cent Doppler on the tail while the room changes size.
+// the diffusers' lengths, at namespace scope: a static constexpr ARRAY in a
+// class needs an out-of-class definition under C++11 once it is indexed, and
+// MinGW's linker (unlike the macOS and Linux ones) refused the plugin without it
+static const double TAIL_AP_SEC[6] = {0.0047, 0.0071, 0.0113, 0.0167, 0.0239, 0.0311};
+
 struct Tail {
 	struct Line { std::vector<float> buf; int w = 0, mask = 0; double len = 0, lenTarget = 0, spread = 1;
 	              double depthFrac = 0, modDepth = 0, modPhase = 0, modInc = 0;
@@ -1013,7 +1041,6 @@ struct Tail {
 	// six allpasses ahead of the feed: with four, the onset's worst crest ran 4.5
 	// to 7.1 depending on the seed; six keep every seed tried under 5.1
 	static const int AP_N = 6;
-	static constexpr double AP_SEC[AP_N] = {0.0047, 0.0071, 0.0113, 0.0167, 0.0239, 0.0311};
 	AP diff[AP_N];
 	// How the input reaches the lines. Fed the same signal at once, every line
 	// sent back a bare copy of a click one trip later: sixteen clicks between 40
@@ -1064,7 +1091,7 @@ struct Tail {
 		vbuf.assign(vs, 0.f); vmask = vs - 1; vw = 0;
 		setDecay(P);
 		for (int k = 0; k < AP_N; k++) {
-			int need = (int)(AP_SEC[k] * sr) + 2, size = 1;
+			int need = (int)(TAIL_AP_SEC[k] * sr) + 2, size = 1;
 			while (size < need) size <<= 1;
 			diff[k].b.assign(size, 0.f); diff[k].mask = size - 1; diff[k].w = 0; diff[k].g = 0.62f;
 		}
@@ -1090,9 +1117,9 @@ struct Tail {
 	void setDiffusion(const Program& P) {
 		double fastest = 1e9;
 		for (int b = 0; b < NB; b++) fastest = std::min(fastest, P.t60[b]);
-		double ring = 3.0 * AP_SEC[AP_N - 1] / -std::log10(0.62);
+		double ring = 3.0 * TAIL_AP_SEC[AP_N - 1] / -std::log10(0.62);
 		double k = std::max(0.15, std::min(1.0, 0.2 * fastest / ring));
-		for (int i = 0; i < AP_N; i++) diff[i].len = std::max(1, std::min(diff[i].mask, (int)(AP_SEC[i] * k * sr)));
+		for (int i = 0; i < AP_N; i++) diff[i].len = std::max(1, std::min(diff[i].mask, (int)(TAIL_AP_SEC[i] * k * sr)));
 	}
 	void setDecay(const Program& P) {
 		double T[EQ_N] = {P.t60[0], P.t60[1], P.t60[2], P.t60[3], P.t60[4], P.t60[5], P.t60x8k};

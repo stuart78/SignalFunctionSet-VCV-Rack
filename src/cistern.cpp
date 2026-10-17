@@ -77,6 +77,7 @@ struct Cistern : Module {
 	std::mutex posMutex;                                  // the screen and the worker both fill in defaults
 	std::atomic<uint32_t> posGen{1};
 	float camYaw = YAW0, camPitch = PITCH0;
+	bool trueDistance = false;                            // menu: far sources pulled in (musical) or where they are
 
 	// what process() wants built, published for the worker
 	std::atomic<float> wSize{0.f}, wDecay{0.f}, wScatter{0.5f}, wHumid{50.f}, wSr{0.f};
@@ -291,7 +292,7 @@ struct Cistern : Module {
 				V3 src[2] = {toWorld(space, p[P_SRC_L]), toWorld(space, p[P_SRC_R])};
 				V3 lis = toWorld(space, p[P_LIS]);
 				cistern::BuildParams bp;
-				bp.rh = hu; bp.scatter = sc;
+				bp.rh = hu; bp.scatter = sc; bp.trueDistance = trueDistance;
 				if (space.mesh) bp.rays = 60000;            // two sources on two threads: ~0.6 s in the largest scans
 				traced = cistern::trace(space, bp, sr, src, 2, lis, roomSame ? traced.get() : nullptr);
 				tSize = size; tScatter = sc; tHumid = hu; tPos = pg; tSr = sr; tSpace = id;
@@ -414,6 +415,7 @@ struct Cistern : Module {
 		json_object_set_new(r, "positions", all);
 		json_object_set_new(r, "camYaw", json_real(camYaw));
 		json_object_set_new(r, "camPitch", json_real(camPitch));
+		json_object_set_new(r, "trueDistance", json_boolean(trueDistance));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
@@ -431,6 +433,7 @@ struct Cistern : Module {
 		posGen++;
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_number_value(j);
 		if (json_t* j = json_object_get(r, "camPitch")) camPitch = clamp((float)json_number_value(j), 0.05f, 1.5f);
+		if (json_t* j = json_object_get(r, "trueDistance")) trueDistance = json_boolean_value(j);
 	}
 };
 
@@ -566,7 +569,8 @@ struct CisternDisplay : OpaqueWidget {
 			if (e.f1 < 0) { e.fold = true; e.w = 1.f; continue; }
 			const float* p = mf[e.f0].gn; const float* q = mf[e.f1].gn;
 			float ang = std::acos(clamp(p[0] * q[0] + p[1] * q[1] + p[2] * q[2], -1.f, 1.f)) * 180.f / (float)M_PI;
-			float fd = std::max(FACET_DEG, room->foldDeg);
+			const float facet = FACET_DEG;                 // a copy: std::max binds a reference, and C++11 wants a definition for that
+			float fd = std::max(facet, room->foldDeg);
 			e.fold = ang > fd;
 			e.w = clamp((ang - fd) / 35.f, 0.35f, 1.f);
 		}
@@ -1160,6 +1164,9 @@ struct CisternWidget : ModuleWidget {
 					[=]() { return (int)std::lround(m->params[Cistern::SPACE_PARAM].getValue()) == i; },
 					[=]() { m->params[Cistern::SPACE_PARAM].setValue((float)i); }));
 		}));
+		menu->addChild(createIndexSubmenuItem("Distance", {"Musical (far sources pulled in past 25 m)", "True (delay and level as the room gives them)"},
+			[=]() { return m->trueDistance ? 1 : 0; },
+			[=](size_t i) { m->trueDistance = i == 1; m->posGen++; }));
 		menu->addChild(createMenuLabel("Drag the sources and the listener on the screen; shift-drag lifts"));
 		menu->addChild(createMenuItem("Reset the positions", "", [=]() { m->resetPositions(clamp(m->wSpace.load(), 0, NSPACES - 1)); }));
 		menu->addChild(createMenuItem("Reset the view", "", [=]() { m->camYaw = Cistern::YAW0; m->camPitch = Cistern::PITCH0; }));
