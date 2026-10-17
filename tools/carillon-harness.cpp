@@ -300,6 +300,34 @@ int main(int argc, char** argv) {
 		check(std::fabs(cp) < 1.5f && std::fabs(cn) < 1.5f && up < 10.f, string::f("prime doublet %+.1f c, nominal doublet %+.1f c (sum %+.1f), twelfth/upper octave/5th/6th harmonics within %.1f c", cp, cn, cp + cn, up));
 	}
 
+	printf("== a soft clapper does not click, and stacked tails do not distort ==\n");
+	{
+		// the clapper's contact noise belongs to a hard clapper: at BRIGHT 0 it
+		// is silent (it was a burst of bright noise the user heard as a click)
+		auto strikeOut = [](float bright, bool clap) {
+			Run r; r.m.unmask = true; r.m.presetRods(Carillon::ROD_CLEAR);
+			r.m.params[Carillon::BRIGHT_PARAM].setValue(bright); r.run(0.01f);
+			r.m.strike(12, 4.f, -1); if (!clap) r.m.bell[12].clap = 0.f;
+			std::vector<float> o; for (int i = 0; i < 4800; i++) { r.tick(); o.push_back(r.m.outputs[Carillon::L_OUTPUT].getVoltage()); }
+			return o; };
+		std::vector<float> a = strikeOut(0.f, true), b = strikeOut(0.f, false);
+		double d = 0, e = 0; for (size_t i = 0; i < a.size(); i++) { d += (a[i] - b[i]) * (a[i] - b[i]); e += b[i] * b[i]; }
+		check(d <= e * 1e-8, string::f("BRIGHT 0: the clapper adds %.0f dB to the strike (want nothing)", 10 * std::log10(d / e + 1e-30)));
+		// DAMP 0 rings for minutes: a chord every half second at REACH 0.9 stacks
+		// tails until the limiter, not the soft clip, holds the level
+		Run r; r.m.unmask = true; r.m.presetRods(Carillon::ROD_PATH);
+		r.m.params[Carillon::DAMP_PARAM].setValue(0.f); r.m.params[Carillon::REACH_PARAM].setValue(0.9f);
+		r.m.params[Carillon::BRIGHT_PARAM].setValue(1.f); r.run(0.01f);
+		int over = 0; float pk = 0.f; int n = (int)(30 * SR), every = (int)(SR / 2);
+		for (int i = 0; i < n; i++) {
+			if (i % every == 0) { int k = (i / every) % 4; for (int bb : {k * 3, k * 3 + 4, k * 3 + 7}) r.m.strike(bb, 4.f, -1); }
+			r.tick();
+			float v = std::max(std::fabs(r.m.outputs[Carillon::L_OUTPUT].getVoltage()), std::fabs(r.m.outputs[Carillon::R_OUTPUT].getVoltage()));
+			pk = std::max(pk, v); if (v > 6.f) over++;
+		}
+		check(over == 0 && pk < 5.5f, string::f("DAMP 0, BRIGHT 1, triads at 2 Hz for 30 s: peak %.2f V, %.1f%% in the soft knee (it was 31%%, to 9.4 V)", pk, 100.f * over / n));
+	}
+
 	printf("== DAMP sets the ring: time for a middle-C bell to fall 60 dB ==\n");
 	{
 		std::string row; float t0 = 0.f, tDef = 0.f;

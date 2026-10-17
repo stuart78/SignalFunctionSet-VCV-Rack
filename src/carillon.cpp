@@ -102,6 +102,7 @@ static inline float carillonSpeedSec(float k) { return 4.f * std::pow(0.0025f, c
 static inline float carillonTrans(float k)    { float c = clamp(k, 0.f, 1.f); return 0.95f * c * c; }
 static const float PL_MICGAP = 0.5f;             // the default mics stand this far in front of the nearest bells
 static const float PL_FLOOR = 2e-4f;
+static const float PL_LIMIT = 5.f;                // V: the limiter's ceiling, under the soft clip's 6
 static const float PL_OUT_GAIN = 1.6f;           // a middle bell struck at full velocity peaks near 3.5 V             // an arrival below this is silent (-37 dB on a full strike) and stops
 
 static const char* PL_NOTE[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
@@ -181,8 +182,8 @@ struct Carillon : Module {
 		float energy = 0.f;                           // follower, for the rods and the picture
 		float out = 0.f;                              // this sample's output
 		float glow = 0.f;                             // the picture: struck recently
-		float clap = 0.f;                             // the clapper: a short, bright contact noise
-		float clapLp = 0.f;
+		float clap = 0.f;                             // the clapper: a short contact noise, as bright as the clapper is hard
+		float clapLp = 0.f, clapHp = 0.f, clapA = 0.5f, clapT = 0.f, clapAtk = 0.001f;
 		float mallet = 0.f, malletT = 0.f, malletDur = 0.003f;   // the contact: force spread over a few ms, not a click
 		float malletW[PL_NM] = {};
 		float u = 0.f, v = 0.f;                       // where it stands on the plane
@@ -225,6 +226,17 @@ struct Carillon : Module {
 	}
 	float micDelay[2][PL_N][PL_MICDELAY] = {};        // per bell per mic, an arrival delay line
 	int   micHead = 0;
+	// The output limiter. With DAMP low a bell rings for up to two minutes, so
+	// strikes stack, and a chord every half second at REACH 0.9 spent 31% of
+	// its time in the soft clipper's knee, up to 9.4 V: the "heavy distortion"
+	// a user heard when a strike's energy overlapped the next. Riding the gain
+	// down keeps the waveform clean; the soft clip stays as a backstop. It
+	// looks 1 ms ahead so a new strike's front is caught rather than clipped,
+	// which is the only thing it does below its threshold (a 1 ms delay).
+	static const int PL_LOOK = 48;
+	float limBuf[2][PL_LOOK] = {};
+	int   limHead = 0;
+	float limGain = 1.f, limDt = -1.f, limAtk = 0.f, limRel = 0.f;
 	int   micLag[2][PL_N] = {};
 	float micGain[2][PL_N] = {};
 
@@ -470,9 +482,19 @@ struct Carillon : Module {
 		b.malletT = 0.f;
 		b.malletDur = clamp(0.0008f * 261.6f / std::max(b.hz[2], 40.f) * (2.4f - 2.2f * brightK) * (1.f - 0.85f * shapeK)
 		                    * carillonSizeContact(sizeK), 0.0001f, 0.006f);
-		// the clapper's own contact noise: small, a few milliseconds, and a
-		// rod arrives with far less of it than a clapper does
-		b.clap = std::max(b.clap, amp * (from >= 0 ? 0.04f : 0.14f) * (0.3f + 0.9f * brightK));
+		// The clapper's own contact noise: small, a few milliseconds, and a rod
+		// arrives with far less of it than a clapper does. It is what a HARD
+		// clapper adds, so it goes with BRIGHT on three counts: its level
+		// (squared, so a soft mallet makes none), its tone (lowpassed from 1.5
+		// kHz on a soft one to 12 on a hard one) and its onset, which swells
+		// over the contact instead of starting at full level. It used to be a
+		// burst of high-passed noise at 0.3 of its level even at BRIGHT 0, and
+		// on a dark strike it was 8-12x the bell's own high end in the first
+		// 5 ms: the click a user heard as "almost like a trigger sound".
+		b.clap = std::max(b.clap, amp * (from >= 0 ? 0.04f : 0.14f) * 1.2f * brightK * brightK);
+		b.clapA = 1.f - std::exp(-2.f * (float)M_PI * 1500.f * std::pow(8.f, brightK) / sr);
+		b.clapT = 0.f;
+		b.clapAtk = std::max(b.malletDur * 0.5f, 0.0005f);
 		b.glow = 1.f;
 		b.quiet = false;
 	}
@@ -676,9 +698,12 @@ struct Carillon : Module {
 			// couple of milliseconds
 			if (b.clap > 1e-4f) {
 				float nz = random::uniform() * 2.f - 1.f;
-				b.clapLp += (nz - b.clapLp) * 0.55f;
-				s += (nz - b.clapLp) * b.clap * 0.6f;
-				b.clap *= 0.997f;
+				b.clapLp += (nz - b.clapLp) * b.clapA;          // the tone: BRIGHT's corner
+				b.clapHp += (b.clapLp - b.clapHp) * 0.04f;      // and no rumble under it
+				float atk = b.clapT < b.clapAtk ? 0.5f - 0.5f * std::cos((float)M_PI * b.clapT / b.clapAtk) : 1.f;
+				s += (b.clapLp - b.clapHp) * b.clap * atk * 0.6f;
+				if (b.clapT >= b.clapAtk) b.clap *= 0.997f;
+				b.clapT += args.sampleTime;
 			}
 			b.out = s * 0.45f;
 			b.energy += (e - b.energy) * 0.002f;
@@ -702,8 +727,24 @@ struct Carillon : Module {
 		// Soft-clipped, linear to 6 V and asymptotic to 10, not clamped: a
 		// struck chord's crest is far above its body, and a clamp there is the
 		// distortion you hear.
-		outputs[L_OUTPUT].setVoltage(sfs::softClip(outL * PL_OUT_GAIN));
-		outputs[R_OUTPUT].setVoltage(sfs::softClip(outR * PL_OUT_GAIN));
+		{
+			float l = outL * PL_OUT_GAIN, r = outR * PL_OUT_GAIN;
+			float dl = limBuf[0][limHead], dr = limBuf[1][limHead];   // 1 ms ago
+			limBuf[0][limHead] = l; limBuf[1][limHead] = r;
+			limHead = (limHead + 1) % PL_LOOK;
+			float pk = 0.f;                                           // the loudest sample about to arrive
+			for (int k = 0; k < PL_LOOK; k++) pk = std::max(pk, std::max(std::fabs(limBuf[0][k]), std::fabs(limBuf[1][k])));
+			float want = pk > PL_LIMIT ? PL_LIMIT / pk : 1.f;
+			// down in a fraction of the look-ahead, back up over a third of a second
+			if (args.sampleTime != limDt) {
+				limDt = args.sampleTime;
+				limAtk = 1.f - std::exp(-limDt / 0.0003f);
+				limRel = 1.f - std::exp(-limDt / 0.35f);
+			}
+			limGain += (want - limGain) * (want < limGain ? limAtk : limRel);
+			outputs[L_OUTPUT].setVoltage(sfs::softClip(dl * limGain));
+			outputs[R_OUTPUT].setVoltage(sfs::softClip(dr * limGain));
+		}
 		outputs[POLY_OUTPUT].setChannels(PL_POLY);
 		for (int c = 0; c < PL_POLY; c++)
 			outputs[POLY_OUTPUT].setVoltage(chanBell[c] >= 0 ? sfs::softClip(bell[chanBell[c]].out * 4.f) : 0.f, c);

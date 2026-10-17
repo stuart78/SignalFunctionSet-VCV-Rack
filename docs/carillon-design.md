@@ -361,3 +361,25 @@ change until the player drags one. The floor grid runs to the edges of the view.
 - Whether the POLY out should be the sixteen loudest or the sixteen most
   recently struck. Loudest first; recently struck as a menu option if it is
   missed.
+
+## User report, 2026-10-14: clicks and distortion
+
+A user loved the gong-like strikes but heard clicks "almost like a trigger
+sound" even at low BRIGHT, and heavy distortion at high BRIGHT with low DAMP.
+Both reproduced in the harness:
+
+- **The click was the clapper's contact noise.** A burst of high-passed white
+  noise, 0.3 of its level even at BRIGHT 0, starting at full level in one
+  sample. Quiet (-54 dB on the bell's RMS) but bright, and on a dark strike it
+  was 8 to 12 times the bell's own high end in the first 5 ms. It now belongs to
+  a hard clapper only: level with BRIGHT squared (silent at 0), lowpassed from
+  1.5 kHz on a soft mallet to 12 kHz on a hard one, and swelling over half the
+  contact.
+- **The distortion was stacked tails in the soft clipper.** At DAMP 0 a bell
+  rings for minutes; a chord every half second at REACH 0.9 spent 31% of its
+  time above 6 V, in the clipper's knee, peaking at 9.4 V. BRIGHT barely moves
+  the level, it only makes the distortion easier to hear. The L/R outs now pass
+  a limiter (5 V ceiling, 1 ms look-ahead, 0.35 s release), so a pile-up gets
+  quieter instead of distorting; the same test peaks at 5.06 V with no time in
+  the knee. At default settings a strike peaks at 3.6 V and the limiter never
+  acts. Cost: +0.1% of a core.
