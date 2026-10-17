@@ -58,10 +58,10 @@ PANEL = "#f0f0f0"
 INK = "#231f20"
 INK_SOFT = "#6a6a78"
 PLATE = "#1a1a1a"
-PLATE_INK = "#e8e8f0"
+PLATE_INK = "#ffffff"
 HAIRLINE = "#b2b2b2"
 SCREEN_BG = "#1a1a32"
-LINK = "#9a9aa6"               # the pot-to-jack connector, as drawn in nanovg
+LINK = "#a8a8b6"               # connectors AND section dividers, as the designer strokes them
 
 G_EIGHTH = "#eeeef2"
 G_QUARTER = "#e4e4e9"
@@ -71,22 +71,27 @@ G_TEXT = "#a8a8b6"
 G_AXIS = "#d8b0a8"
 
 FONT = "Figtree"
-T_LABEL = 3.3 * MM             # 9.74 -- one label size, per panel-style.hpp
-T_NOTE = 2.5 * MM              # 7.38
-T_TITLE = 5.6 * MM             # 16.54
-LS_LABEL = 0.10 * MM           # letter spacing, 0.30
-LS_NOTE = 0.04 * MM
+# Measured off the designer's 2026-09 panels and mirrored in panel-style.hpp:
+# labels Regular 2.37 mm, title ExtraBold 2.71 mm, neither tracked. Every text
+# position is a BASELINE.
+T_LABEL = 2.37 * MM            # 7.0 -- 28 units at 4x
+T_NOTE = 2.0 * MM
+T_TITLE = 2.71 * MM            # 8.0 -- 32 units at 4x
+W_TITLE = 800
+TITLE_BASELINE = 8.55 * MM
+LS_LABEL = 0.0
+LS_NOTE = 0.0
 
-GAP_KNOB = 5.6 * MM            # control centre -> label centre (NVG_ALIGN_MIDDLE)
-GAP_KNOB_LARGE = 8.6 * MM      # the large knob's body reaches past GAP_KNOB
-GAP_JACK = 5.4 * MM
-GAP_TRIM = 4.4 * MM
+GAP_KNOB = 6.8 * MM            # control centre -> label BASELINE, as panel-style.hpp
+GAP_KNOB_LARGE = 8.2 * MM
+GAP_JACK = 5.8 * MM
+GAP_TRIM = 5.3 * MM
 PAIR_SPAN = 2 * HP             # cells from a pot to its jack
 SZ_TRIM, SZ_JACK, SZ_KNOB = 17.856, 23.700, 28.348   # what each helper labels
 SZ_KNOB_LARGE = 37.500                 # RoundLargeBlackKnob, 12.7mm across
 
 RETICULE_W = 0.5               # stroke widths, in Rack units
-LINK_W = 0.35 * MM
+LINK_W = 0.169 * MM
 
 # Real component sizes in px, the same table panel_reticules.py works from.
 PARTS = [
@@ -152,7 +157,8 @@ def snap(v):
 # same for a trimpot and a huge knob; panel-style.hpp states three fixed centre
 # gaps instead, which do not hold a constant clearance across the three.
 GAP_CELLS = 1.0
-GAPS = "cells"                 # "cells" = derived from the size, "code" = panel-style.hpp
+GAPS = "code"                  # "cells" = derived from the size, "code" = panel-style.hpp
+                               # (code: the mock must put labels where Rack will)
 
 
 def gap_for(size_px, code_gap):
@@ -201,7 +207,7 @@ def text(x, y, s, size=T_LABEL, fill=INK, anchor="middle", ls=None, weight=400):
     ls = LS_LABEL if ls is None else ls
     return (f'<text x="{n(x)}" y="{n(y)}" font-family="{FONT}" font-size="{n(size)}" '
             f'font-weight="{weight}" letter-spacing="{n(ls)}" fill="{fill}" '
-            f'text-anchor="{anchor}" dominant-baseline="middle">{s}</text>')
+            f'text-anchor="{anchor}">{s}</text>')
 
 
 def svg_open(w, h, note):
@@ -580,6 +586,16 @@ def labels(body, ev, env=None, defs=None):
             def evl(x):
                 return pr.evaluate(x.replace("sfs::", ""), e)
             try:
+                if fn == "divider":
+                    links.append((evl(args[0]), evl(args[1]), evl(args[2]), evl(args[3]), False))
+                    continue
+                if fn == "title" and len(args) == 1:
+                    t = text_arg(args[0], e)
+                    if t is None:
+                        failed = True
+                        break
+                    made.append((None, TITLE_BASELINE / MM, t, "TITLE", "start"))   # x: the panel's margin
+                    continue
                 if fn == "link":
                     onplate = len(args) > 4 and "true" in args[4]
                     links.append((evl(args[0]), evl(args[1]), evl(args[2]), evl(args[3]), onplate))
@@ -680,7 +696,7 @@ def module_svg(key):
     hp_units = int(round(wmm / 5.08))
     w = hp_units * HP
 
-    art = [rect(x, y, pw, ph, PLATE, rx=6) for (x, y, pw, ph) in plates]
+    art = [rect(x, y, pw, ph, PLATE, rx=1.35 * MM) for (x, y, pw, ph) in plates]
     # A SCREENLESS display (Wheel, Flock) draws straight onto the faceplate in
     # the panel's own greys, so a dark slab here would be drawn by the
     # designer and then covered by nothing: the region is outlined instead,
@@ -691,7 +707,7 @@ def module_svg(key):
                f'stroke-width="{raw(RETICULE_W * S)}" stroke-dasharray="{raw(3 * S)} {raw(3 * S)}"/>'
                for k, cx, cy, ew, eh in elems if k == "screen"]
     else:
-        ret = [rect(cx - ew / 2, cy - eh / 2, ew, eh, SCREEN_BG, rx=3)
+        ret = [rect(cx - ew / 2, cy - eh / 2, ew, eh, SCREEN_BG, rx=1.27 * MM)
                for k, cx, cy, ew, eh in elems if k == "screen"]
     # Snapped, not 99%: in the design file the point of a reticule is that its
     # edges are on the grid. The shipped res/*.svg keeps 99% of the real part.
@@ -705,10 +721,15 @@ def module_svg(key):
 
     lab = [line(x1 * MM, y1 * MM, x2 * MM, y2 * MM, "#4a4a52" if op else LINK, LINK_W)
            for (x1, y1, x2, y2, op) in links]
+    import panel_logo
     for (x, y, t, kind, align) in texts:
+        if x is None:
+            x = panel_logo.margin_mm(wmm)
         lab.append(text(x * MM, y * MM, t, KIND_SIZE[kind], KIND_FILL[kind], align,
                         LS_NOTE if kind == "NOTE" else LS_LABEL,
-                        600 if kind == "TITLE" else 400))
+                        W_TITLE if kind == "TITLE" else 400))
+    # the Signal Function Set mark, top right, as on every finished panel
+    logo = [panel_logo.group(wmm, S * MM, "")]
 
     # Controls are snapped for you. Screens and plates are stated by hand in the
     # widget and in PLATES, so they are reported rather than moved -- the numbers
@@ -737,6 +758,7 @@ def module_svg(key):
         g("Plates", art or ['<!-- none: see PLATES in tools/panel_reticules.py -->']),
         g("Reticules", ret),
         g("Labels (mock)", lab),
+        g("Logo", logo),
     ] + ([grid_layer(w)] if GRID else [])
     if not shared:
         audit.insert(0, "labels not mocked: this widget does not use sfs::PanelLabels")

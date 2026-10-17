@@ -314,7 +314,8 @@ struct TouchWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/touch.svg")));
 
 		auto* lab = new sfs::PanelLabels();
-		lab->title(4.5f, 11.f, "TOUCH");
+		lab->box.size = box.size;
+		lab->title("TOUCH");
 
 		addParam(createParamCentered<RoundLargeBlackKnob>(
 			mm2px(Vec(X_KNOB_L, Y_STYLE)), module, Touch::STYLEA_PARAM));

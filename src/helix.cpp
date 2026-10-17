@@ -444,7 +444,7 @@ struct HelixWidget : ModuleWidget {
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
-		lbl->title(6.f, 9.f, "HELIX");
+		lbl->title("HELIX");
 
 		HelixDisplay* disp = new HelixDisplay();
 		disp->module = module;

@@ -26,8 +26,10 @@ static const NVGcolor PANEL      = nvgRGB(0xF0, 0xF0, 0xF0);  // the faceplate
 static const NVGcolor INK        = nvgRGB(0x23, 0x1F, 0x20);  // label text on the faceplate
 static const NVGcolor INK_SOFT   = nvgRGB(0x6A, 0x6A, 0x78);  // sub-labels, pot-position notes
 static const NVGcolor PLATE      = nvgRGB(0x1A, 0x1A, 0x1A);  // dark inset grouping a section
-static const NVGcolor PLATE_INK  = nvgRGB(0xE8, 0xE8, 0xF0);  // label text on a plate
-static const NVGcolor HAIRLINE   = nvgRGB(0xB2, 0xB2, 0xB2);  // connectors, reticules
+static const NVGcolor PLATE_INK  = nvgRGB(0xFF, 0xFF, 0xFF);  // label text on a plate (white, as the designer draws it)
+static const NVGcolor HAIRLINE   = nvgRGB(0xB2, 0xB2, 0xB2);  // reticules
+static const NVGcolor RULE       = nvgRGB(0xA8, 0xA8, 0xB6);  // pot-to-jack connectors AND section dividers
+static const float RULE_W        = 0.169f;                    // mm: both, as the designer strokes them
 
 // display palette — what the screens clear to and draw with
 static const NVGcolor SCREEN_BG   = nvgRGB(0x1A, 0x1A, 0x32);
@@ -56,13 +58,26 @@ static const int GRID_ROWS = 25;
 static const float PAIR_SPAN = 2.f;      // cells from a pot to its jack
 
 // ── type ────────────────────────────────────────────────────────────────────
-// One label size across the plugin. Figtree has a far larger x-height than the
-// mono face the panels used before, so it reads bigger at the same nominal size
-// — hence 4.4mm rather than the old 6mm. NOTE is for the small annotations that
-// mark what a pot position means, and is the only other size in use.
-static const float TYPE_LABEL = 3.3f;   // mm
-static const float TYPE_NOTE  = 2.5f;   // mm — pot-position notes, ranges
-static const float TYPE_TITLE = 5.6f;   // mm — the module name
+// Measured off the designer's 2026-09 panels (canon, count, spool, field, flock,
+// sigma, wheel, carillon...), so a code-drawn panel and a finished one match:
+//   labels  Figtree Regular, cap height 1.66 mm = 2.37 mm type, no tracking,
+//           their BASELINE a fixed gap above the control (LABEL_GAP_*)
+//   title   Figtree ExtraBold, cap height 1.90 mm = 2.71 mm type, no tracking,
+//           one HP in (half an HP on 8HP and under), baseline 8.55 mm, so its
+//           cap centre sits level with the logo's centre at 7.62 mm
+// These are EM sizes, as Figma and SVG mean a font size. nanovg does not: its
+// size is the font's ascender-to-descender height (stb_truetype's
+// ScaleForPixelHeight), which for Figtree is 950 + 250 = 1.2 em, so it is
+// handed size * NVG_EM. Without that every label came out at 5/6 of the
+// designer's (seen side by side with Canon).
+// The code used to set labels at 3.3 (a 2.75 mm em) tracked 0.1 mm and the
+// title at 5.6 SemiBold (4.67 mm em), against the designer's 2.37 and 2.71.
+// NOTE is for the small annotations that mark what a pot position means.
+static const float TYPE_LABEL = 2.37f;  // mm
+static const float TYPE_NOTE  = 2.0f;   // mm — pot-position notes, ranges
+static const float TYPE_TITLE = 2.71f;  // mm — the module name
+static const float TITLE_BASELINE = 8.55f;  // mm from the top
+static const float NVG_EM = 1.2f;           // Figtree: nanovg size per em (see above)
 
 // ── screen type ─────────────────────────────────────────────────────────────
 // One size for on-screen text, for the same reason there is one size for panel
@@ -100,24 +115,18 @@ static inline void screenFont(NVGcontext* vg, const std::shared_ptr<Font>& f,
 }
 
 // ── spacing ─────────────────────────────────────────────────────────────────
-// Labels sit ABOVE their control; a jack's label clears the jack by a little
-// more because the jack's own bezel reads as part of the shape.
-static const float LABEL_GAP_KNOB = 5.6f;    // mm from control centre to label baseline
-// A RoundLargeBlackKnob is about 12.7 mm across against the standard knob's 9,
-// so its own body reaches past the standard gap and the label lands on top of
-// it. Measured off a rendered panel, not guessed.
-static const float LABEL_GAP_KNOB_LARGE = 8.6f;
-// Rogan knobs are BIGGER than the Round Black ones they stand in for, so they
-// need their own gaps -- Rogan1P is 10.63mm against RoundBlackKnob's 9.60, and
-// Rogan3P is 14.14 against RoundLargeBlackKnob's 12.19. At the Round gaps the
-// label baseline lands inside the knob. Measured clearances: 1.68mm on the
-// small, 2.53mm on the large.
-static const float LABEL_GAP_ROGAN = 7.0f;
-static const float LABEL_GAP_ROGAN_LARGE = 9.6f;
-static const float LABEL_GAP_JACK = 5.4f;
-static const float LABEL_GAP_TRIM = 4.4f;
+// Labels sit ABOVE their control: each gap is control centre to label BASELINE.
+// The designer's newest panels (canon, count) put a trimpot's and a jack's label
+// 5.3 mm above it; that leaves a jack 1.3 mm of air, the tightest anywhere, so
+// jacks get 5.8 here and the larger knobs keep about 2 mm clear of their edge.
+static const float LABEL_GAP_TRIM = 5.3f;
+static const float LABEL_GAP_JACK = 5.8f;
+static const float LABEL_GAP_KNOB = 6.8f;        // RoundBlackKnob, 9.6 mm
+static const float LABEL_GAP_KNOB_LARGE = 8.2f;  // RoundLargeBlackKnob, 12.2 mm
+static const float LABEL_GAP_ROGAN = 7.3f;       // Rogan1P, 10.6 mm
+static const float LABEL_GAP_ROGAN_LARGE = 9.1f; // Rogan3P, 14.1 mm
 static const float PLATE_PAD      = 2.6f;    // inset padding around a grouped section
-static const float PLATE_RADIUS   = 2.0f;
+static const float PLATE_RADIUS   = 1.35f;   // the designer's plates and the tools' (panel_reticules.py)
 
 // Whether Rack's own window has focus. Hover events keep arriving while another
 // application is in front, so an instrument that plays on hover plays whenever
@@ -134,6 +143,9 @@ static inline std::shared_ptr<Font> panelFont() {
 static inline std::shared_ptr<Font> panelFontBold() {
 	return APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/Figtree-SemiBold.ttf"));
 }
+static inline std::shared_ptr<Font> panelFontTitle() {
+	return APP->window->loadFont(asset::plugin(pluginInstance, "res/fonts/Figtree-ExtraBold.ttf"));
+}
 
 // ── labels ──────────────────────────────────────────────────────────────────
 // Positions are in mm and are the CONTROL's centre; the widget applies the gap,
@@ -145,7 +157,7 @@ struct PanelLabels : Widget {
 	struct Link { Vec a, b; bool onPlate; };
 	std::vector<Item> items;
 	std::vector<Link> links;
-	std::shared_ptr<Font> font, bold;
+	std::shared_ptr<Font> font, bold, heavy;
 
 	void add(float x, float y, const std::string& t, Kind k = LABEL,
 	         int align = NVG_ALIGN_CENTER) {
@@ -181,32 +193,47 @@ struct PanelLabels : Widget {
 	void link(float x1, float y1, float x2, float y2, bool onPlate = false) {
 		links.push_back({Vec(x1, y1), Vec(x2, y2), onPlate});
 	}
+	// A rule between sections. The designer strokes these exactly as the
+	// connectors (RULE, RULE_W): horizontals run between the screen's edges,
+	// about 2 mm below the controls above them; verticals part column groups,
+	// starting just above their first label.
+	void divider(float x1, float y1, float x2, float y2) {
+		links.push_back({Vec(x1, y1), Vec(x2, y2), false});
+	}
+	// The module name: (x, baseline). title(t) places it where every finished
+	// panel does -- set box.size first, since the margin depends on the width.
 	void title(float x, float y, const std::string& t) {
 		add(x, y, t, TITLE, NVG_ALIGN_LEFT);
+	}
+	void title(const std::string& t) {
+		float wmm = box.size.x / mm2px(1.f);
+		add(wmm <= 8.f * HP + 0.01f ? 0.5f * HP : HP, TITLE_BASELINE, t, TITLE, NVG_ALIGN_LEFT);
 	}
 
 	void draw(const DrawArgs& args) override {
 		if (!font || font->handle < 0) font = panelFont();
 		if (!bold || bold->handle < 0) bold = panelFontBold();
+		if (!heavy || heavy->handle < 0) heavy = panelFontTitle();
 		if (!font || font->handle < 0) return;
 		NVGcontext* vg = args.vg;
 		for (const Link& l : links) {          // drawn first, so a component covers its ends
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, mm2px(l.a.x), mm2px(l.a.y));
 			nvgLineTo(vg, mm2px(l.b.x), mm2px(l.b.y));
-			nvgStrokeColor(vg, l.onPlate ? nvgRGB(0x4A, 0x4A, 0x52) : nvgRGB(0x9A, 0x9A, 0xA6));
-			nvgStrokeWidth(vg, mm2px(0.35f));
+			nvgStrokeColor(vg, l.onPlate ? nvgRGB(0x4A, 0x4A, 0x52) : RULE);
+			nvgStrokeWidth(vg, mm2px(RULE_W));
 			nvgStroke(vg);
 		}
 		for (const Item& it : items) {
 			bool isTitle = it.kind == TITLE;
-			nvgFontFaceId(vg, isTitle && bold && bold->handle >= 0 ? bold->handle : font->handle);
-			nvgFontSize(vg, mm2px(it.kind == NOTE ? TYPE_NOTE
-			                    : isTitle         ? TYPE_TITLE : TYPE_LABEL));
-			nvgTextLetterSpacing(vg, mm2px(it.kind == NOTE ? 0.04f : 0.10f));
+			nvgFontFaceId(vg, isTitle && heavy && heavy->handle >= 0 ? heavy->handle : font->handle);
+			nvgFontSize(vg, mm2px(NVG_EM * (it.kind == NOTE ? TYPE_NOTE
+			                              : isTitle         ? TYPE_TITLE : TYPE_LABEL)));
+			nvgTextLetterSpacing(vg, 0.f);
 			nvgFillColor(vg, it.kind == ON_PLATE ? PLATE_INK
 			               : it.kind == NOTE     ? INK_SOFT : INK);
-			nvgTextAlign(vg, it.align | NVG_ALIGN_MIDDLE);
+			// every position is a BASELINE, as the designer's labels sit on one
+			nvgTextAlign(vg, it.align | NVG_ALIGN_BASELINE);
 			nvgText(vg, mm2px(it.pos.x), mm2px(it.pos.y), it.text.c_str(), NULL);
 		}
 		Widget::draw(args);

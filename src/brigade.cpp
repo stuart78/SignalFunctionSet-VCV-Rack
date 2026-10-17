@@ -377,7 +377,7 @@ struct BrigadeWidget : ModuleWidget {
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
-		lbl->title(6.f, 9.f, "BRIGADE");
+		lbl->title("BRIGADE");
 
 		BrigadeDisplay* disp = new BrigadeDisplay();
 		disp->module = module;

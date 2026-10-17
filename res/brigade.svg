@@ -1,8 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="81.28mm" height="128.5mm" viewBox="0 0 81.28 128.5">
 <rect width="81.28" height="128.5" fill="#f0f0f0"/>
   <g id="PanelArt">
-    <rect x="41.00" y="103.50" width="39.00" height="13.00" rx="2.03" fill="#1a1a1a"/>
-    <rect x="4.00" y="14.00" width="73.28" height="52.00" rx="1.02" fill="#1a1a32"/>
+    <rect x="41.00" y="100.33" width="39.00" height="16.17" rx="1.35" fill="#1a1a1a"/>
+    <rect x="4.00" y="14.00" width="73.28" height="52.00" rx="1.27" fill="#1a1a32"/>
+    <g id="Logo" transform="translate(61.870 6.350) scale(0.084667) translate(-1331 -75)">
+      <path d="M1331 90.0028H1336V85.0019H1341V95.0037H1346V80.0009H1351V100.005H1356V75H1361V100.005H1366V85.0019H1371V95.0037H1376V90.0028H1381" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M1388.38 100.005L1403.37 75C1403.37 80.4594 1407.58 90.0028 1413.38 90.0028H1433.38L1438.38 100.005" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1455.21 75H1450.21V105.006H1455.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1495.21 75H1500.21V105.006H1495.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 77.6255L1470.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1470.21 77.6255L1460.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 92.6284L1470.21 102.63" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 102.63L1470.21 92.6284" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1480.21 77.6255L1490.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1490.21 77.6255L1480.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1490.21 92.6284H1480.21V102.63H1490.21V92.6284Z" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+    </g>
   </g>
   <g id="Reticules" style="display:none">
     <circle cx="9.50" cy="76.00" r="2.99" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
