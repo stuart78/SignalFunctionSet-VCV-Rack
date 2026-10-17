@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1517.7166" viewBox="0 0 1440 1517.7166">
+  <!-- Strata: 24HP at 4x, geometry read from src/strata.cpp. Design layer only. -->
+  <g id="Background" data-name="Background">
+    <rect x="0" y="0" width="1440" height="1517.7166" fill="#f0f0f0"/>
+  </g>
+  <g id="Plates" data-name="Plates">
+    <rect x="525" y="1305" width="855" height="195" rx="15.9449" fill="#1a1a1a"/>
+  </g>
+  <g id="Reticules" data-name="Reticules">
+    <rect x="60" y="120" width="1320" height="570" rx="15" fill="#1a1a32"/>
+    <circle cx="112.2047" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="246.8504" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="381.4961" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="516.1417" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="650.7874" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="785.4331" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="920.0788" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1054.7244" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1189.3701" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1324.0158" cy="791.3386" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="112.2047" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="246.8504" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="381.4961" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="516.1417" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="650.7874" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="785.4331" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="920.0788" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1054.7244" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1189.3701" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1324.0158" cy="921.2599" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="920.0788" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1054.7244" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1189.3701" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1324.0158" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="381.4961" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="516.1417" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="650.7874" cy="1104.3307" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="920.0788" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1054.7244" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1189.3701" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1324.0158" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="381.4961" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="516.1417" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="650.7874" cy="1234.252" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="112.2047" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="246.8504" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="381.4961" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="595.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="715.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="835.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="955.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1075.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1195.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="1315.0394" cy="1429.1339" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+  </g>
+  <g id="Labels (mock)" data-name="Labels (mock)">
+    <line x1="112.2047" y1="791.3386" x2="112.2047" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="246.8504" y1="791.3386" x2="246.8504" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="381.4961" y1="791.3386" x2="381.4961" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="516.1417" y1="791.3386" x2="516.1417" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="650.7874" y1="791.3386" x2="650.7874" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="785.4331" y1="791.3386" x2="785.4331" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="920.0788" y1="791.3386" x2="920.0788" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1054.7244" y1="791.3386" x2="1054.7244" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1189.3701" y1="791.3386" x2="1189.3701" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1324.0158" y1="791.3386" x2="1324.0158" y2="921.2599" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="920.0788" y1="1104.3307" x2="920.0788" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1054.7244" y1="1104.3307" x2="1054.7244" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1189.3701" y1="1104.3307" x2="1189.3701" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="1324.0158" y1="1104.3307" x2="1324.0158" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="381.4961" y1="1104.3307" x2="381.4961" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="516.1417" y1="1104.3307" x2="516.1417" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="650.7874" y1="1104.3307" x2="650.7874" y2="1234.252" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="60" y1="990" x2="1380" y2="990" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="315" y1="705" x2="315" y2="1290" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <line x1="855" y1="705" x2="855" y2="1290" stroke="#a8a8b6" stroke-width="1.9961"/>
+    <text x="60" y="100.9843" font-family="Figtree" font-size="32.0079" font-weight="800" letter-spacing="0" fill="#231f20" text-anchor="start">STRATA</text>
+    <text x="112.2047" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">FREQ</text>
+    <text x="246.8504" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">FM</text>
+    <text x="381.4961" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">X</text>
+    <text x="516.1417" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">Y</text>
+    <text x="650.7874" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">Z</text>
+    <text x="785.4331" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">GLIDE</text>
+    <text x="920.0788" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">WARP</text>
+    <text x="1054.7244" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">FOLD</text>
+    <text x="1189.3701" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">TILT</text>
+    <text x="1324.0158" y="728.7402" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">SYNC</text>
+    <text x="920.0788" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">RATE</text>
+    <text x="1054.7244" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">START</text>
+    <text x="1189.3701" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">CRUSH</text>
+    <text x="1324.0158" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">SHUFFLE</text>
+    <text x="381.4961" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">ROT X</text>
+    <text x="516.1417" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">ROT Y</text>
+    <text x="650.7874" y="1041.7323" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">ROT Z</text>
+    <text x="112.2047" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">HARD</text>
+    <text x="246.8504" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">CLOCK</text>
+    <text x="381.4961" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#231f20" text-anchor="middle">RESET</text>
+    <text x="595.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">STEP</text>
+    <text x="715.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">X</text>
+    <text x="835.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">Y</text>
+    <text x="955.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">Z</text>
+    <text x="1075.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">OUT</text>
+    <text x="1195.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">L</text>
+    <text x="1315.0394" y="1360.63" font-family="Figtree" font-size="27.9921" font-weight="400" letter-spacing="0" fill="#ffffff" text-anchor="middle">R</text>
+  </g>
+  <g id="Logo" data-name="Logo">
+    <g id="Logo" transform="translate(1210.748 75.000) scale(1.000002) translate(-1331 -75)">
+  <path d="M1331 90.0028H1336V85.0019H1341V95.0037H1346V80.0009H1351V100.005H1356V75H1361V100.005H1366V85.0019H1371V95.0037H1376V90.0028H1381" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M1388.38 100.005L1403.37 75C1403.37 80.4594 1407.58 90.0028 1413.38 90.0028H1433.38L1438.38 100.005" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1455.21 75H1450.21V105.006H1455.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1495.21 75H1500.21V105.006H1495.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 77.6255L1470.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1470.21 77.6255L1460.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 92.6284L1470.21 102.63" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 102.63L1470.21 92.6284" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1480.21 77.6255L1490.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1490.21 77.6255L1480.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1490.21 92.6284H1480.21V102.63H1490.21V92.6284Z" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+</g>
+  </g>
+</svg>

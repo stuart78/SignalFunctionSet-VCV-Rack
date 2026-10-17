@@ -1543,7 +1543,7 @@ struct StrataDisplay : OpaqueWidget {
 		if (!module) { module = strataPreview(); draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
 		float w = box.size.x, h = box.size.y;
-		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, mm2px(1.f));
+		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, mm2px(1.27f));   // the designer's screen radius
 		nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
 		const StrataTable* Tp = module->table;
@@ -1732,12 +1732,21 @@ struct StrataDisplay : OpaqueWidget {
 // transport row at the foot with the outputs on a plate.
 // =============================================================================
 static const float ST_PX[10] = {9.5f, 20.9f, 32.3f, 43.7f, 55.1f, 66.5f, 77.9f, 89.3f, 100.7f, 112.1f};
-// two rows of trimpot-over-jack pairs under a 47 mm screen, then the foot
-static const float ST_PY = 67.f, ST_PCV = 79.f, ST_PY2 = 92.f, ST_PCV2 = 104.f, ST_FY = 119.5f;
-// row 2 sits in row 1's columns 1-4 and 8-10
-static const float ST_PX2[7] = {9.5f, 20.9f, 32.3f, 43.7f, 89.3f, 100.7f, 112.1f};
+// Laid out to the designer's measured conventions (panel-style.hpp): the screen
+// one HP in from either side and two HP down, two rows of trimpot-over-jack
+// pairs parted by a rule, and the foot with its plate running to 25 HP.
+static const float ST_SX = 5.08f, ST_SY = 10.16f, ST_SW = 111.76f, ST_SH = 48.26f;
+static const float ST_PY = 67.f, ST_PCV = 78.f, ST_PY2 = 93.5f, ST_PCV2 = 104.5f, ST_FY = 121.f;
+// the rules, all on the quarter-HP grid the designer draws on: across between
+// the rows (1.8 mm under row 1's jacks), and verticals from a quarter HP under
+// the screen
+static const float ST_RULE = 83.82f, ST_RTOP = 59.69f, ST_RBOT = 109.22f;
+static const float ST_V1 = 26.67f, ST_V2 = 72.39f;
+// row 2, in the order of PN2: the read corrupted under WARP..SYNC (row 1's
+// columns 7-10), the listeners' turns under X/Y/Z (columns 3-5)
+static const float ST_PX2[7] = {77.9f, 89.3f, 100.7f, 112.1f, 32.3f, 43.7f, 55.1f};
 // the foot: three inputs, then seven outputs at 10.16 mm on the plate
-static const float ST_OX[7] = {51.0f, 61.16f, 71.32f, 81.48f, 91.64f, 101.8f, 111.96f};
+static const float ST_OX[7] = {50.38f, 60.54f, 70.70f, 80.86f, 91.02f, 101.18f, 111.34f};
 
 struct StrataWidget : ModuleWidget {
 	StrataWidget(Strata* module) {
@@ -1746,12 +1755,12 @@ struct StrataWidget : ModuleWidget {
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
-		lbl->title(6.f, 8.f, "STRATA");
+		lbl->title("STRATA");
 
 		StrataDisplay* disp = new StrataDisplay();
 		disp->module = module;
-		disp->box.pos = mm2px(Vec(3.0f, 11.0f));
-		disp->box.size = mm2px(Vec(115.92f, 47.0f));
+		disp->box.pos = mm2px(Vec(ST_SX, ST_SY));
+		disp->box.size = mm2px(Vec(ST_SW, ST_SH));
 		addChild(disp);
 
 		static const char* PN[10] = {"FREQ", "FM", "X", "Y", "Z", "GLIDE", "WARP", "FOLD", "TILT", "SYNC"};
@@ -1764,8 +1773,8 @@ struct StrataWidget : ModuleWidget {
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX[i], ST_PCV)), module, PI[i]));
 			lbl->pairDown(ST_PX[i], ST_PY, ST_PCV, PN[i]);
 		}
-		// row 2: the read corrupted (RATE, START, CRUSH, SHUFFLE) on the left,
-		// the listeners' turns on the right over the L/R outs they move
+		// row 2: the read corrupted (RATE, START, CRUSH, SHUFFLE) under the shape
+		// macros it belongs with, the listeners' turns under the X/Y/Z they turn in
 		static const char* PN2[7] = {"RATE", "START", "CRUSH", "SHUFFLE", "ROT X", "ROT Y", "ROT Z"};
 		static const int PP2[7] = {Strata::RATE_PARAM, Strata::START_PARAM, Strata::CRUSH_PARAM, Strata::SHUFFLE_PARAM,
 		                           Strata::ROTX_PARAM, Strata::ROTY_PARAM, Strata::ROTZ_PARAM};
@@ -1776,6 +1785,12 @@ struct StrataWidget : ModuleWidget {
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX2[i], ST_PCV2)), module, PI2[i]));
 			lbl->pairDown(ST_PX2[i], ST_PY2, ST_PCV2, PN2[i]);
 		}
+		// the rules: one across between the rows, and two verticals running down
+		// both rows, so they read as three column groups: pitch | where (X/Y/Z,
+		// GLIDE, and the listeners' turns) | shape (the macros and the read)
+		lbl->divider(ST_SX, ST_RULE, ST_SX + ST_SW, ST_RULE);
+		lbl->divider(ST_V1, ST_RTOP, ST_V1, ST_RBOT);
+		lbl->divider(ST_V2, ST_RTOP, ST_V2, ST_RBOT);
 		static const char* FN[3] = {"HARD", "CLOCK", "RESET"};
 		static const int FI[3] = {Strata::HARD_INPUT, Strata::CLOCK_INPUT, Strata::RESET_INPUT};
 		for (int i = 0; i < 3; i++) {
