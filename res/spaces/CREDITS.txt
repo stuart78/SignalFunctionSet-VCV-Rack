@@ -1,0 +1,17 @@
+Cistern's scanned spaces are photogrammetry scans, converted to room geometry
+by tools/cistern-convert.cpp (reduced to their air, smoothed, materials
+assigned; the Pantheon scaled by 1.72 to its real 43.3 m and its oculus
+re-opened, Leake Street scaled by 1.64 to its real ~300 m). All are licensed
+under Creative Commons Attribution 4.0 (http://creativecommons.org/licenses/by/4.0/).
+
+pantheon.bin    "The Pantheon Interior" (https://skfb.ly/pJOwI) by artfletch
+hintze.bin      "Hintze Hall" (https://skfb.ly/oF9N6) by artfletch
+leake.bin       "Leake Street Graffiti Tunnel" (https://skfb.ly/6TFJV) by artfletch
+oldchurch.bin   "Old church modeling - Interior Scene" (https://skfb.ly/STIp) by Aurélien Martel
+undercroft.bin  "Lincoln's Inn Chapel Undercroft" (https://skfb.ly/oItqQ) by artfletch
+bartless.bin    "St Bartholomew-the-Less Interior" (https://skfb.ly/o6rPA) by artfletch
+stourton.bin    "Church Of St Peter Stourton" (https://skfb.ly/oGNzU) by artfletch
+mosque.bin      "Mosque of Tree of Al Buqayawiyya, Jordan" (https://skfb.ly/oZYxr) by SJoudeh
+salt.bin        "Salt Tower Lower Room" (https://skfb.ly/oNoqN) by artfletch
+
+The Dan Harpole Cistern is built from its published dimensions, not a scan.

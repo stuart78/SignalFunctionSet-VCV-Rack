@@ -587,6 +587,16 @@
         "Polyphonic"
       ],
       "hidden": true
+    },
+    {
+      "slug": "Cistern",
+      "name": "Cistern",
+      "description": "Reverb from a real space: the room built from its dimensions, sources and listener placed in it.",
+      "tags": [
+        "Reverb",
+        "Stereo"
+      ],
+      "hidden": true
     }
   ]
 }

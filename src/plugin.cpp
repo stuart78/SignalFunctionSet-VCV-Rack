@@ -58,6 +58,7 @@ void init(Plugin* p) {
 	p->addModel(modelCount);
 	p->addModel(modelCarillon);
 	p->addModel(modelStrata);
+	p->addModel(modelCistern);
 	p->addModel(modelWheel);
 
 	// Add modules here

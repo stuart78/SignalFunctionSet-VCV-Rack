@@ -30,8 +30,10 @@ PLATE = "#1a1a1a"                  # dark inset grouping a section
 # Held in mm, not panel units, because a panel may be authored at a larger scale
 # so its quarter-HP grid comes out integral (tools/figma_panel_template.py). A
 # file's own units-per-mm then scales these, and a 75dpi file is unchanged.
-PLATE_R_MM = 6.0 / MM              # corner radius
-SCREEN_R_MM = 3.0 / MM
+# Radii as the designer's 2026-09 panels draw them (canon, flock, spool): plates
+# 1.35 mm (16 units at their 300 dpi), screens 1.27 mm (15).
+PLATE_R_MM = 1.35                  # corner radius
+SCREEN_R_MM = 1.27
 STROKE_MM = 0.5 / MM               # reticule hairline
 
 # Real component sizes, read from Rack's own ComponentLibrary (px).
@@ -429,10 +431,15 @@ def guide_shapes(elems, indent="    ", upmm=MM):
     return out
 
 
-def splice(path, old, elems, plates=(), upmm=MM, screens="filled"):
+def splice(path, old, elems, plates=(), upmm=MM, screens="filled", wmm=None):
     """Rewrite the two layers this tool owns -- PanelArt and Reticules -- and
-    leave every other layer of the designer's file alone."""
+    leave every other layer of the designer's file alone. PanelArt carries the
+    Signal Function Set mark top right, placed as the designer places it
+    (tools/panel_logo.py), so a code-drawn panel is not missing it."""
     art = art_shapes(elems, "    ", plates, upmm, screens)
+    if wmm:
+        import panel_logo
+        art.append(panel_logo.group(wmm, upmm))
     guides = guide_shapes(elems, "    ", upmm)
     out = old
     for gid in ("Screens", "PanelArt", "Reticules"):   # drop whatever is there now
@@ -469,16 +476,18 @@ PLATES = {
     # PHASE is an OUTPUT, so it belongs on the plate with the other two.
     # Left off it, its label was drawn in the on-plate white and vanished
     # into the light panel.
-    "helix": [(41.0, 103.5, 39.0, 13.0)],
+    "helix": [(41.0, 100.33, 39.0, 16.17)],     # top raised 2026-10-05 for the measured label gap
     # the five outputs at the foot, right of the startle button
     "flock": [(40.64, 114.5, 50.8, 13.0)],
     # each channel's V/OCT + GATE pair at the foot
     "count": [],
     # the three outputs at the foot
     "carillon": [(87.5, 110.5, 43.5, 13.5)],
-    "strata": [(45.4, 110.0, 72.2, 15.5)],
+    "strata": [(44.45, 110.49, 72.39, 16.51)],
+    # the two outputs at the foot
+    "cistern": [(80.01, 110.49, 26.67, 16.51)],
     "canon": [],
-    "brigade": [(41.0, 103.5, 39.0, 13.0)],
+    "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
     # each tape keeps its own column, and a plate over that row would cover four
     # inputs too.
@@ -520,6 +529,7 @@ MODULES = {
     "count":   ("Count",   "src/count.cpp",   "res/count.svg",   {"CT_N": 6}),
     "carillon":    ("Carillon",    "src/carillon.cpp",    "res/carillon.svg",    {}),
     "strata":      ("Strata",      "src/strata.cpp",      "res/strata.svg",      {}),
+    "cistern":     ("Cistern",     "src/cistern.cpp",     "res/cistern.svg",     {}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
@@ -569,5 +579,5 @@ if __name__ == "__main__":
                  for (k, x, y, w, h) in collect(body, env, defs)]
         pl = [(x * upmm, y * upmm, w * upmm, h * upmm) for (x, y, w, h) in PLATES.get(key, [])]
         nc, ns = splice(p, old, elems, pl, upmm,
-                        "none" if key in NO_SCREEN_SLAB else "filled")
+                        "none" if key in NO_SCREEN_SLAB else "filled", wmm)
         print(f"{key:8} {nc:3} controls, {ns} screen(s) -> {svg}  ({upmm:.4f} units/mm)")
