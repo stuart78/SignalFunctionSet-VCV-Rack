@@ -53,7 +53,7 @@ static const Material MATERIALS[M_COUNT] = {
 	{"carpet on stone", {0.050, 0.100, 0.300, 0.500, 0.600, 0.650}, 0.20},
 	{"furnished floor", {0.120, 0.160, 0.220, 0.260, 0.280, 0.300}, 0.60},
 	{"coffered concrete", {0.040, 0.050, 0.060, 0.070, 0.080, 0.090}, 0.60},
-	{"plaster on lath", {0.140, 0.100, 0.060, 0.050, 0.040, 0.030}, 0.30},   // a vault or ceiling that flexes takes the bass
+	{"plaster on lath", {0.140, 0.100, 0.060, 0.050, 0.040, 0.030}, 0.30},   // a vault or ceiling that flexes absorbs low frequencies
 	{"water",           {0.008, 0.008, 0.013, 0.015, 0.020, 0.025}, 0.00},
 	{"board-formed concrete", {0.012, 0.014, 0.017, 0.018, 0.022, 0.027}, 0.40},   // set so Houston lands its measured 15-17 s
 	{"opening",         {1.000, 1.000, 1.000, 1.000, 1.000, 1.000}, 0.00},
@@ -777,15 +777,15 @@ static const SpaceInfo SPACES[] = {
 	{"cistern",    "Dan Harpole Cistern",           nullptr, "", M_SEALED_CONCRETE, M_SEALED_CONCRETE, M_SEALED_CONCRETE, 0.5, makeCistern},
 	{"houston",    "Buffalo Bayou Cistern",         nullptr, "", M_WATER, M_BOARD_CONCRETE, M_BOARD_CONCRETE, 0.4, makeHouston},
 	{"basilica",   "Basilica Cistern, Istanbul",    nullptr, "", M_WATER, M_PLASTER, M_BRICK, 0.4, makeBasilica},
-	{"pantheon",   "The Pantheon",                  "pantheon.bin",   "\"The Pantheon Interior\" by artfletch, CC BY 4.0", M_PEWS, M_MARBLE, M_COFFERED, 0.5, nullptr},
-	{"hintze",     "Hintze Hall",                   "hintze.bin",     "\"Hintze Hall\" by artfletch, CC BY 4.0", M_FURNISHED, M_STONE, M_PLASTER, 0.4, nullptr},
-	{"leake",      "Leake Street Tunnel",           "leake.bin",      "\"Leake Street Graffiti Tunnel\" by artfletch, CC BY 4.0", M_ROUGH_CONCRETE, M_BRICK, M_BRICK, 0.4, nullptr},
-	{"oldchurch",  "Old Church",                    "oldchurch.bin",  "\"Old church modeling - Interior Scene\" by Aurélien Martel, CC BY 4.0", M_PEWS, M_STONE, M_WOOD, 0.4, nullptr},
-	{"undercroft", "Lincoln's Inn Undercroft",      "undercroft.bin", "\"Lincoln's Inn Chapel Undercroft\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
-	{"bartless",   "St Bartholomew-the-Less",       "bartless.bin",   "\"St Bartholomew-the-Less Interior\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_LATH, 0.4, nullptr},
-	{"stourton",   "St Peter, Stourton",            "stourton.bin",   "\"Church Of St Peter Stourton\" by artfletch, CC BY 4.0", M_PEWS, M_PLASTER, M_WOOD, 0.4, nullptr},
-	{"mosque",     "Mosque of the Tree, Jordan",    "mosque.bin",     "\"Mosque of Tree of Al Buqayawiyya, Jordan\" by SJoudeh, CC BY 4.0", M_CARPET, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
-	{"salt",       "Salt Tower, Lower Room",        "salt.bin",       "\"Salt Tower Lower Room\" by artfletch, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
+	{"pantheon",   "The Pantheon",                  "pantheon.bin",   "\"The Pantheon Interior\" by artfletch, skfb.ly/pJOwI, CC BY 4.0", M_PEWS, M_MARBLE, M_COFFERED, 0.5, nullptr},
+	{"hintze",     "Hintze Hall",                   "hintze.bin",     "\"Hintze Hall\" by artfletch, skfb.ly/oF9N6, CC BY 4.0", M_FURNISHED, M_STONE, M_PLASTER, 0.4, nullptr},
+	{"leake",      "Leake Street Tunnel",           "leake.bin",      "\"Leake Street Graffiti Tunnel\" by artfletch, skfb.ly/6TFJV, CC BY 4.0", M_ROUGH_CONCRETE, M_BRICK, M_BRICK, 0.4, nullptr},
+	{"oldchurch",  "Old Church",                    "oldchurch.bin",  "\"Old church modeling - Interior Scene\" by Aurélien Martel, skfb.ly/STIp, CC BY 4.0", M_PEWS, M_STONE, M_WOOD, 0.4, nullptr},
+	{"undercroft", "Lincoln's Inn Undercroft",      "undercroft.bin", "\"Lincoln's Inn Chapel Undercroft\" by artfletch, skfb.ly/oItqQ, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
+	{"bartless",   "St Bartholomew-the-Less",       "bartless.bin",   "\"St Bartholomew-the-Less Interior\" by artfletch, skfb.ly/o6rPA, CC BY 4.0", M_PEWS, M_PLASTER, M_LATH, 0.4, nullptr},
+	{"stourton",   "St Peter, Stourton",            "stourton.bin",   "\"Church Of St Peter Stourton\" by artfletch, skfb.ly/oGNzU, CC BY 4.0", M_PEWS, M_PLASTER, M_WOOD, 0.4, nullptr},
+	{"mosque",     "Mosque of the Tree, Jordan",    "mosque.bin",     "\"Mosque of Tree of Al Buqayawiyya, Jordan\" by SJoudeh, skfb.ly/oZYxr, CC BY 4.0", M_CARPET, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
+	{"salt",       "Salt Tower, Lower Room",        "salt.bin",       "\"Salt Tower Lower Room\" by artfletch, skfb.ly/oNoqN, CC BY 4.0", M_STONE, M_ROUGH_STONE, M_ROUGH_STONE, 0.5, nullptr},
 };
 static const int NSPACES = (int)(sizeof(SPACES) / sizeof(SPACES[0]));
 
@@ -1045,7 +1045,7 @@ struct Tail {
 	// How the input reaches the lines. Fed the same signal at once, every line
 	// sent back a bare copy of a click one trip later: sixteen clicks between 40
 	// and 80 ms after the tail started, crest factor 16, heard as an echo. Each
-	// line now takes its own sparse random burst of the input (velvet noise,
+	// line now receives its own sparse random burst of the input (velvet noise,
 	// VEL_N signed pulses over VEL_SEC), so its first return is already noise.
 	static const int VEL_N = 24;
 	static constexpr double VEL_SEC = 0.05;

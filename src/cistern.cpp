@@ -136,7 +136,7 @@ struct Cistern : Module {
 		configParam<SizeQ>(SIZE_PARAM, -2.f, 1.f, 0.f, "Size, against the real room", "", 2.f);
 		configParam<DecayQ>(DECAY_PARAM, DECAY_MIN, 2.f, 0.f, "Decay, against the room's own", "", 2.f);
 		configParam(SCATTER_PARAM, 0.f, 1.f, 0.5f, "Scatter (how much of each reflection goes diffuse)", "%", 0.f, 100.f);
-		configParam(HUMID_PARAM, 10.f, 90.f, 50.f, "Humidity (the air takes the treble)", "%");
+		configParam(HUMID_PARAM, 10.f, 90.f, 50.f, "Humidity (drier air absorbs more high frequencies)", "%");
 		configParam(MOD_PARAM, 0.f, 2.f, 1.f, "Movement in the tail", "%", 0.f, 100.f);
 		configParam(MIX_PARAM, 0.f, 1.f, 0.5f, "Mix", "% wet", 0.f, 100.f);
 		configSwitch(FREEZE_PARAM, 0.f, 1.f, 0.f, "Freeze", {"Off", "On"});
@@ -482,6 +482,9 @@ struct CisternDisplay : OpaqueWidget {
 	std::shared_ptr<Font> font;
 	Vec pressPos; float dragDist = 0.f;
 	int dragPos = -1, hoverPos = -1;
+	// the CREDITS button (drawn under the room's size, top right) and the list it opens
+	bool showCredits = false, hoverCredits = false;
+	Rect creditsBtn;
 	// the room drawn, and its frame: rebuilt when SPACE changes
 	int shownId = -1;
 	std::shared_ptr<const cistern::Space> room;
@@ -768,6 +771,12 @@ struct CisternDisplay : OpaqueWidget {
 	}
 
 	void onButton(const ButtonEvent& e) override {
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS && (showCredits || creditsBtn.contains(e.pos))) {
+			showCredits = !showCredits;
+			dragPos = -1; dragDist = 1e9f;                    // not a drag, not an orbit
+			e.consume(this);
+			return;
+		}
 		if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS) {
 			pressPos = e.pos; dragDist = 0.f;
 			dragPos = posAt(e.pos);
@@ -784,10 +793,11 @@ struct CisternDisplay : OpaqueWidget {
 		}
 	}
 	void onHover(const HoverEvent& e) override {
-		hoverPos = posAt(e.pos);
+		hoverCredits = creditsBtn.contains(e.pos);
+		hoverPos = showCredits ? -1 : posAt(e.pos);
 		OpaqueWidget::onHover(e);
 	}
-	void onLeave(const LeaveEvent& e) override { hoverPos = -1; OpaqueWidget::onLeave(e); }
+	void onLeave(const LeaveEvent& e) override { hoverPos = -1; hoverCredits = false; OpaqueWidget::onLeave(e); }
 	void onDragMove(const DragMoveEvent& e) override {
 		if (!module || !room || e.button != GLFW_MOUSE_BUTTON_LEFT) return;
 		float z = getAbsoluteZoom();
@@ -983,6 +993,41 @@ struct CisternDisplay : OpaqueWidget {
 	}
 	static std::string secs(float t) { return t >= 10.f ? string::f("%.0fs", t) : string::f("%.1fs", t); }
 
+	// The credits, over the room: every scan's source and licence (CC BY asks
+	// for the name, the work and a link), the room on screen brighter, and a
+	// line for the rooms built from published dimensions. Any click closes it.
+	void drawCredits(NVGcontext* vg, float w, float h) {
+		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, mm2px(1.27f));
+		nvgFillColor(vg, nvgTransRGBAf(sfs::SCREEN_BG, 0.94f)); nvgFill(vg);
+		if (!font || font->handle < 0) return;
+		sfs::screenFont(vg, font);
+		float x = mm2px(3.f), y = mm2px(3.f), lw = w - 2 * x;
+		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+		nvgFontSize(vg, mm2px(2.6f));
+		nvgFillColor(vg, sfs::SCREEN_TEXT);
+		nvgText(vg, x, y, "CREDITS", NULL);
+		y += mm2px(4.6f);
+		nvgFontSize(vg, mm2px(1.9f));
+		nvgTextLineHeight(vg, 1.15f);
+		for (int i = 0; i < NSPACES; i++) {
+			const cistern::SpaceInfo& I = cistern::SPACES[i];
+			if (!I.credit[0]) continue;
+			nvgFillColor(vg, i == shownId ? sfs::SCREEN_TEXT : sfs::SCREEN_DIM);
+			float b[4];
+			nvgTextBoxBounds(vg, x, y, lw, I.credit, NULL, b);
+			nvgTextBox(vg, x, y, lw, I.credit, NULL);
+			y = b[3] + mm2px(0.9f);
+		}
+		y += mm2px(1.2f);
+		nvgFillColor(vg, sfs::SCREEN_DIM);
+		nvgTextBox(vg, x, y, lw, "Built from published dimensions: the Dan Harpole Cistern, Fort Worden (its interior after "
+		                          "Centrum's photographs), the Buffalo Bayou Cistern, Houston, and the Basilica Cistern, "
+		                          "Istanbul. Where a detail is estimated, docs/cistern-design.md says so.", NULL);
+		nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_BOTTOM);
+		nvgFillColor(vg, nvgTransRGBAf(sfs::SCREEN_DIM, 0.7f));
+		nvgText(vg, w - mm2px(2.f), h - mm2px(1.4f), "click to close", NULL);
+	}
+
 	void draw(const DrawArgs& args) override {
 		NVGcontext* vg = args.vg;
 		Cistern* m = M();
@@ -1078,10 +1123,18 @@ struct CisternDisplay : OpaqueWidget {
 					m->dX.load(), m->dZ.load(), m->dY.load(), m->dVol.load());
 				nvgText(vg, w - mm2px(2.f), mm2px(1.6f), dims.c_str(), NULL);
 			}
-			if (I.credit[0]) {
+			{
+				// CREDITS, under the size: who scanned each room, on request
 				nvgFontSize(vg, mm2px(2.0f));
-				nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
-				nvgText(vg, mm2px(2.f), mm2px(4.6f), (std::string("scan: ") + I.credit).c_str(), NULL);
+				float bounds[4];
+				nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP);
+				nvgTextBounds(vg, w - mm2px(2.f), mm2px(4.8f), "CREDITS", NULL, bounds);
+				float pad = mm2px(0.6f);
+				creditsBtn = Rect(Vec(bounds[0] - pad, bounds[1] - pad), Vec(bounds[2] - bounds[0] + 2 * pad, bounds[3] - bounds[1] + 2 * pad));
+				nvgBeginPath(vg); nvgRoundedRect(vg, creditsBtn.pos.x, creditsBtn.pos.y, creditsBtn.size.x, creditsBtn.size.y, mm2px(0.5f));
+				nvgStrokeColor(vg, nvgTransRGBAf(sfs::SCREEN_DIM, hoverCredits || showCredits ? 0.9f : 0.45f)); nvgStrokeWidth(vg, 0.7f); nvgStroke(vg);
+				nvgFillColor(vg, hoverCredits || showCredits ? sfs::SCREEN_TEXT : sfs::SCREEN_DIM);
+				nvgText(vg, w - mm2px(2.f), mm2px(4.8f), "CREDITS", NULL);
 				nvgFontSize(vg, mm2px(2.6f));
 			}
 			static const char* BN[NB] = {"125", "250", "500", "1k", "2k", "4k"};
@@ -1095,6 +1148,7 @@ struct CisternDisplay : OpaqueWidget {
 			nvgFillColor(vg, m->frozen ? sfs::SCREEN_BLUE : sfs::SCREEN_HOT);
 			nvgText(vg, w - mm2px(2.f), h - mm2px(1.4f), st, NULL);
 		}
+		if (showCredits) drawCredits(vg, w, h);
 		nvgRestore(vg);
 	}
 };

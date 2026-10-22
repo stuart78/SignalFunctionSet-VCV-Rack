@@ -20,7 +20,7 @@ the opposite goal: a believable large space, where a discrete echo is a fault.
 - **Materials**: absorption in six octave bands (125 Hz to 4 kHz) and a
   scattering coefficient, from standard tables.
 - **Air**: absorption per band from ISO 9613-1 at a temperature and humidity.
-  In a large, hard room the air, not the walls, is what takes the treble: at
+  In a large, hard room the air absorbs more high frequencies than the walls do: at
   45 s a sound has travelled more than 15 km. A tail that keeps its highs for
   45 s is the commonest way a long reverb sounds fake.
 - **Derived**: volume, surface area per material, mean free path (4V/S), and the
@@ -67,7 +67,7 @@ missing scan, so each preset gets a pass to close the latter.
 ### The cistern's numbers
 
 The quoted 45 s needs smooth, sealed concrete (absorption about 0.005 at 125 Hz)
-and is the LOW-frequency decay: by 500 Hz the air takes over. With the estimated
+and is the LOW-frequency decay: above 500 Hz air absorption sets the decay. With the estimated
 column grid the model predicts 47.9 s at 125 Hz, 33.8 s at 250, 22.2 s at 500,
 15.7 s at 1 kHz, 9.9 s at 2 kHz and 4.4 s at 4 kHz at 20 C and 50% humidity
 (V 10,719 m3, S 6,324 m2, mean free path 6.8 m, 88 columns). The harness checks
@@ -153,7 +153,7 @@ apart showed two things in that spot:
   near the centre). The harness reports it rather than failing on it.
 - **A click on top was the engine.** Every line was fed the same input at once,
   so one trip later all sixteen sent back a bare copy of it: crest factor 16 at
-  183 ms (start of the tail plus the shortest line). Each line now takes its own
+  183 ms (start of the tail plus the shortest line). Each line now receives its own
   velvet-noise burst of the input (24 signed pulses over 50 ms), and the tail's
   first half second runs at crest 2.5 to 4.7, which is diffuse. 12 pulses was
   not enough (6.9). Cost 2.9% of a core.
@@ -332,7 +332,7 @@ interior at every setting tried) and the Montroi castle (exterior only).
 A scan smoothed to half a metre loses what a room is furnished with, so the
 materials put it back as aggregates on the surface it sits on: floor with
 pews, furnished floor (cases, exhibits, visitors), carpet on stone, coffered
-concrete, rough stone, plaster on lath (a vault that flexes takes the bass).
+concrete, rough stone, plaster on lath (a vault that flexes absorbs low frequencies).
 **Estimates for each building type, unoccupied, not measurements**; no
 published reverberation times were found for any of these rooms (St Peter's
 in Rome, far larger than the Pantheon, measures 7.1 s mid-band, its authors
@@ -384,7 +384,7 @@ cutaway**: each room's surface reduced by vertex clustering to 1,700-3,900
 faces, a face drawn only when its inner side faces the camera (so the near
 walls and the ceiling fall away and the room is seen from inside, the way an
 architectural cutaway is), painted back to front with flat shading under a
-fixed light, the floor in the display blue. The reduced faces take the
+fixed light, the floor in the display blue. The reduced faces use the
 area-weighted normals of the surface they replace, or their jagged facets
 flickered between floor and wall. Drawn into a framebuffer, redrawn only when
 the space or the view changes. The cistern is built the same way from its own
@@ -531,3 +531,7 @@ real 300 m tunnel is not evenly reverberant along its length), sound does not
 bend round corners beyond what scattering gives, and the early window stops at
 0.9 s. Listening: `handoff/cistern/listening/distance/` (near, far musical,
 far true).
+
+## Round 11: credits on the screen (2026-10-19)
+
+The scan credits used to sit as a line under the room name, for scanned rooms only. They are now behind a **CREDITS** button under the room size. Clicking it opens a list of all nine scans, each with its author, its link and its licence (CC BY asks for all three), with the room on screen drawn brighter. A last line names the three rooms built from published dimensions and points to this document for the estimated details. Any click closes the list, and while it is open a click neither drags a source nor turns the view. The links come from `res/spaces/CREDITS.txt` and are now part of each `SPACES[]` credit string, so the right-click "Scan credits" menu shows them too.
