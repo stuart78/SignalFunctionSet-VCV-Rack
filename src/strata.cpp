@@ -1273,7 +1273,9 @@ std::string StrataCellQ::getDisplayValueString() {
 struct StrataView {
 	float yaw = 0.f, pitch = 0.8f;
 	float sx = 1.f, ox = 0.f, oy = 0.f;
+	float kx = 1.f;                                  // the columns drawn this much wider (display only)
 	void rotate(float x, float y, float z, float& px, float& py, float& d) const {
+		x *= kx;
 		float cy = std::cos(yaw), sy = std::sin(yaw), cp = std::cos(pitch), sp = std::sin(pitch);
 		float x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
 		px = x1; py = y * cp + z1 * sp; d = z1 * cp - y * sp;
@@ -1437,14 +1439,29 @@ struct StrataDisplay : OpaqueWidget {
 		// frame height; fitted to it exactly, the bottom layer ran off the screen
 		float a = T ? amp(*T) : A2;
 		float yTop = (T ? yLayer(*T, L - 1) : 0.f) + 1.3f * a, yBot = (T ? yLayer(*T, 0) : 0.f) - 1.3f * a;
+		// the right-hand pane, clear of the header and the footer, with room
+		// round the box for the axis labels
+		float pad = mm2px(4.f), top = mm2px(7.f), bot = mm2px(7.f);
+		float x0 = split() + pad, w = box.size.x - pad - x0, h = box.size.y - top - bot;
+		// The pane is about twice as wide as it is tall and a cube is not, so
+		// the columns are drawn wider until the box, seen from the default
+		// angle, has the pane's proportions (at most 3x). Projected at yaw y and
+		// pitch p, the box is kx|cos y| + |sin y|·D/2 wide and
+		// H0 + (kx|sin y| + |cos y|·D/2)·|sin p| tall, so kx solves directly.
+		// Fixed by the default angle, not the current one, so orbiting does not
+		// stretch the table.
+		{
+			float cy = std::fabs(std::cos(Strata::YAW0)), sy = std::fabs(std::sin(Strata::YAW0));
+			float cp = std::fabs(std::cos(Strata::PITCH0)), sp = std::fabs(std::sin(Strata::PITCH0));
+			float H0 = (yTop - yBot) / 2.f * cp, asp = w / h, hd = D / 2.f;
+			float den = cy - asp * sy * sp;
+			V.kx = den > 0.f ? clamp((asp * (H0 + cy * hd * sp) - sy * hd) / den, 1.f, 3.f) : 3.f;
+		}
 		float mnx = 1e9f, mxx = -1e9f, mny = 1e9f, mxy = -1e9f;
 		for (float x : {-1.f, 1.f}) for (float y : {yBot, yTop}) for (float z : {-D / 2.f, D / 2.f}) {
 			float px, py, d; V.rotate(x, y, z, px, py, d);
 			mnx = std::min(mnx, px); mxx = std::max(mxx, px); mny = std::min(mny, py); mxy = std::max(mxy, py);
 		}
-		// the right-hand pane, clear of the header and the footer
-		float pad = mm2px(2.f), top = mm2px(5.5f), bot = mm2px(5.5f);
-		float x0 = split() + pad, w = box.size.x - pad - x0, h = box.size.y - top - bot;
 		V.sx = std::min(w / (mxx - mnx), h / (mxy - mny));
 		V.ox = x0 + w / 2.f - (mnx + mxx) / 2.f * V.sx;
 		V.oy = top + h / 2.f + (mny + mxy) / 2.f * V.sx;
@@ -1496,7 +1513,7 @@ struct StrataDisplay : OpaqueWidget {
 			if (lift) w[1] = b / std::max(std::fabs(cp), 0.2f);
 			else {
 				float bb = b / (std::fabs(sp) < 0.2f ? std::copysign(0.2f, sp) : sp);
-				w[0] = a * cy - bb * sy;
+				w[0] = (a * cy - bb * sy) / V.kx;
 				w[2] = a * sy + bb * cy;
 			}
 			// the move is made where the listener is heard, after ROT X/Y/Z;
@@ -1539,6 +1556,69 @@ struct StrataDisplay : OpaqueWidget {
 		if (module) delete module->retired.exchange(nullptr);
 	}
 
+	// The axes, named as the knobs are, outside the box: X along the columns,
+	// Y along the rows (into the screen), Z up the layers, each with its first
+	// and last cell numbered where that cell sits. Each goes on whichever of
+	// its four parallel box edges lies furthest out from the box's centre on
+	// screen (an outline edge, never one crossing the middle), the lower of
+	// the two for X and Y and the left one for Z, and moves edge as the view
+	// turns. An axis with one cell is not labelled.
+	void drawAxes(NVGcontext* vg, const StrataTable& T, const StrataView& V) {
+		if (!font || font->handle < 0) return;
+		float a = amp(T), yB = yLayer(T, 0) - a, yT = yLayer(T, T.layers - 1) + a;
+		float lo[3] = {-1.f, yB, -D / 2.f}, hi[3] = {1.f, yT, D / 2.f};
+		if (T.rows <= 1) { lo[2] = -0.25f; hi[2] = 0.25f; }   // a flat row: the strip it is drawn in
+		float CX, CY, d;
+		V.project(0.f, (yB + yT) / 2.f, (lo[2] + hi[2]) / 2.f, CX, CY, d);
+		struct Ax { const char* name; int world, n; float first, last; };
+		Ax axes[3] = {
+			{"X", 0, T.cols, stWorldX(0.f, T.cols), stWorldX((float)(T.cols - 1), T.cols)},
+			{"Y", 2, T.rows, zRow(T, 0.f), zRow(T, (float)(T.rows - 1))},
+			{"Z", 1, T.layers, yLayer(T, 0.f), yLayer(T, (float)(T.layers - 1))},
+		};
+		sfs::screenFont(vg, font);
+		nvgFontSize(vg, mm2px(2.0f));
+		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+		for (const Ax& A : axes) {
+			if (A.n <= 1) continue;
+			// the four edges along this axis: the other two coordinates at lo or hi
+			int o1 = (A.world + 1) % 3, o2 = (A.world + 2) % 3;
+			float best = -1e9f, bestTie = 0.f, e1 = 0.f, e2 = 0.f, md[4];
+			float mx[4], my[4];
+			for (int i = 0; i < 4; i++) {
+				float p[3]; p[A.world] = 0.f;
+				p[o1] = (i & 1) ? hi[o1] : lo[o1]; p[o2] = (i & 2) ? hi[o2] : lo[o2];
+				p[A.world] = (lo[A.world] + hi[A.world]) / 2.f;
+				V.project(p[0], p[1], p[2], mx[i], my[i], d);
+				md[i] = std::hypot(mx[i] - CX, my[i] - CY);
+				best = std::max(best, md[i]);
+			}
+			int pick = 0; bool first = true;
+			for (int i = 0; i < 4; i++) {
+				if (md[i] < best * 0.98f) continue;
+				float tie = A.world == 1 ? -mx[i] : my[i];   // Z: leftmost; X, Y: lowest
+				if (first || tie > bestTie) { pick = i; bestTie = tie; first = false; }
+			}
+			e1 = (pick & 1) ? hi[o1] : lo[o1]; e2 = (pick & 2) ? hi[o2] : lo[o2];
+			// outward from the box's centre, through the edge's midpoint
+			float ux = mx[pick] - CX, uy = my[pick] - CY, ul = std::hypot(ux, uy);
+			if (ul < 1e-3f) { ux = 0.f; uy = 1.f; } else { ux /= ul; uy /= ul; }
+			float off = mm2px(2.2f);
+			auto at = [&](float t, float& X, float& Y) {
+				float p[3]; p[A.world] = t; p[o1] = e1; p[o2] = e2;
+				V.project(p[0], p[1], p[2], X, Y, d);
+				X += ux * off; Y += uy * off;
+			};
+			float X, Y;
+			nvgFillColor(vg, sfs::SCREEN_TEXT);
+			at((lo[A.world] + hi[A.world]) / 2.f, X, Y);
+			nvgText(vg, X, Y, A.name, NULL);
+			nvgFillColor(vg, sfs::SCREEN_DIM);
+			at(A.first, X, Y); nvgText(vg, X, Y, "1", NULL);
+			at(A.last, X, Y); nvgText(vg, X, Y, string::f("%d", A.n).c_str(), NULL);
+		}
+	}
+
 	void draw(const DrawArgs& args) override {
 		if (!module) { module = strataPreview(); draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
@@ -1561,37 +1641,45 @@ struct StrataDisplay : OpaqueWidget {
 		int pts = clamp(480 / T.cols, 16, 48);
 		if (T.frames > 256) pts = std::min(pts, 20);
 
-		struct Strip { int l, r; float depth; };
+		// How bright each layer is follows the first voice's height
+		// continuously: full on the layer it is in, fading out over one layer
+		// gap either side (smoothstep), so a voice moving between two layers
+		// hands the brightness from one to the other rather than switching.
+		float pz = clamp(v0.pz, 0.f, (float)(T.layers - 1));
+		auto layerLit = [&](int l) {
+			float t = clamp(1.f - std::fabs((float)l - pz), 0.f, 1.f);
+			return t * t * (3.f - 2.f * t);
+		};
+		struct Strip { int l, r; float depth, lit; };
 		std::vector<Strip> strips;
 		for (int l = 0; l < T.layers; l++) for (int r = 0; r < T.rows; r++) {
 			float X, Y, d; V.project(0.f, yLayer(T, l), zRow(T, r), X, Y, d);
-			strips.push_back({l, r, d});
+			strips.push_back({l, r, d, layerLit(l)});
 		}
-		std::sort(strips.begin(), strips.end(), [](const Strip& a, const Strip& b) { return a.depth > b.depth; });
-		float fd = strips.front().depth, nd = strips.back().depth;
+		float fd = -1e9f, nd = 1e9f;
+		for (const Strip& s : strips) { fd = std::max(fd, s.depth); nd = std::min(nd, s.depth); }
+		// dimmer layers first, so the brighter one is drawn over them; back to
+		// front within a layer
+		std::sort(strips.begin(), strips.end(), [](const Strip& a, const Strip& b) {
+			return a.lit != b.lit ? a.lit < b.lit : a.depth > b.depth;
+		});
 		std::vector<float> line;
-		float floorSign = module->camPitch >= 0.f ? -1.f : 1.f;
+		// No hidden-line fills: each frame used to carry an opaque curtain down
+		// to its layer's floor, and from below the curtains of the nearer
+		// layer blacked out bands of the ones behind it. The lit layer is
+		// drawn over the others instead, so it reads first from any angle.
 		for (const Strip& s : strips) {
 			float yOff = yLayer(T, s.l), z = zRow(T, s.r);
-			bool solid = s.l == curL;
 			float near = fd == nd ? 1.f : (fd - s.depth) / (fd - nd);
 			for (int c = 0; c < T.cols; c++) {
 				float x0, x1; frameGeom(T, (float)c, x0, x1);
 				frameLine(T, T.index(c, s.r, s.l), pts, x0, x1, yOff, z, V, line);
-				// the curtain, down to this layer's floor
-				float fX0, fY0, fX1, fY1, d;
-				V.project(x1, yOff + floorSign * amp(T) * 1.05f, z, fX0, fY0, d);
-				V.project(x0, yOff + floorSign * amp(T) * 1.05f, z, fX1, fY1, d);
 				nvgBeginPath(vg);
 				nvgMoveTo(vg, line[0], line[1]);
 				for (size_t k = 2; k < line.size(); k += 2) nvgLineTo(vg, line[k], line[k + 1]);
-				nvgLineTo(vg, fX0, fY0); nvgLineTo(vg, fX1, fY1); nvgClosePath(vg);
-				nvgFillColor(vg, nvgTransRGBAf(sfs::SCREEN_BG, 0.95f)); nvgFill(vg);
-				nvgBeginPath(vg);
-				nvgMoveTo(vg, line[0], line[1]);
-				for (size_t k = 2; k < line.size(); k += 2) nvgLineTo(vg, line[k], line[k + 1]);
-				nvgStrokeColor(vg, nvgTransRGBAf(sfs::SCREEN_BLUE, solid ? 0.3f + 0.6f * near : 0.12f + 0.12f * near));
-				nvgStrokeWidth(vg, solid ? 0.7f : 0.5f); nvgStroke(vg);
+				float dim = 0.08f + 0.12f * near, lit = 0.35f + 0.6f * near;
+				nvgStrokeColor(vg, nvgTransRGBAf(sfs::SCREEN_BLUE, dim + (lit - dim) * s.lit));
+				nvgStrokeWidth(vg, 0.5f + 0.2f * s.lit); nvgStroke(vg);
 			}
 		}
 
@@ -1614,6 +1702,8 @@ struct StrataDisplay : OpaqueWidget {
 			}
 			nvgStrokeColor(vg, nvgTransRGBAf(sfs::SCREEN_DIM, 0.3f)); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
 		}
+
+		drawAxes(vg, T, V);
 
 		// the sequence: a path through the volume, a dot on each step, the current one ringed
 		if (module->nSteps > 0) {

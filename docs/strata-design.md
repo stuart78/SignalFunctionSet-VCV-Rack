@@ -283,3 +283,10 @@ both stay (decided 2026-10-02). Strata reuses Wave's band-limited mipmap code.
   A cut shorter than a sample cannot be band-limited (64 pieces at 1760 Hz
   measured -28 dB), so **the finest levels give way on high notes**, the way the
   mips thin harmonics: no piece shorter than 6 samples. After that, -58 to -75 dB.
+
+## Fifth round (2026-10-19): the 3D view
+
+- **No hidden-line fill.** Each frame used to carry an opaque fill down to its layer's floor, to hide what was behind it. Seen from below, the fills pointed up, and the nearer layer blacked out bands of the layers behind it. Frames are now lines only.
+- **Brightness follows the voice's height.** Brightness is full on the layer the first voice is in and fades over one layer gap either side (smoothstep). A voice gliding between two layers moves the brightness across rather than switching it. Dimmer layers are drawn first, so the bright one sits on top from any angle.
+- **The box fills the pane.** The pane is about twice as wide as it is tall, so the columns are drawn wider (`StrataView::kx`, at most 3x) until the box, seen from the default angle, has the pane's proportions. This is display only: the listeners and the mix use the same world coordinates as before. It is solved for the default angle rather than the current one, so orbiting does not reshape the table.
+- **The axes are labelled.** X, Y and Z, as the knobs are named, each with its first and last cell numbered. Each label goes on whichever of its four box edges lies furthest out on screen, so it moves to another edge as the view turns.
