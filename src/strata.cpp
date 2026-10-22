@@ -381,7 +381,7 @@ static StrataFile stReadWav(const std::string& path) {
 	// frame size x cols x rows x layers, refusing anything that overflows
 	auto fits = [n](uint64_t a, uint64_t b) { return a && b && a <= n / b; };
 	uint64_t want = gfs;
-	bool grid = gfs && fits(want, gc) && fits(want *= gc, gr) && fits(want *= gr, gl) && (want *= gl) == n;
+	bool grid = gfs && fits(want, gc) && fits(want *= gc, gr) && fits(want *= gr, gl) && want * gl == n;
 	if (grid && gfs <= (uint32_t)INT32_MAX) {
 		f.frameSize = (int)gfs; f.cols = (int)gc; f.rows = (int)gr; f.layers = (int)gl;
 		if (f.layerNames.size() != gl) f.layerNames.clear();
@@ -685,7 +685,7 @@ struct Strata : Module {
 
 	// Load one file (its own grid) or several (each a layer). Runs on a
 	// thread; the table arrives in process() when it is built.
-	void load(std::vector<std::string> paths) {
+	void load(const std::vector<std::string>& paths) {
 		if (paths.empty()) return;
 		if (loader.joinable()) loader.join();
 		loading = true;
@@ -702,7 +702,7 @@ struct Strata : Module {
 	}
 	void waitLoaded() { if (loader.joinable()) loader.join(); }
 
-	static StrataTable* buildFromFiles(std::vector<std::string> paths, StrataConform c, bool sq, std::string& err) {
+	static StrataTable* buildFromFiles(const std::vector<std::string>& paths, StrataConform c, bool sq, std::string& err) {
 		// stacked in the order given, bottom layer first (a folder is sorted
 		// by name before it gets here)
 		std::vector<StrataFile> files;
@@ -1077,7 +1077,8 @@ struct Strata : Module {
 						float at = (float)((base + sl / ratio - a0) / inc) - 1.f;
 						v.bl.add(clamp(at, -0.999999f, 0.f), h, d);
 					};
-					for (double m = std::floor(s0); m <= s1; m += 1.0) {
+					for (int64_t mi = (int64_t)std::floor(s0); (double)mi <= s1; mi++) {
+						double m = (double)mi;
 						// the slave wrapping into cycle m (not the restart at the
 						// start of segment 2, which is the master's)
 						if (m > s0) { float h, d; seam(0.f, 1.f, wHi, wLo, h, d); place(m, h, d); }

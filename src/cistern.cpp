@@ -315,7 +315,7 @@ struct Cistern : Module {
 				cistern::Program* expect = nullptr;
 				cistern::Program* p = P.get();
 				while (running && !incoming.compare_exchange_strong(expect, p)) { expect = nullptr; collect(); std::this_thread::sleep_for(ms5); }
-				if (running) P.release();
+				if (running) { cistern::Program* handed = P.release(); (void)handed; }   // `incoming` owns it now
 			}
 			tracing = false;
 		}

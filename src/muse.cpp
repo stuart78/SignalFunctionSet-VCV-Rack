@@ -643,7 +643,6 @@ struct Muse : Module {
 		if (cvScaleMode == CV_SCALE_VOCT) {
 			cvOut = voctForPitchAddr(addrNow);
 		} else {
-			(void)0;
 			int idx3 = addrNow & 0x7;
 			int oct  = (addrNow >> 3) & 0x1;
 			float pitchSemis = museDegree(idx3) + busScale.period * (float)oct;

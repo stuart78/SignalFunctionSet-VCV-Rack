@@ -382,7 +382,7 @@ struct Builder {
 	Space& s;
 	double solid = 0;                                     // volume the solids take
 	explicit Builder(Space& sp) : s(sp) {}
-	void tri(V3 a, V3 b, V3 c, int mat, const V3& air) {
+	void tri(const V3& a, V3 b, V3 c, int mat, const V3& air) {
 		V3 n = (b - a).cross(c - a);
 		double l = n.len();
 		if (l < 1e-12) return;
@@ -395,7 +395,7 @@ struct Builder {
 	// The big surfaces (floor, lid, walls) are traced as planes and cylinders
 	// and only DRAWN as triangles: a floor as a fan of long slivers gave every
 	// ray a dozen huge bounding boxes to test, and a trace went from 0.2 s to 2.4.
-	void drawTri(V3 a, V3 b, V3 c, int mat, const V3& air) {
+	void drawTri(const V3& a, V3 b, V3 c, int mat, const V3& air) {
 		V3 n = (b - a).cross(c - a);
 		double l = n.len();
 		if (l < 1e-12) return;
