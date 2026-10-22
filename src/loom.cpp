@@ -275,6 +275,10 @@ struct Loom : Module {
 	// note lands somewhere else.
 	float noteOff[LOOM_N] = {};
 	int   lastNearest = -1;
+	// A poly GATE + V/OCT is one note per channel: chanStr[c] is the string
+	// channel c is playing, held while that channel's gate is high.
+	static const int LOOM_CH = 16;
+	int   chanStr[LOOM_CH];
 
 	// Whether patching a string's own output takes it out of the stereo mix.
 	// Off by default: the mix is the instrument, and a player reaching for one
@@ -317,13 +321,14 @@ struct Loom : Module {
 	float internalHz = 6.f;         // auto-play fallback when CLOCK is unpatched
 
 	// ── play state ─────────────────────────────────────────────────────────────
-	dsp::SchmittTrigger gateTrig, clockTrig, resetTrig, resetBtnTrig;
+	dsp::SchmittTrigger gateTrig[LOOM_CH], clockTrig, resetTrig, resetBtnTrig;
 	dsp::SchmittTrigger strTrig[LOOM_N];
 	int   autoIdx = 0, autoWalk = 0;
 	int   geomCount = 0;
 	float intPhase = 0.f;
 
 	Loom() {
+		for (int c = 0; c < LOOM_CH; c++) chanStr[c] = -1;
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 
 		configParam(BODY_PARAM,   0.f, 1.f, 0.45f, "Body resonance", "%", 0.f, 100.f);
@@ -367,9 +372,9 @@ struct Loom : Module {
 		configInput(SPREAD_CV_INPUT, "Strum spread CV (±5V)");
 		configInput(ROOT_CV_INPUT,   "Root CV (1V/oct, semitone-quantized)");
 		configInput(OCT_CV_INPUT,    "Octave CV (1V per octave)");
-		configInput(VOCT_INPUT,      "V/oct — transposes the whole loom");
-		configInput(GATE_INPUT,      "Gate — strums every enabled string");
-		configInput(VEL_INPUT,       "Velocity (0–10V, polyphonic: channel N → string N)");
+		configInput(VOCT_INPUT,      "V/oct (polyphonic: channel N is the note for GATE channel N)");
+		configInput(GATE_INPUT,      "Gate (polyphonic: each channel plays its own note on the nearest free string)");
+		configInput(VEL_INPUT,       "Velocity (0–10V; polyphonic: follows the GATE channel when GATE is poly, otherwise channel N → string N)");
 		configInput(CLOCK_INPUT,     "Clock — advances the auto pattern");
 		configInput(RESET_INPUT,     "Reset the auto pattern");
 		configInput(PATTERN_CV_INPUT, "Auto pattern CV (1V per pattern)");
@@ -497,6 +502,33 @@ struct Loom : Module {
 		return clamp(inputs[VEL_INPUT].getPolyVoltage(i) / 10.f, 0.03f, 1.f);
 	}
 
+	// The enabled string whose own tuning is nearest the note `want` (in
+	// semitones, the frame the strings are measured in), passing over a string
+	// another channel played while it is still held or still ringing, so three
+	// notes struck together, or picked one after another, sound on three
+	// strings instead of re-plucking one and cutting it off. If every string
+	// is busy, the nearest busy one is taken.
+	int nearestString(float want, float base, int self, int nch) {
+		bool taken[LOOM_N] = {};
+		for (int k = 0; k < nch; k++) {
+			int j = chanStr[k];
+			if (k == self || j < 0) continue;
+			bool held = inputs[GATE_INPUT].getVoltage(k) >= 1.f;
+			bool ringing = !str[j].asleep && str[j].amp > 1e-3f;
+			if (held || ringing) taken[j] = true;
+		}
+		for (int pass = 0; pass < 2; pass++) {
+			int best = -1; float bestD = 1e9f;
+			for (int i = 0; i < LOOM_N; i++) {
+				if (!enabled[i] || (pass == 0 && taken[i])) continue;
+				float d = std::fabs(want - (base + tuneOf(i)));
+				if (d < bestD) { bestD = d; best = i; }
+			}
+			if (best >= 0) return best;
+		}
+		return -1;
+	}
+
 	float paramCV(int p, int in, float lo, float hi) {
 		float v = params[p].getValue();
 		if (in >= 0 && inputs[in].isConnected())
@@ -615,32 +647,50 @@ struct Loom : Module {
 			autoIdx = 0; autoWalk = 0; intPhase = 0.f;
 		}
 
-		bool globalGate = inputs[GATE_INPUT].getVoltage() >= 1.f;
-		if (gateTrig.process(inputs[GATE_INPUT].getVoltage(), 0.1f, 1.f)) {
+		// GATE is polyphonic: in NEAREST each channel is a note, at the V/OCT
+		// channel beside it, on a string of its own. Only channel 1 was read,
+		// so a poly cable played its first note and dropped the rest. A STRUM
+		// is the whole instrument at once, so it stays on channel 1.
+		int gch = std::min(inputs[GATE_INPUT].getChannels(), (int)LOOM_CH);
+		bool polyGate = gch > 1;
+		bool anyGate = false;
+		// Every channel's trigger runs every sample, 0V where the cable has no
+		// such channel, so each one is LOW before a channel appears: a trigger
+		// first read HIGH does not fire, and that would drop the first note.
+		for (int c = 0; c < LOOM_CH; c++) {
+			float g = c < gch ? inputs[GATE_INPUT].getVoltage(c) : 0.f;
+			anyGate = anyGate || (c == 0 && g >= 1.f);
+			if (!gateTrig[c].process(g, 0.1f, 1.f) || c >= gch) continue;
 			if (nearestOn) {
 				// The note wanted, in the same semitone frame the strings are
 				// measured in: base plus V/OCT. Each string's own pitch is base
 				// plus its tuning, so the comparison is tuning against V/OCT.
-				float want = (oct + rootSemis / 12.f + voct) * 12.f;
-				int best = -1; float bestD = 1e9f;
-				for (int i = 0; i < LOOM_N; i++) {
-					if (!enabled[i]) continue;
-					float own = (oct + rootSemis / 12.f) * 12.f + tuneOf(i);
-					float d = std::fabs(want - own);
-					if (d < bestD) { bestD = d; best = i; }
-				}
+				float base = (oct + rootSemis / 12.f) * 12.f;
+				float want = (oct + rootSemis / 12.f + inputs[VOCT_INPUT].getPolyVoltage(c)) * 12.f;
+				int best = nearestString(want, base, c, gch);
+				chanStr[c] = best;
 				if (best >= 0) {
 					// Bend that string to the note. Its own tuning stays where
 					// it is -- this is an offset, so the tuning the screen shows
 					// is still the truth about the instrument.
-					noteOff[best] = want - ((oct + rootSemis / 12.f) * 12.f + tuneOf(best));
+					noteOff[best] = want - (base + tuneOf(best));
 					lastNearest = best;
-					pluck(best, velFor(best), -1.f);
+					// a poly GATE takes its velocity from its own channel; a
+					// mono one from the string's, as before
+					float vel = polyGate && inputs[VEL_INPUT].isConnected()
+					          ? clamp(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f, 0.03f, 1.f)
+					          : velFor(best);
+					pluck(best, vel, -1.f);
 				}
-			} else {
+			} else if (c == 0) {
 				strum(1.f, -1.f);
 			}
 		}
+		for (int c = gch; c < LOOM_CH; c++) chanStr[c] = -1;
+		// the strings a held gate is sustaining
+		bool heldStr[LOOM_N] = {};
+		for (int c = 0; c < gch; c++)
+			if (chanStr[c] >= 0 && inputs[GATE_INPUT].getVoltage(c) >= 1.f) heldStr[chanStr[c]] = true;
 
 		bool autoOn = params[AUTO_PARAM].getValue() > 0.5f;
 		lights[AUTO_LIGHT].setBrightness(autoOn ? 1.f : 0.f);
@@ -689,7 +739,7 @@ struct Loom : Module {
 			// Holding all eight is what made a bowed melody sound like a bowed
 			// chord: the exciter runs while gateHeld is true, so every string
 			// would go on being bowed under a single note.
-			bool heldByGlobal = globalGate && (!nearestOn || i == lastNearest);
+			bool heldByGlobal = nearestOn ? heldStr[i] : anyGate;
 			s.gateHeld = enabled[i] && (heldByGlobal || gv >= 1.f);
 			if (s.sustainTimer > 0.f) s.sustainTimer -= args.sampleTime;
 
