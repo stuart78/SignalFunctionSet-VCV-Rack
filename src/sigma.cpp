@@ -80,6 +80,20 @@ static inline float sgLog2n(int n) {
 	return t[n & 255];
 }
 
+// sin(2 pi ph) for ph in [0,1) with no table: folded to |y| <= 1/4 and an
+// odd Taylor polynomial to y^11 (error under 6e-8, below the table's own).
+// Branch-free and gather-free, so the per-partial oscillator loop vectorises,
+// which a table lookup per partial prevents.
+static inline float sgSinPoly(float ph) {
+	float t = ph - 0.5f;                            // sin(2 pi ph) = -sin(2 pi t)
+	float a = std::fabs(t);
+	float y = std::copysign(std::min(a, 0.5f - a), t);
+	float z = y * y;
+	float r = y * (6.28318531f + z * (-41.3417022f + z * (81.6052492f
+	        + z * (-76.7058597f + z * (42.0586940f - z * 15.0946426f)))));
+	return -r;
+}
+
 static inline float sgSin(float ph) {              // ph in [0,1)
 	float f = ph * SG_TBL;
 	int k = (int)f;
@@ -121,6 +135,88 @@ static inline float sgSoftClip(float x) {
 	if (a <= T) return x;
 	return std::copysign(T + K * (1.f - K / (K + a - T)), x);
 }
+// The per-partial envelopes for one voice and one sample: advance() with its
+// divisions taken out (the increments come in precomputed) and its switch
+// written as arithmetic, so there is no branch per partial. A free function
+// with restrict parameters, kept out of line (inlined, the restrict is lost),
+// because through `V.` and `this` the compiler cannot rule out the arrays
+// overlapping. Stage numbers are Sigma::Stage's: 0 idle, 1 attack, 2 decay, 3 sustain,
+// 4 release. Writes each partial's envelope after DEPTH into amt.
+__attribute__((noinline)) static void sgEnvBlock(int np, float* __restrict env, int* __restrict stage,
+                       float* __restrict wait, float* __restrict envMax,
+                       const float* __restrict relFrom, const float* __restrict depth,
+                       const float* __restrict rateOwn, const float* __restrict rateDie,
+                       float* __restrict amt, float att, float dec, float rel, float S, float dt) {
+	for (int p = 0; p < np; p++) {
+		float e = env[p];
+		int st = stage[p];
+		float w = wait[p];
+		float eAtt = e + rateOwn[p] * att;
+		float eDec = e - rateDie[p] * dec;
+		float eRel = e - rateDie[p] * relFrom[p] * rel;
+		// The stage is chosen by multiplying by 0 or 1 rather than by ?:,
+		// because with ?: the compiler loads each stage's inputs only for the
+		// partials in that stage, one branch per partial, which measured
+		// slower than the switch this replaced.
+		float isA = (float)(st == 1), isD = (float)(st == 2);
+		float isS = (float)(st == 3), isR = (float)(st == 4);
+		float ne = isA * std::min(eAtt, 1.f) + isD * std::max(eDec, S)
+		         + isS * S + isR * std::max(eRel, 0.f);
+		// attack -> decay -> sustain step up by one; release -> idle is 4 -> 0
+		int nst = st + (int)(st == 1 && eAtt >= 1.f) + (int)(st == 2 && eDec <= S)
+		        - 4 * (int)(st == 4 && eRel <= 0.f);
+		bool waiting = w > 0.f;                      // ENV SPREAD's start delay
+		wait[p] = waiting ? w - dt : w;
+		e = waiting ? e : ne;
+		env[p] = e;
+		stage[p] = waiting ? st : nst;
+		// DEPTH against the envelope. Below zero the partial blooms from
+		// silence: the distance the envelope has fallen from its own peak
+		// (see the resolve in Sigma::process).
+		float d = depth[p];
+		// (Tracked only while DEPTH is negative. Written as a max against 0
+		// otherwise, since envMax is never below 0: as a select the compiler
+		// turned it into a conditional store and would not vectorise.)
+		float mx = std::max(envMax[p], d < 0.f ? e : 0.f);
+		envMax[p] = mx;
+		amt[p] = d >= 0.f ? 1.f - d + d * e : -d * (mx - e);
+	}
+}
+
+// The lowpass's gain at each partial, re-applied to the level it had before
+// the lowpass at the last resolve: the same expressions, in the same order,
+// as the resolve in Sigma::process, for when only the cutoff has moved.
+__attribute__((noinline)) static void sgFilterBlock(int np, const float* __restrict pre,
+                       const float* __restrict freq, float* __restrict lvOut,
+                       float fc, float Q, float nyq, float fadeLo) {
+	float fcl = std::max(fc, 1.f), iq2 = 1.f / (Q * Q);
+	for (int p = 0; p < np; p++) {
+		float f = freq[p];
+		float w = f / fcl;
+		float w2 = w * w;
+		float den = std::sqrt((1.f - w2) * (1.f - w2) + w2 * iq2);
+		float lv = pre[p] * (1.f / std::max(den, 0.02f));
+		float fade = f > fadeLo ? (nyq - f) / (nyq - fadeLo) : 1.f;
+		lvOut[p] = f >= nyq ? 0.f : lv * fade;
+	}
+}
+
+// The oscillators for one voice and one sample, summed into a stereo pair.
+__attribute__((noinline)) static void sgOscBlock(int np, float* __restrict phase, const float* __restrict incr,
+                       const float* __restrict lv, const float* __restrict amt,
+                       const float* __restrict pl, const float* __restrict pr,
+                       float& outL, float& outR) {
+	float l = 0.f, r = 0.f;
+	for (int p = 0; p < np; p++) {
+		float ph = phase[p] + incr[p];
+		ph -= std::floor(ph);
+		phase[p] = ph;
+		float s = sgSinPoly(ph) * lv[p] * amt[p];
+		l += s * pl[p]; r += s * pr[p];
+	}
+	outL += l; outR += r;
+}
+
 static const int SG_NPRESET = 21;
 
 // The ADSR sliders read in MILLISECONDS. What is stored is a 0..1 position on
@@ -212,6 +308,13 @@ struct Sigma : Module {
 		// the envelope, phase increment, pan gains.
 		float cLv[SG_MAXP] = {}, cInc[SG_MAXP] = {}, cPL[SG_MAXP] = {}, cPR[SG_MAXP] = {};
 		bool  cOver[SG_MAXP] = {};
+		// what the oscillator pass reads: the level with a partial past
+		// Nyquist zeroed, and its increment zeroed so its phase holds there,
+		// as it did when the loop skipped it
+		float cA[SG_MAXP] = {}, cIncE[SG_MAXP] = {};
+		// a partial's level before the lowpass, and its frequency, kept so
+		// the lowpass alone can be re-evaluated between resolves
+		float cPre[SG_MAXP] = {}, cF[SG_MAXP] = {};
 		int   ctl = 0;
 		float mEnv = 0.f; int mStage = ST_IDLE; float mRelFrom = 0.f;
 		float ampGain = 1.f;      // velocity -> level, latched at note-on
@@ -1283,14 +1386,26 @@ struct Sigma : Module {
 
 		bool envRouted = false;
 		for (int t = 0; t < SG_MOD_N; t++) envRouted = envRouted || mod[3][t] != 0.f;
+		// which sources reach a per-partial destination; a source with all
+		// three at zero multiplies the level by 1 and adds 0 to pitch and pan
+		bool envCutOnly = envRouted;
+		for (int t = 0; t < SG_MOD_N; t++) if (t != SG_MOD_CUT && mod[3][t] != 0.f) envCutOnly = false;
+		bool srcRouted[SG_MODSRC];
+		for (int i = 0; i < SG_MODSRC; i++)
+			srcRouted[i] = mod[i][SG_MOD_LEVEL] != 0.f || mod[i][SG_MOD_PITCH] != 0.f || mod[i][SG_MOD_PAN] != 0.f;
 
 		// ── synthesis pass: EVERY voice, not just the patched channels ──────
 		// A released voice is still sounding, so the loop that renders them
 		// cannot be bounded by the cable's channel count.
 		// Each partial's own envelope rate is a knob, not a voice property.
 		float rateOwnP[SG_MAXP];
-		for (int p = 0; p < nPartials; p++)
+		float rateDieP[SG_MAXP];
+		for (int p = 0; p < nPartials; p++) {
 			rateOwnP[p] = mRateOwn[p](pRate[p], [](float r) { return 0.25f * std::pow(16.f, r); });
+			rateDieP[p] = rateOwnP[p] * (1.f + envRate * (float)p * 0.35f);
+		}
+		// advance()'s three divisions, once a sample instead of once a partial
+		EnvInc inc = envInc(dt, A, D, S, R);
 		for (int c = 0; c < SG_VOICES; c++) {
 			Voice& V = voice[c];
 			if (V.mStage == ST_IDLE && !V.on) continue;
@@ -1360,30 +1475,22 @@ struct Sigma : Module {
 			// of Hz at most, are nowhere near 3 kHz and hold fine.
 			const bool envMoving = envRouted
 			    && (V.mStage == ST_ATT || V.mStage == ST_DEC || V.mStage == ST_REL);
-			const bool resolve = envMoving || (V.ctl-- <= 0);
+			// Routed ONLY to CUT, a moving envelope changes nothing per partial
+			// except the lowpass's gain at that partial, so that alone is
+			// re-evaluated every sample and the rest keeps the usual 16.
+			const bool resolve = (envMoving && !envCutOnly) || (V.ctl-- <= 0);
 			if (resolve) V.ctl = SG_MM_CTRL - 1;
-			for (int p = 0; p < nPartials; p++) {
+			const bool filterOnly = envMoving && envCutOnly && !resolve;
+			// The per-partial envelopes: advance() without a branch per
+			// partial (sgEnvBlock), giving the same envelope.
+			float envAmtP[SG_MAXP];
+			sgEnvBlock(nPartials, V.env, V.stage, V.wait, V.envMax, V.relFrom,
+			           pDepth, rateOwnP, rateDieP, envAmtP, inc.att, inc.dec, inc.rel, inc.S, dt);
+			if (resolve) for (int p = 0; p < nPartials; p++) {
 				int n = p + 1;
-
-				// per-partial envelope, at its own rate and after its own wait
-				float rateOwn = rateOwnP[p];                      // 0.25x..4x, per knob move
-				float rateDie = rateOwn * (1.f + envRate * (float)p * 0.35f);
-				if (V.wait[p] > 0.f) { V.wait[p] -= dt; }
-				else advance(V.env[p], V.stage[p], V.relFrom[p],
-				             rateOwn, rateDie, dt, A, D, S, R);
-
-				// DEPTH against the envelope -- per sample, since the envelope is.
 				float d = pDepth[p];
-				float envAmt;
-				if (d >= 0.f) {
-					envAmt = 1.f - d + d * V.env[p];
-				} else {
-					// BLOOM FROM SILENCE: see the comment in the resolve below.
-					if (V.env[p] > V.envMax[p]) V.envMax[p] = V.env[p];
-					envAmt = -d * (V.envMax[p] - V.env[p]);
-				}
-
-				if (resolve) {
+				float envAmt = envAmtP[p];
+				{
 				// ── level ───────────────────────────────────────────────────
 				float lv = pSoft[p] + (pLevel[p] - pSoft[p]) * morph;
 				lv *= SFS_EXP2(-tilt * 2.5f * sgLog2n(n));
@@ -1442,6 +1549,7 @@ struct Sigma : Module {
 
 				// ── LFOs, spread across the partial index ───────────────────
 				for (int i = 0; i < SG_MODSRC; i++) {
+					if (!srcRouted[i]) continue;   // adds nothing: skip its sine
 					// The three LFOs are spread across the partial index; the
 					// envelope is not, because a note does not start at a
 					// different time for each partial -- ENV SPREAD already
@@ -1458,6 +1566,7 @@ struct Sigma : Module {
 				}
 
 				float f = f0 * ratio * SFS_EXP2(cents * (1.f / 1200.f));
+				V.cPre[p] = lv; V.cF[p] = f;
 				// The second-order lowpass magnitude, evaluated at this
 				// partial's own frequency. Resonance is a real peak at fc, not
 				// a fake one -- the maths is the same as the filter's.
@@ -1479,6 +1588,7 @@ struct Sigma : Module {
 				// and the ones past Nyquist are always the high ones, which is
 				// why only part of the picture stuck.
 				V.cLv[p] = lv; V.cOver[p] = over; V.cInc[p] = f * dt;
+				V.cA[p] = over ? 0.f : lv; V.cIncE[p] = over ? 0.f : f * dt;
 				V.cPL[p] = std::sqrt(0.5f * (1.f - pan));   // equal power
 				V.cPR[p] = std::sqrt(0.5f * (1.f + pan));
 				if (c == dispVoice) {
@@ -1488,12 +1598,12 @@ struct Sigma : Module {
 					liveCents[p] = 1200.f * SFS_LOG2(std::max(ratio / (float)n, 1e-6f)) + cents;
 				}
 				}   // resolve
-				if (V.cOver[p]) continue;
-				V.phase[p] += V.cInc[p];
-				V.phase[p] -= std::floor(V.phase[p]);
-				float s = sgSin(V.phase[p]) * V.cLv[p] * envAmt;
-				vL += s * V.cPL[p]; vR += s * V.cPR[p];
 			}
+			if (filterOnly)
+				sgFilterBlock(nPartials, V.cPre, V.cF, V.cA, fc, Q, nyq, fadeLo);
+			// The oscillators, in a loop of their own with nothing in it that
+			// branches or gathers, so it runs four partials at a time.
+			sgOscBlock(nPartials, V.phase, V.cIncE, V.cA, envAmtP, V.cPL, V.cPR, vL, vR);
 
 			// VELOCITY REACHES THE LEVEL AT LAST. Until now V.vel fed the morph
 			// and nothing else, so a pianissimo note was exactly as loud as a
@@ -1529,6 +1639,13 @@ struct Sigma : Module {
 	// A partial's OWN rate (the RATE tab) still scales everything, because that
 	// is a per-partial envelope speed and a user who sets it fast means all of
 	// it. Only the macro spread is confined to decay and release.
+	// advance()'s three divisions, computed once a sample for the per-partial
+	// envelopes in process(), which apply them with selects.
+	struct EnvInc { float att, dec, rel, S; };
+	static EnvInc envInc(float dt, float A, float D, float S, float R) {
+		return {dt / std::max(A, 1e-4f), dt * (1.f - S) / std::max(D, 1e-4f), dt / std::max(R, 1e-4f), S};
+	}
+
 	static void advance(float& e, int& st, float& relFrom,
 	                    float rateAtt, float rateDie, float dt,
 	                    float A, float D, float S, float R) {

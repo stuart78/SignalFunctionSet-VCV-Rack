@@ -39,8 +39,14 @@ consts    = "\n".join(grab(r'static const int %s[^\n]*\n' % c, c) for c in
 # the level chain, exactly as the engine runs it. Since 2026-09-25 it is two
 # blocks: the envelope's share every sample, and the rest at control rate, with
 # the product taken at the output -- so it is lifted as two and multiplied.
-envblock  = between('float d = pDepth[p];',
-                    'envAmt = -d * (V.envMax[p] - V.env[p]);\n\t\t\t\t}', 'envelope share')
+# Since 2026-10-21 the envelope's share is computed in sgEnvBlock(), a free
+# function over arrays, so it is lifted from there and its array names mapped
+# onto the locals levelOf() provides.
+envblock  = between('float d = depth[p];',
+                    'amt[p] = d >= 0.f ? 1.f - d + d * e : -d * (mx - e);', 'envelope share')
+envblock  = ('float e = V_env_p;\n' + envblock.replace('depth[p]', 'pDepth[p]')
+             .replace('envMax[p] = mx;', 'V_emax_p = mx;').replace('envMax[p]', 'V_emax_p')
+             .replace('amt[p] =', 'float envAmt ='))
 lvblock   = between('float lv = pSoft[p] + (pLevel[p] - pSoft[p]) * morph;',
                     '(1.f - std::max(0.f, -oddEven));   // even', 'level chain')
 levelchain = envblock + '\n' + lvblock + '\n\tlv *= envAmt;'
@@ -49,9 +55,12 @@ log2n     = grab(r'static inline float sgLog2n\(int n\) \{.*?\n\}', 'sgLog2n()')
 # verbatim, stands in for the array it fills
 ratef     = grab(r'rateOwnP\[p\] = mRateOwn\[p\]\(pRate\[p\], \[\]\(float r\) \{ return (.*?); \}\);', 'rate formula')
 ratef     = re.search(r'return (.*?); \}', ratef).group(1).replace(', r)', ', pRate[p])')
-ratechain = between('float rateOwn = rateOwnP[p];',
-                    'float rateDie = rateOwn * (1.f + envRate * (float)p * 0.35f);', 'rate')
-ratechain = ratechain.replace('rateOwnP[p]', '(' + ratef + ')')
+ratechain = grab(r'rateDieP\[p\] = rateOwnP\[p\] \* \(1\.f \+ envRate \* \(float\)p \* 0\.35f\);', 'rate')
+ratechain = ('float rateOwn = (' + ratef + ');\n' +
+             ratechain.replace('rateDieP[p] = rateOwnP[p]', 'float rateDie = rateOwn'))
+# the per-partial envelope step the engine runs, and the increments it takes
+envblockfn = grab(r'__attribute__\(\(noinline\)\) static void sgEnvBlock\(.*?\n\}\n', 'sgEnvBlock()')
+envinc    = grab(r'struct EnvInc \{[^}]*\};\n\tstatic EnvInc envInc\(.*?\n\t\}\n', 'envInc()')
 
 gatepass  = between('// \u2500\u2500 gate pass: channels strike voices',
                     'for (int c = nch; c < SG_VOICES; c++) chanVoice[c] = -1;', 'gate pass')
@@ -76,6 +85,8 @@ static const char* SG_MODNAME[SG_MOD_N] = {"LVL","PIT","PAN","TLT","STR","CUT"};
 
 %(softclip)s
 
+%(envblockfn)s
+
 struct P { float v=0.f; void setValue(float x){v=x;} float getValue()const{return v;} };
 
 %(stage)s
@@ -93,7 +104,16 @@ struct Sigma {
 	%(helpers)s
 	%(loadpre)s
 	%(advance)s
+	%(envinc)s
 };
+
+// One partial's envelope for one sample, through the engine's own sgEnvBlock().
+static void partialStep(float& env, int& st, float rel, float rateOwn, float rateDie,
+                        float dt, float A, float D, float S, float R) {
+	Sigma::EnvInc k = Sigma::envInc(dt, A, D, S, R);
+	float w = 0.f, mx = 0.f, dep = 1.f, amt;
+	sgEnvBlock(1, &env, &st, &w, &mx, &rel, &dep, &rateOwn, &rateDie, &amt, k.att, k.dec, k.rel, k.S, dt);
+}
 
 // The gate pass reads VEL; give it an input that reports 10V patched.
 struct Voice {
@@ -428,7 +448,7 @@ int main(int argc, char** argv) {
 				float envRate = (float)e; int p = top;
 				%(ratechain_body)s
 				float env = 0.f, rel = 0.f; int st = ST_ATT; int n = 0;
-				while (st == ST_ATT && n < 48000 * 20) { Sigma::advance(env, st, rel, rateOwn, rateDie, dt, A, D, S, R); n++; }
+				while (st == ST_ATT && n < 48000 * 20) { partialStep(env, st, rel, rateOwn, rateDie, dt, A, D, S, R); n++; }
 				t[e] = (float)n * dt;
 			}
 			if (std::fabs(t[0] - t[1]) > 1e-9f)
@@ -456,7 +476,7 @@ int main(int argc, char** argv) {
 				%(ratechain_body)s
 				// straight to the decay segment: this is about the decay only
 				float env = 1.f, rel = 0.f; int st = ST_DEC; int n = 0;
-				while (st == ST_DEC && n < 48000 * 30) { Sigma::advance(env, st, rel, rateOwn, rateDie, dt, A, D, S, R); n++; }
+				while (st == ST_DEC && n < 48000 * 30) { partialStep(env, st, rel, rateOwn, rateDie, dt, A, D, S, R); n++; }
 				float secs = (float)n * dt;
 				float cyc = secs * (float)(p + 1) * 261.6f;
 				printf("    %%-16s  %%3d   %%5.2f    %%8.2f  %%7.1f%%s\n",
@@ -563,11 +583,11 @@ int main(int argc, char** argv) {
 }
 '''
 # the level chain needs V.env[p] renamed to a plain local
-lc = levelchain.replace('V.envMax[p]', 'V_emax_p').replace('V.env[p]', 'V_env_p')
+lc = levelchain
 H = H.replace('__FASTMATH__', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'fastmath.hpp'))
 open(os.path.join(OUT,'h.cpp'),'w').write(H % dict(
     consts=consts, moddest=moddest, paramenum=paramenum, defaultFor=defaultFor,
     initSpec=initSpec, stage=stage, helpers=helpers, loadpre=loadpre, advance=advance, softclip=softclip, vrandfn=vrandfn, gatepass=gatepass,
-    levelchain_body=lc, log2n=log2n,
+    levelchain_body=lc, log2n=log2n, envblockfn=envblockfn, envinc=envinc,
     ratechain_body=ratechain.replace('pRate[p]', 'm.pRate[p]')))
 print("generated; extracted %d blocks verbatim" % 9)
