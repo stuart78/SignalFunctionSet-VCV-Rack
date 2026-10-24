@@ -30,9 +30,11 @@ Three parts, each worked out from the room:
    the reverb becomes a set of delays, one per arrival time, in three bands.
    The listener hears through a pair of cardioid microphones, so the direction
    a reflection arrives from places it in the stereo image.
-2. **The tail, from the physics.** A 16-line feedback delay network produces
-   the later part of the reverb. Its decay at every octave is set to the room's own, worked out from
-   the room's volume, its surfaces and the air in it.
+2. **The tail, from the room's figures.** A 16-line feedback delay network, a
+   standard reverb design, produces the later part of the reverb. Its decay at
+   every octave is set to what the room's volume, its surfaces and the air in
+   it predict. It follows that predicted decay, not the room's actual echo
+   pattern.
 3. **The handover.** The tail starts where the traced reflections end, at a
    level matched to them, so the join is not heard.
 
@@ -56,8 +58,9 @@ the screen says **TRACING** and the previous version keeps playing.
 | Mosque of the Tree, Jordan | scan | about 1 s |
 | Salt Tower, Lower Room, Tower of London | scan | about 2 s |
 
-Decay times are at the default SIZE and DECAY. Where the sources and the
-listener stand changes the early reflections, not the decay.
+Decay times are what the model calculates at the default SIZE and DECAY, not
+measurements taken in the buildings. Where the sources and the listener stand
+changes the early reflections, not the decay.
 
 **Built** spaces are made from published dimensions. The Dan Harpole Cistern
 is a cylinder on a grid of square columns with flared capitals under a beam
@@ -110,7 +113,7 @@ them.
 |---|---|
 | **SPACE** | Chooses the room. The CV is 1 V per space. |
 | **SIZE** | Scales the room, from a quarter to twice its real size. The tooltip reads the result in metres. |
-| **DECAY** | Sets the decay from a tenth to four times the room's own. The tooltip reads the result in seconds at 500 Hz. |
+| **DECAY** | Sets the decay from a tenth to four times the decay the model calculates for the room. The tooltip reads the result in seconds at 500 Hz. |
 | **SCATTER** | How much of each reflection goes diffuse instead of bouncing like a mirror. Low, a curved wall focuses sound back at you (listen for it in the round cistern); high, the room is smooth. Default 50%. |
 | **HUMID** | The humidity of the air, 10% to 90%. Drier air absorbs more high frequencies, and over the 15 km a sound travels in a 45-second tail that is most of what darkens it. |
 | **MOVE** | Slow movement in the tail's delays, so a long tail does not settle into fixed resonances that sound metallic. |
@@ -164,8 +167,8 @@ opposite ends of Hintze Hall. Each keeps its own place in the stereo image, and
 the room joins them.
 
 **Down the tunnel.** Leake Street, the source near one end and the listener
-near the other. Switch Distance to True to hear how late and quiet a source
-300 m away really is.
+near the other. Switch Distance to True to hear a source 300 m away with the
+delay and level the model gives it.
 
 **A room that grows.** A slow LFO on SIZE. The room swells and shrinks under
 the sound without cutting the tail.

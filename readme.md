@@ -38,7 +38,7 @@ Modules grouped by function:
 **Effects**
 - [Slice](#slice): Cuts a stereo stream onto a grid and reworks each piece
 - [Crystal](#crystal): Quad echo chamber shaped like a real crystal
-- [Cistern](#cistern): Reverb from real rooms, scanned or built from plans
+- [Cistern](#cistern): Reverb modelled on real rooms, scanned or built from plans
 
 **Clocks & Sequencers**
 - [Arrange](#arrange): Song-form sequencer: 8 phrases, 4 per-instrument clock buses
@@ -674,7 +674,7 @@ Named for the Dan Harpole Cistern at Fort Worden, where Pauline Oliveros, Stuart
 **Features:**
 - **The room on the screen.** Each space is drawn at its true proportions, the scans as architectural sections. Drag the two sources and the listener; shift-drag lifts them. Positions are kept per space and saved with the patch.
 - **Stereo from where things stand.** The orange L and R dots are the two sources, one per input (R is normalled to L). The white dot is the listener, a pair of cardioid microphones, so moving a source moves it in the image.
-- **SIZE and DECAY are relative to the real room.** SIZE scales the space from a quarter to twice its size, and DECAY sets the decay from a tenth to four times the room's own. The tooltips read the result in metres and seconds.
+- **SIZE and DECAY are relative to the room.** SIZE scales the space from a quarter to twice its real size, and DECAY sets the decay from a tenth to four times the decay the model calculates for it. The tooltips read the result in metres and seconds.
 - **SCATTER** sets how much of each reflection goes diffuse, from a hard, focused room to a smooth one. **HUMID** is the humidity of the air: drier air absorbs more high frequencies over the length of a long tail. **MOVE** is slow movement in the tail.
 - **Changing space leaves the old room ringing.** The new room starts while the old one rings out in its own acoustic, so a space change never bends the pitch of what is already sounding.
 - **Moving a source never cuts the tail.** A retrace crossfades the early reflections over 40 ms and the tail carries on.

@@ -590,7 +590,7 @@
     {
       "slug": "Cistern",
       "name": "Cistern",
-      "description": "Reverb from real rooms, scanned or built from plans.",
+      "description": "Reverb modelled on real rooms, scanned or built from plans.",
       "tags": [
         "Reverb",
         "Stereo"

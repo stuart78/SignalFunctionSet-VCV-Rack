@@ -134,7 +134,7 @@ struct Cistern : Module {
 	Cistern() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam<SizeQ>(SIZE_PARAM, -2.f, 1.f, 0.f, "Size, against the real room", "", 2.f);
-		configParam<DecayQ>(DECAY_PARAM, DECAY_MIN, 2.f, 0.f, "Decay, against the room's own", "", 2.f);
+		configParam<DecayQ>(DECAY_PARAM, DECAY_MIN, 2.f, 0.f, "Decay, against the room's calculated decay", "", 2.f);
 		configParam(SCATTER_PARAM, 0.f, 1.f, 0.5f, "Scatter (how much of each reflection goes diffuse)", "%", 0.f, 100.f);
 		configParam(HUMID_PARAM, 10.f, 90.f, 50.f, "Humidity (drier air absorbs more high frequencies)", "%");
 		configParam(MOD_PARAM, 0.f, 2.f, 1.f, "Movement in the tail", "%", 0.f, 100.f);
