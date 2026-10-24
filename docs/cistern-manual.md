@@ -2,9 +2,16 @@
 
 ## Overview
 
-Cistern is a reverb whose rooms are real places at their real dimensions. You
-choose a space, place two sources and a listener in it on the screen, and the
-sound is what that space's geometry and materials do to it.
+Cistern is a reverb modelled on the shapes of real places. You choose a space,
+place two sources and a listener in it on the screen, and Cistern works out how
+sound would reflect around that shape, at that size, from where everything
+stands.
+
+It is a model, not a recording of the room. The geometry is simplified, the
+surface materials are estimates, only the first part of the reverb is traced,
+and the decay times are calculated rather than measured in the buildings. Treat
+the rooms as large spaces of the right shape and size with a plausible
+character, not as reproductions of what it sounds like to stand in them.
 
 It is named for the Dan Harpole Cistern at Fort Worden, Port Townsend: an empty
 concrete water tank 57 m across and 4.3 m high, its roof on a grid of concrete
@@ -73,7 +80,12 @@ The screen draws the space at its true proportions: the built cisterns as
 their edges, the scans as architectural sections (vertical cuts across the
 room, one along it, and its footprint).
 
-- **Drag** a source (L or R) or the listener to move it across the floor.
+- The two **orange** dots marked **L** and **R** are the sources: the L input
+  is played from one and the R input from the other. The **white** dot is the
+  listener, a pair of microphones angled toward the sources, and the L and R
+  outputs are what those microphones pick up. (In Strata, L and R are the
+  listeners; here they are the sources.)
+- **Drag** a source or the listener to move it across the floor.
   **Shift-drag** lifts it. Nothing can be moved into a wall.
 - **Drag** an empty part of the screen to turn the view. **Double-click**
   resets the view.
@@ -89,7 +101,7 @@ normalled to L, so a mono signal comes from both sources at once.
 By default distance is **musical**: past 25 m, extra distance counts for less,
 so a source at the far end of a 300 m tunnel arrives late enough to sound far
 away without arriving too late to play with (150 m is heard as about 65 m).
-Choose **True** in the menu to hear delay and level exactly as the room gives
+Choose **True** in the menu for the delay and level as the model calculates
 them.
 
 ## Controls

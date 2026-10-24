@@ -665,7 +665,7 @@ Sixteen crystal habits are built as intersections of half-spaces from symmetry-e
 
 <img src="screenshots/Cistern.png" alt="Cistern panel" height="320"> 
 
-Reverb from real rooms. Each space is a real place at its real dimensions, and the sound is what its geometry and materials do to it. Place two sources and a listener in the room on the screen; Cistern traces rays from each source, keeps what reaches the listener as the early reflections, and hands over to a tail whose decay is set by the room's volume, surfaces and air.
+A reverb modelled on the shapes of real rooms. Place two sources and a listener in the room on the screen; Cistern traces rays from each source, keeps what reaches the listener as the early reflections, and hands over to a tail whose decay is set from the room's volume, surfaces and air. It is a model, not a recording: the geometry is simplified, the materials are estimates and the decay times are calculated, so each room is a space of the right shape and size rather than a reproduction of the real one.
 
 Named for the Dan Harpole Cistern at Fort Worden, where Pauline Oliveros, Stuart Dempster and Panaiotis recorded *Deep Listening* in 1988.
 
@@ -673,7 +673,7 @@ Named for the Dan Harpole Cistern at Fort Worden, where Pauline Oliveros, Stuart
 
 **Features:**
 - **The room on the screen.** Each space is drawn at its true proportions, the scans as architectural sections. Drag the two sources and the listener; shift-drag lifts them. Positions are kept per space and saved with the patch.
-- **Stereo from where things stand.** The listener hears through a pair of cardioid microphones, so moving a source moves it in the image. Each input is its own source; R is normalled to L.
+- **Stereo from where things stand.** The orange L and R dots are the two sources, one per input (R is normalled to L). The white dot is the listener, a pair of cardioid microphones, so moving a source moves it in the image.
 - **SIZE and DECAY are relative to the real room.** SIZE scales the space from a quarter to twice its size, and DECAY sets the decay from a tenth to four times the room's own. The tooltips read the result in metres and seconds.
 - **SCATTER** sets how much of each reflection goes diffuse, from a hard, focused room to a smooth one. **HUMID** is the humidity of the air: drier air absorbs more high frequencies over the length of a long tail. **MOVE** is slow movement in the tail.
 - **Changing space leaves the old room ringing.** The new room starts while the old one rings out in its own acoustic, so a space change never bends the pitch of what is already sounding.
