@@ -179,7 +179,7 @@ int main(int argc, char** argv) {
 		// the decay is checked on the TAIL alone: in a small room with the
 		// source close, the direct sound and the early field are most of the
 		// energy, and the full response's first 25 dB is their fall
-		Program tp = *P; tp.taps.clear();
+		Program tp = *P; tp.taps.clear(); pack(tp);
 		Reverb tr; tr.setProgram(&tp, 1.0, 7);
 		std::vector<float> Mt(n); float a2, b2;
 		for (size_t i = 0; i < n; i++) { float a = i == 0 ? 1.f : 0.f; tr.process(a, a, a2, b2); Mt[i] = 0.5f * (a2 + b2); }

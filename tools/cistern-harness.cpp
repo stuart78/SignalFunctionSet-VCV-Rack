@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
 		// carry the same energy. Crest factor can. Measured on the tail ALONE,
 		// because the early field is meant to be discrete (and the round wall's
 		// focus near 2R/c is a real feature of a round room, reported below).
-		Program tp = *P; tp.taps.clear();
+		Program tp = *P; tp.taps.clear(); pack(tp);
 		Reverb tr; tr.setProgram(&tp, 1.0, 7);
 		int len = (int)((P->tMix + 0.5) * SR); std::vector<float> m(len); float a, b;
 		for (int i = 0; i < len; i++) { float x = i == 0 ? 1.f : 0.f; tr.process(x, x, a, b); m[i] = 0.5f * (a + b); }

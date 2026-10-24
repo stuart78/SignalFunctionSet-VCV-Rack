@@ -11,6 +11,7 @@
 // the frame it reads. Design: docs/strata-design.md.
 // =============================================================================
 #include "plugin.hpp"
+#include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "dr_wav.h"
@@ -151,6 +152,28 @@ struct StrataDown2 {
 		return y;
 	}
 };
+
+// The x4 chain with FOLD and CRUSH at zero, as one filter at 1x: up and
+// down through the halfbands with nothing in between is linear and time
+// invariant, so its impulse response IS the chain (48 taps, a 34.5-sample
+// delay). Measured from the chain itself, so it cannot drift from it. Taps
+// reversed, oldest first, to run against a voice's input history.
+static const int ST_LINN = 64;
+struct StrataLinear {
+	float hr[ST_LINN];
+	StrataLinear() {
+		StrataUp2 u1, u2; StrataDown2 d2, d1;
+		float h[ST_LINN];
+		for (int n = 0; n < ST_LINN; n++) {
+			float z2[2], z4[2], y2[2];
+			u1.process(n == 0 ? 1.f : 0.f, z2);
+			for (int j = 0; j < 2; j++) { u2.process(z2[j], z4); y2[j] = d2.process(z4[0], z4[1]); }
+			h[n] = d1.process(y2[0], y2[1]);
+		}
+		for (int j = 0; j < ST_LINN; j++) hr[j] = h[ST_LINN - 1 - j];
+	}
+};
+static const StrataLinear& stLinear() { static StrataLinear l; return l; }
 
 // CRUSH: a mid-tread quantiser of step d, and its antiderivative for ADAA.
 // F is even and, between steps, a straight line: n(n-1)/2 whole steps under
@@ -455,6 +478,14 @@ struct Strata : Module {
 		double crushX = 0.0;                          // the crusher's, the same
 		StrataUp2 up1, up2;                           // the folder's x4: 1x to 2x, then 2x to 4x
 		StrataDown2 dn1, dn2;
+		// With FOLD and CRUSH both at zero the x4 chain is linear, and the
+		// whole of it is one filter at 1x (stLinear()); this voice runs that
+		// instead, from its last 64 inputs, until either knob moves
+		float lin[2 * ST_LINN] = {};                  // the inputs, written twice so they read contiguously
+		int linPos = 0;
+		bool chain = false;                           // the x4 chain is running
+		int linRun = 0;                               // samples the chain has run linear
+		sfs::Memo mMip, mShuf;                        // the two log2s a sample, which move only with the pitch
 		dsp::SchmittTrigger hard;
 		StrataBl bl;                                  // band-limits sync's restart and warp's corners
 		float px = 0.f, py = 0.f, pz = 0.f;       // where it read, for the outputs and the screen
@@ -947,7 +978,7 @@ struct Strata : Module {
 			// sweeps; the cost is that the top octave of harmonics fades out
 			// before Nyquist. Half an octave of margin was tried first and the
 			// harness measured the level being faded out aliasing at -36 dB.
-			float lf = std::log2(std::max(eff * (float)ST_N, 1e-9f)) + 1.f + darken;
+			float lf = v.mMip(std::max(eff * (float)ST_N, 1e-9f), [](float x) { return std::log2(x); }) + 1.f + darken;
 			lf = clamp(lf, 0.f, (float)(ST_LEVELS - 1));
 			int k0 = (int)lf; float kf = lf - k0;
 			int k1 = std::min(k0 + 1, ST_LEVELS - 1);
@@ -1005,7 +1036,7 @@ struct Strata : Module {
 			float shLv = shL;
 			{
 				float perPiece = 1.f / std::max(ratio * (float)inc * std::max(wLo, wHi) * ST_SHUF_MIN, 1e-9f);
-				shLv = std::min(shLv, std::max(std::log2(perPiece), 0.f));
+				shLv = std::min(shLv, std::max(v.mShuf(perPiece, [](float x) { return std::log2(x); }), 0.f));
 			}
 			int shK = std::min((int)shLv, ST_SHUF_K);
 			float shF = shK == ST_SHUF_K ? 0.f : shLv - shK;
@@ -1137,7 +1168,39 @@ struct Strata : Module {
 			// fades in over the first tenth of the knob; the halfband stages run
 			// even at zero, where they are flat, so the latency never switches.
 			// The 2x-to-4x stages run at the 2x rate: fed twice a sample.
-			{
+			v.lin[v.linPos] = v.lin[v.linPos + ST_LINN] = s;
+			v.linPos = (v.linPos + 1) & (ST_LINN - 1);
+			// The chain only runs while it can change something: FOLD or CRUSH
+			// up, or within 64 samples of either coming back down (what they
+			// did is still in its filters). Otherwise the 1x filter gives the
+			// same output. Starting the chain refills it from the last 63
+			// inputs, all of which went through it linear, so it is in exactly
+			// the state it would be in had it run all along.
+			bool shaped = fold > 0.f || crushD > 0.f;
+			if (shaped) {
+				if (!v.chain) {
+					v.up1 = StrataUp2(); v.up2 = StrataUp2(); v.dn1 = StrataDown2(); v.dn2 = StrataDown2();
+					for (int i = 0; i < ST_LINN - 1; i++) {
+						float z2[2], z4[2], y2[2];
+						v.up1.process(v.lin[v.linPos + i], z2);
+						for (int j = 0; j < 2; j++) {
+							v.up2.process(z2[j], z4);
+							v.foldX = z4[1]; v.crushX = z4[1];   // what the loop below leaves at FOLD/CRUSH zero
+							y2[j] = v.dn2.process(z4[0], z4[1]);
+						}
+						v.dn1.process(y2[0], y2[1]);
+					}
+					v.chain = true;
+				}
+				v.linRun = 0;
+			} else if (v.chain && ++v.linRun > ST_LINN) v.chain = false;
+			if (!v.chain) {
+				const float* hr = stLinear().hr;
+				const float* x = v.lin + v.linPos;           // oldest first; x[ST_LINN - 1] is s
+				float acc = 0.f;
+				for (int i = 0; i < ST_LINN; i++) acc += hr[i] * x[i];
+				s = acc;
+			} else {
 				float z2[2], z4[2], y2[2];
 				v.up1.process(s, z2);
 				float adaa = std::min(fold * 10.f, 1.f);

@@ -673,8 +673,16 @@ inline Space makeBasilica() {
 static const int RB = 3;                                   // render bands: low, mid, high
 static const int NSRC = 2;                                 // sources: one per input channel
 struct Tap { int delay; int in; float g[2][RB]; };        // which input, per ear, per render band
+// A tap as the audio thread reads it: both ears' three band gains padded to
+// four, so one tap is two four-wide multiply-adds against the four floats a
+// history sample occupies (the fourth is zero on both sides). Built by
+// pack() on the worker, never on the audio thread.
+typedef float cs4 __attribute__((vector_size(16)));
+static inline cs4 cs4load(const float* p) { cs4 v; std::memcpy(&v, p, sizeof v); return v; }
+struct PackedTap { float gL[4], gR[4]; int delay; };
 struct Program {
 	std::vector<Tap> taps;
+	std::vector<PackedTap> packed[NSRC];                   // the taps by source, for the audio thread
 	int maxDelay = 1;
 	double t60[NB] = {};                                   // the room's decay per band
 	double t60x8k = 1;                                     // and at 8 kHz, for the tail's filter
@@ -963,12 +971,24 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 inline void calibrate(Program& P, double modAmt, uint64_t seed);
 // A traced early field made playable at a decay: the tail calibrated against
 // it, the early taps faded where the tail comes in, and the wet level set.
+// the taps split by source and padded to four bands: what Reverb::early reads
+inline void pack(Program& P) {
+	for (int k = 0; k < NSRC; k++) P.packed[k].clear();
+	for (const Tap& t : P.taps) {
+		PackedTap q;
+		for (int r = 0; r < 4; r++) { q.gL[r] = r < RB ? t.g[0][r] : 0.f; q.gR[r] = r < RB ? t.g[1][r] : 0.f; }
+		q.delay = t.delay;
+		P.packed[t.in].push_back(q);
+	}
+}
+
 inline std::unique_ptr<Program> assemble(const Program& traced, double decay, double modAmt = 1.0, uint64_t seed = 7) {
 	std::unique_ptr<Program> P(new Program(traced));
 	P->decay = decay;
 	for (int b = 0; b < NB; b++) P->t60[b] *= decay;
 	P->t60x8k *= decay;
 	calibrate(*P, modAmt, seed);
+	pack(*P);
 	return P;
 }
 
@@ -1266,6 +1286,12 @@ struct Reverb {
 	std::vector<float> hist[NSRC];
 	std::vector<float> tbuf;                                // the tail's feed, delayed
 	int w = 0, hmask = 0;
+	// samples since anything but zero went into the history: past a program's
+	// longest delay every tap reads zero and early() has nothing to add. The
+	// band split decays to exactly zero (it underflows) within a few thousand
+	// samples of silence, so this is exact, and it covers a room ringing out
+	// after a SPACE change, which is only ever fed silence.
+	int quietFor = 0;
 	float lp1[NSRC] = {}, lp2[NSRC] = {};
 	float a1 = 0, a2 = 0;
 	float inGain = 1.f, inStep = 0.f;
@@ -1278,7 +1304,7 @@ struct Reverb {
 		int size = 1; while (size < (int)(HIST_SEC * sr)) size <<= 1;
 		hmask = size - 1;
 		for (int k = 0; k < NSRC; k++) hist[k].assign((size_t)size * 4, 0.f);
-		tbuf.assign(size, 0.f); w = 0;
+		tbuf.assign(size, 0.f); w = 0; quietFor = 0;
 		for (int k = 0; k < NSRC; k++) lp1[k] = lp2[k] = 0.f;
 		a1 = 1.f - (float)std::exp(-2 * M_PI * 300.0 / sr);
 		a2 = 1.f - (float)std::exp(-2 * M_PI * 3000.0 / sr);
@@ -1301,15 +1327,22 @@ struct Reverb {
 	float wetNorm() const { return prev ? (float)(prev->wetNorm + (cur->wetNorm - prev->wetNorm) * fade) : (float)cur->wetNorm; }
 	void setMod(double amt) { tail.setMod(amt); }
 
+	// The early taps: per source, each tap's three bands for both ears as two
+	// four-wide multiply-adds (the history's pad and the gains' pad are both
+	// zero). Skipped outright once every sample a tap could read is zero.
 	inline void early(const Program* P, float g, float& l, float& r) {
-		const float* h[NSRC] = {hist[0].data(), hist[1].data()};
-		float sl = 0.f, sr2 = 0.f;
-		for (const Tap& t : P->taps) {
-			const float* b = h[t.in] + (size_t)((w - t.delay) & hmask) * 4;
-			sl  += t.g[0][0] * b[0] + t.g[0][1] * b[1] + t.g[0][2] * b[2];
-			sr2 += t.g[1][0] * b[0] + t.g[1][1] * b[1] + t.g[1][2] * b[2];
+		if (quietFor >= P->maxDelay) return;
+		cs4 accL = {0.f, 0.f, 0.f, 0.f}, accR = accL;
+		for (int k = 0; k < NSRC; k++) {
+			const float* h = hist[k].data();
+			for (const PackedTap& t : P->packed[k]) {
+				cs4 b = cs4load(h + (size_t)((w - t.delay) & hmask) * 4);
+				accL += b * cs4load(t.gL);
+				accR += b * cs4load(t.gR);
+			}
 		}
-		l += g * sl; r += g * sr2;
+		l += g * (accL[0] + accL[1] + accL[2] + accL[3]);
+		r += g * (accR[0] + accR[1] + accR[2] + accR[3]);
 	}
 	void process(float inL, float inR, float& outL, float& outR) {
 		// FREEZE: the loop goes lossless and the input is shut out of it
@@ -1321,13 +1354,16 @@ struct Reverb {
 		// in, sound already in the room keeps the level it entered at.
 		float g = inGain * wetNorm();
 		float in[NSRC] = {inL * g, inR * g};
+		bool wrote = false;
 		for (int k = 0; k < NSRC; k++) {
 			// the input split into the render bands, complementary
 			lp1[k] += (in[k] - lp1[k]) * a1; float rest = in[k] - lp1[k];
 			lp2[k] += (rest - lp2[k]) * a2; float hi = rest - lp2[k], mid = rest - hi;
 			float* hw = hist[k].data() + (size_t)w * 4;
 			hw[0] = lp1[k]; hw[1] = mid; hw[2] = hi;
+			wrote = wrote || lp1[k] != 0.f || mid != 0.f || hi != 0.f;
 		}
+		quietFor = wrote ? 0 : std::min(quietFor + 1, 1 << 30);
 		tbuf[w] = 0.5f * (in[0] + in[1]);
 		float l = 0, r = 0;
 		float td;
