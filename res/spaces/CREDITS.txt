@@ -14,4 +14,5 @@ stourton.bin    "Church Of St Peter Stourton" (https://skfb.ly/oGNzU) by artflet
 mosque.bin      "Mosque of Tree of Al Buqayawiyya, Jordan" (https://skfb.ly/oZYxr) by SJoudeh
 salt.bin        "Salt Tower Lower Room" (https://skfb.ly/oNoqN) by artfletch
 
-The Dan Harpole Cistern is built from its published dimensions, not a scan.
+The Dan Harpole Cistern, the Buffalo Bayou Cistern and the Basilica Cistern
+are built from published dimensions, not scans.

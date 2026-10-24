@@ -29,6 +29,7 @@ Modules grouped by function:
   - [PolyKit In (Expander)](#polykit-in-expander): every input of every instrument as its own jack
 - [Wheel](#wheel): Hurdy-gurdy drone instrument, one wheel bowing six strings
 - [Carillon](#carillon): Twenty-five bells joined by rods you draw
+- [Strata](#strata): A wavetable voice you travel through in three dimensions
 
 **Filters & Resonators**
 - [Band](#band): Harmonic bandpass bank (isolate individual harmonics)
@@ -37,6 +38,7 @@ Modules grouped by function:
 **Effects**
 - [Slice](#slice): Cuts a stereo stream onto a grid and reworks each piece
 - [Crystal](#crystal): Quad echo chamber shaped like a real crystal
+- [Cistern](#cistern): Reverb from real rooms, scanned or built from plans
 
 **Clocks & Sequencers**
 - [Arrange](#arrange): Song-form sequencer: 8 phrases, 4 per-instrument clock buses
@@ -528,6 +530,32 @@ Twenty-five tuned bells, one for every semitone of two octaves round the root, j
 
 **Context menu:** Layout, tuning order, register, lift the felts, rod presets, reset mic positions.
 
+#### Strata
+
+<img src="screenshots/Strata.png" alt="Strata panel" height="320"> 
+
+A wavetable voice you travel through. A table here is a volume of single-cycle frames: columns, rows and layers, up to 16 of each and 1024 frames in all. The sound is one point in that volume, and everything Strata does is about where that point is and how it moves. Between grid points the frames are blended, never stepped.
+
+Strata plays what WaveStack builds. WaveStack writes the table's shape into the WAV (an open `wt3d` chunk), so a 3D table opens as a 3D table; any other wavetable WAV opens as a row.
+
+**Features:**
+- **X, Y and Z place the point.** Knobs span the table, and the CVs add 1 V per cell, so a sequencer can step cell by cell. Each axis clamps or wraps at its edge (menu). X, Y and Z outputs report where each voice is reading.
+- **Polyphonic.** Sixteen voices, each with its own V/OCT, FM, X, Y and Z, so a chord can spread across the table.
+- **Waypoints.** Click frames on the screen to lay up to sixteen; CLOCK steps through them and GLIDE travels between them. Glide is rate-based by default, so a long move takes longer than a short one, and the path runs straight through the volume or along the grid.
+- **Shape what is read.** WARP bends the cycle's phase, FOLD folds it, TILT darkens or brightens it, and SYNC runs it 1x to 8x against the pitch, with a HARD sync input.
+- **Corrupt the read.** RATE reads more or less than one frame per cycle and START offsets where the read begins, so a cycle stops lining up with a frame. CRUSH reduces the bit depth, and SHUFFLE cuts the cycle into 2 to 64 pieces and reorders them.
+- **Anti-aliased, and measured.** Every frame is band-limited per octave, FOLD and CRUSH run at four times the sample rate, and the seams that WARP, SYNC, SHUFFLE and the read controls create are smoothed with band-limited steps.
+- **Two listeners in the cube.** The L and R outputs hear every voice from two points you drag inside the volume, louder the nearer a voice reads. ROT X, Y and Z turn the pair around the cube's centre.
+- **Factory tables** in 1D, 2D and 3D, and any table can have layers added on top of it.
+
+**Controls:** Freq, FM, X, Y, Z, Glide, Warp, Fold, Tilt, Sync, Rate, Start, Crush, Shuffle, Rot X, Rot Y, Rot Z.
+**Inputs:** V/OCT, FM, X, Y, Z (all poly), Hard sync (poly), Clock, Reset, and a CV for every other control.
+**Outputs:** Out (poly), X, Y, Z (poly), Step, L, R.
+
+**Context menu:** Load a table or a folder of tables as layers, factory tables, add or remove a layer, conform at load (normalize, remove DC, align zero crossings), waypoints, glide (rate or time), path (straight or along the grid), edges (clamp or wrap per axis), new shuffle order, reset the listeners.
+
+Full detail in the [Strata manual](docs/strata-manual.md).
+
 ### Filters & Resonators
 
 #### Band
@@ -632,6 +660,36 @@ Sixteen crystal habits are built as intersections of half-spaces from symmetry-e
 **Outputs:** Quad A / B / C / D.
 
 **Context menu:** Solid faces (occlusion), Draw on the panel (no screen), Ping alternates A / B, Repeat pitch.
+
+#### Cistern
+
+<img src="screenshots/Cistern.png" alt="Cistern panel" height="320"> 
+
+Reverb from real rooms. Each space is a real place at its real dimensions, and the sound is what its geometry and materials do to it. Place two sources and a listener in the room on the screen; Cistern traces rays from each source, keeps what reaches the listener as the early reflections, and hands over to a tail whose decay is set by the room's volume, surfaces and air.
+
+Named for the Dan Harpole Cistern at Fort Worden, where Pauline Oliveros, Stuart Dempster and Panaiotis recorded *Deep Listening* in 1988.
+
+**Twelve spaces.** Three are built from published dimensions: the Dan Harpole Cistern (round, 57 m across and 4.3 m high, on a grid of concrete columns), the Buffalo Bayou Cistern in Houston (221 columns over a water floor) and the Basilica Cistern in Istanbul (336 columns under brick vaults). Nine are photogrammetry scans: the Pantheon, Hintze Hall at the Natural History Museum, the Leake Street tunnel, an old church, the undercroft of Lincoln's Inn Chapel, St Bartholomew-the-Less, St Peter at Stourton, a mosque in Jordan, and the lower room of the Salt Tower at the Tower of London. Decay times run from about 1 s to over 20 s.
+
+**Features:**
+- **The room on the screen.** Each space is drawn at its true proportions, the scans as architectural sections. Drag the two sources and the listener; shift-drag lifts them. Positions are kept per space and saved with the patch.
+- **Stereo from where things stand.** The listener hears through a pair of cardioid microphones, so moving a source moves it in the image. Each input is its own source; R is normalled to L.
+- **SIZE and DECAY are relative to the real room.** SIZE scales the space from a quarter to twice its size, and DECAY sets the decay from a tenth to four times the room's own. The tooltips read the result in metres and seconds.
+- **SCATTER** sets how much of each reflection goes diffuse, from a hard, focused room to a smooth one. **HUMID** is the humidity of the air: drier air absorbs more high frequencies over the length of a long tail. **MOVE** is slow movement in the tail.
+- **Changing space leaves the old room ringing.** The new room starts while the old one rings out in its own acoustic, so a space change never bends the pitch of what is already sounding.
+- **Moving a source never cuts the tail.** A retrace crossfades the early reflections over 40 ms and the tail carries on.
+- **Distance is musical by default.** Past 25 m, extra distance counts for less, so a source at the far end of a long tunnel stays usable. True distance is in the menu.
+- **FREEZE** holds the tail and shuts the input out of it.
+
+**Controls:** Space, Size, Decay, Scatter, Humid, Move, Mix, Freeze.
+**Inputs:** L, R (normalled to L), Freeze gate, and a CV for every control.
+**Outputs:** L, R.
+
+**Context menu:** Space, distance (musical or true), reset the positions, reset the view, scan credits. The **CREDITS** button on the screen lists every scan with its author and link.
+
+**Scan credits** (all CC BY 4.0): "The Pantheon Interior", "Hintze Hall", "Leake Street Graffiti Tunnel", "Lincoln's Inn Chapel Undercroft", "St Bartholomew-the-Less Interior", "Church Of St Peter Stourton" and "Salt Tower Lower Room" by artfletch; "Old church modeling - Interior Scene" by Aurélien Martel; "Mosque of Tree of Al Buqayawiyya, Jordan" by SJoudeh. Links in the [Cistern manual](docs/cistern-manual.md#scan-credits) and `res/spaces/CREDITS.txt`.
+
+Full detail in the [Cistern manual](docs/cistern-manual.md).
 
 ### Clocks & Sequencers
 
