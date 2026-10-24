@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.22.1",
+  "version": "2.23.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -585,8 +585,7 @@
       "tags": [
         "Oscillator",
         "Polyphonic"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Cistern",
@@ -595,8 +594,7 @@
       "tags": [
         "Reverb",
         "Stereo"
-      ],
-      "hidden": true
+      ]
     }
   ]
 }
