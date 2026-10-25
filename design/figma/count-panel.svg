@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="1517.7166" viewBox="0 0 480 1517.7166">
+  <!-- Count: 8HP at 4x, geometry read from src/count.cpp. Design layer only. -->
+  <g id="Background" data-name="Background">
+    <rect x="0" y="0" width="480" height="1517.7166" fill="#f0f0f0"/>
+  </g>
+  <g id="Plates" data-name="Plates">
+    <!-- none: see PLATES in tools/panel_reticules.py -->
+  </g>
+  <g id="Reticules" data-name="Reticules">
+    <rect x="30.9449" y="120" width="418.937" height="180" rx="15" fill="#1a1a32"/>
+    <circle cx="165" cy="404.5276" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="285" cy="404.5276" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="405" cy="404.5276" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="165" cy="570.4725" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="285" cy="570.4725" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="405" cy="570.4725" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="60" cy="404.5276" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="60" cy="570.4725" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="750" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="885.8268" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="1020.4725" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="1155.1181" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="1289.7638" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="135.4724" cy="1425.5906" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="750" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="885.8268" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="1020.4725" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="1155.1181" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="1289.7638" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="255.4724" cy="1425.5906" r="37.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="750" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="885.8268" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="1020.4725" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="1155.1181" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="1289.7638" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+    <circle cx="389.4095" cy="1425.5906" r="52.5" fill="none" stroke="#b2b2b2" stroke-width="2"/>
+  </g>
+  <g id="Labels (mock)" data-name="Labels (mock)">
+
+  </g>
+  <g id="Logo" data-name="Logo">
+    <g id="Logo" transform="translate(280.748 75.000) scale(1.000002) translate(-1331 -75)">
+  <path d="M1331 90.0028H1336V85.0019H1341V95.0037H1346V80.0009H1351V100.005H1356V75H1361V100.005H1366V85.0019H1371V95.0037H1376V90.0028H1381" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M1388.38 100.005L1403.37 75C1403.37 80.4594 1407.58 90.0028 1413.38 90.0028H1433.38L1438.38 100.005" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1455.21 75H1450.21V105.006H1455.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1495.21 75H1500.21V105.006H1495.21" stroke="#4A4A4A" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 77.6255L1470.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1470.21 77.6255L1460.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 92.6284L1470.21 102.63" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1460.21 102.63L1470.21 92.6284" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1480.21 77.6255L1490.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1490.21 77.6255L1480.21 87.6274" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+  <path d="M1490.21 92.6284H1480.21V102.63H1490.21V92.6284Z" stroke="#4A4A4A" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+</g>
+  </g>
+</svg>

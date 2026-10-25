@@ -121,6 +121,45 @@ int main() {
 		check(std::fabs(m.bpmEff - 100.f) < 0.5f, string::f("measured %.1f BPM", m.bpmEff));
 	}
 
+	printf("== RUN and RST ==\n");
+	{
+		Count m; rack::engine::Module::ProcessArgs a; a.sampleRate = SR; a.sampleTime = 1.f / SR; int64_t frame = 0;
+		auto run = [&](float sec, int& pulses) { bool was = false; pulses = 0;
+			for (int s = 0; s < (int)(sec * SR); s++) { a.frame = frame++; m.process(a);
+				bool h = m.outputs[Count::GATE_OUTPUT].getVoltage() > 5.f; if (h && !was) pulses++; was = h; } };
+		int p;
+		run(1.f, p);                                         // 120 BPM: 2 beats
+		check(p == 2 && m.params[Count::RUN_PARAM].getValue() > 0.5f, string::f("running by default: %d pulses in a second", p));
+		double held = m.phase;
+		m.params[Count::RUN_PARAM].setValue(0.f);
+		run(1.f, p);
+		check(p == 0 && m.phase == held, string::f("stopped: %d pulses, the beat held at %.3f", p, m.phase));
+		m.params[Count::RUN_PARAM].setValue(1.f);
+		run(0.01f, p);
+		check(m.phase > held && m.phase < held + 0.1, string::f("resumed from where it stopped (%.3f)", m.phase));
+		m.params[Count::RUN_PARAM].setValue(0.f); run(0.1f, p);
+		m.resetOnRun = true; m.params[Count::RUN_PARAM].setValue(1.f);
+		run(0.01f, p);
+		check(m.phase < 0.05, string::f("with Reset when RUN starts: back to the top (%.3f)", m.phase));
+		run(0.7f, p);
+		m.params[Count::RESET_PARAM].setValue(1.f); run(0.001f, p); m.params[Count::RESET_PARAM].setValue(0.f);
+		check(m.phase < 0.01, string::f("RST resets (%.4f)", m.phase));
+	}
+	{
+		// an external clock is ignored while stopped, and its period survives the stop
+		Count m; rack::engine::Module::ProcessArgs a; a.sampleRate = SR; a.sampleTime = 1.f / SR; int64_t frame = 0;
+		sfs::previewConnect(m.inputs[Count::CLOCK_INPUT], 1);
+		int period = (int)(0.6f * SR);
+		auto clock = [&](int beats) { for (int s = 0; s < period * beats; s++) {
+			m.inputs[Count::CLOCK_INPUT].setVoltage((s % period) < 100 ? 10.f : 0.f); a.frame = frame++; m.process(a); } };
+		clock(4);
+		long before = m.extBeats;
+		m.params[Count::RUN_PARAM].setValue(0.f); clock(3);
+		check(m.extBeats == before, string::f("stopped: clock pulses not counted (%ld before, %ld after)", before, m.extBeats));
+		m.params[Count::RUN_PARAM].setValue(1.f); clock(2);
+		check(std::fabs(m.bpmEff - 100.f) < 0.5f && m.extBeats == before + 2, string::f("resumed: %.1f BPM, the gap across the stop not taken as a period", m.bpmEff));
+	}
+
 	printf("\n%d failure(s)\n", fails);
 	return fails ? 1 : 0;
 }

@@ -109,10 +109,13 @@ struct CtMaskQ : ParamQuantity {
 };
 
 struct Count : Module {
-	enum ParamId { BPM_PARAM, STEPS_PARAM, ENUMS(DIV_PARAM, CT_N), ENUMS(MASK_PARAM, CT_N), PARAMS_LEN };
+	enum ParamId { BPM_PARAM, STEPS_PARAM, ENUMS(DIV_PARAM, CT_N), ENUMS(MASK_PARAM, CT_N),
+	               // ── appended 2026-10; do not reorder ──
+	               RUN_PARAM, RESET_PARAM,
+	               PARAMS_LEN };
 	enum InputId { BPM_INPUT, STEPS_INPUT, CLOCK_INPUT, RESET_INPUT, INPUTS_LEN };
 	enum OutputId { ENUMS(GATE_OUTPUT, CT_N), OUTPUTS_LEN };
-	enum LightId { LIGHTS_LEN };
+	enum LightId { RUN_LIGHT, LIGHTS_LEN };
 
 	double phase = 0.0;                      // beats since reset
 	int    steps = 16;
@@ -137,6 +140,13 @@ struct Count : Module {
 	double sinceEdge = 0.0;
 	long   extBeats = 0;                     // pulses seen since reset
 	bool   extValid = false;
+	// RUN: stopped, the beat holds where it is, the outputs stay low and an
+	// external clock's pulses are ignored. On by default, so a patch saved
+	// before RUN existed keeps playing.
+	bool   wasRunning = true;
+	bool   resetOnRun = false;               // menu: start from the top when RUN comes on
+	bool   skipMeasure = false;              // the first clock edge after a stop is not a period
+	dsp::SchmittTrigger resetBtnTrig;
 
 	Count() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -154,6 +164,8 @@ struct Count : Module {
 		configInput(STEPS_INPUT, "Steps CV (+-5V = +-16 steps)");
 		configInput(CLOCK_INPUT, "Clock in, one pulse per beat (overrides BPM)");
 		configInput(RESET_INPUT, "Reset");
+		configSwitch(RUN_PARAM, 0.f, 1.f, 1.f, "Run", {"Stopped", "Running"});
+		configButton(RESET_PARAM, "Reset");
 	}
 
 	void reset() {
@@ -164,7 +176,22 @@ struct Count : Module {
 	void process(const ProcessArgs& args) override {
 		float dt = args.sampleTime;
 		steps = clamp((int)std::round(params[STEPS_PARAM].getValue() + inputs[STEPS_INPUT].getVoltage() * 3.2f), 1, CT_MAXSTEPS);
-		if (resetTrig.process(inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f)) reset();
+		bool resetIn = resetTrig.process(inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f);
+		bool resetBtn = resetBtnTrig.process(params[RESET_PARAM].getValue() > 0.5f ? 10.f : 0.f, 0.1f, 1.f);
+		if (resetIn || resetBtn) reset();
+		bool running = params[RUN_PARAM].getValue() > 0.5f;
+		lights[RUN_LIGHT].setBrightness(running ? 1.f : 0.f);
+		if (running && !wasRunning) {
+			if (resetOnRun) reset();
+			skipMeasure = true;
+		}
+		wasRunning = running;
+		if (!running) {
+			// held: no beat, no edges counted, every output low
+			if (inputs[CLOCK_INPUT].isConnected()) { clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f); sinceEdge += dt; }
+			for (int i = 0; i < CT_N; i++) { out[i].trig.process(dt); outputs[GATE_OUTPUT + i].setVoltage(0.f); }
+			return;
+		}
 
 		// ── the beat ─────────────────────────────────────────────────────
 		// Internal: BPM plus CV. External: the beat is the pulse, measured
@@ -174,7 +201,9 @@ struct Count : Module {
 		if (ext) {
 			sinceEdge += dt;
 			if (clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f)) {
-				if (sinceEdge > 0.01 && sinceEdge < 10.0) { extPeriod = sinceEdge; extValid = true; }
+				// (the gap across a stop is not a period: keep the last one)
+				if (!skipMeasure && sinceEdge > 0.01 && sinceEdge < 10.0) { extPeriod = sinceEdge; extValid = true; }
+				skipMeasure = false;
 				sinceEdge = 0.0;
 				phase = (double)extBeats;
 				extBeats++;
@@ -216,6 +245,7 @@ struct Count : Module {
 	json_t* dataToJson() override {
 		json_t* r = json_object();
 		json_object_set_new(r, "gateMode", json_integer(gateMode));
+		json_object_set_new(r, "resetOnRun", json_boolean(resetOnRun));
 		json_t* rots = json_array();
 		for (int i = 0; i < CT_N; i++) json_array_append_new(rots, json_integer(out[i].rot));
 		json_object_set_new(r, "rot", rots);
@@ -226,6 +256,7 @@ struct Count : Module {
 	}
 	void dataFromJson(json_t* r) override {
 		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "resetOnRun")) resetOnRun = json_boolean_value(j);
 		if (json_t* rots = json_object_get(r, "rot"))
 			for (int i = 0; i < CT_N && i < (int)json_array_size(rots); i++)
 				out[i].rot = clamp((int)json_integer_value(json_array_get(rots, i)), 0, CT_MAXSTEPS - 1);
@@ -299,10 +330,13 @@ struct CountDisplay : OpaqueWidget {
 // =============================================================================
 // Panel: 8HP, the designer's Figma export (2026-09-21). The art carries its
 // own outlined labels, so there is NO sfs::PanelLabels here. The strip under
-// the title; CLOCK, BPM and STEPS in one row over RESET and the two CVs; then
-// six rows of DIV, MASK and the gate on a plate. Positions are the art's.
+// the title; a narrow column of buttons on the left (RUN over RST, 2026-10),
+// then CLOCK, BPM and STEPS in one row over RESET and the two CVs, the three
+// moved right to a 2HP pitch to make room, since four columns of jacks do
+// not fit 8HP; then six rows of DIV, MASK and the gate on a plate. Positions
+// are the art's, the top section awaiting the art's update.
 // =============================================================================
-static const float CT_X_IN = 7.58f, CT_X_BPM = 20.36f, CT_X_STEPS = 32.97f;
+static const float CT_X_BTN = 5.08f, CT_X_IN = 13.97f, CT_X_BPM = 24.13f, CT_X_STEPS = 34.29f;
 static const float CT_Y_TOP = 34.25f, CT_Y_CV = 48.3f;
 static const float CT_X_DIV = 11.47f, CT_X_MASK = 21.63f, CT_X_OUT = 32.97f;
 static const float CT_Y_OUT[CT_N] = {63.5f, 75.0f, 86.4f, 97.8f, 109.2f, 120.7f};
@@ -324,6 +358,9 @@ struct CountWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_CV)), module, Count::RESET_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_BPM, CT_Y_CV)), module, Count::BPM_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_STEPS, CT_Y_CV)), module, Count::STEPS_INPUT));
+		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
+			mm2px(Vec(CT_X_BTN, CT_Y_TOP)), module, Count::RUN_PARAM, Count::RUN_LIGHT));
+		addParam(createParamCentered<VCVButton>(mm2px(Vec(CT_X_BTN, CT_Y_CV)), module, Count::RESET_PARAM));
 
 		for (int i = 0; i < CT_N; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_DIV, CT_Y_OUT[i])), module, Count::DIV_PARAM + i));
@@ -337,6 +374,7 @@ struct CountWidget : ModuleWidget {
 		if (!m) return;
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createIndexPtrSubmenuItem("Gate length", {"5 ms trigger", "Half the pulse"}, &m->gateMode));
+		menu->addChild(createBoolPtrMenuItem("Reset when RUN starts", "", &m->resetOnRun));
 		// ROTATION SHOWS ITS RESULT. A repeating mask rotated by its own
 		// period is unchanged -- Threes by 4, Odd by 2 -- and those are the
 		// first amounts anyone tries, so each entry carries the row it would
