@@ -334,10 +334,12 @@ struct CountDisplay : OpaqueWidget {
 // then CLOCK, BPM and STEPS in one row over RESET and the two CVs, the three
 // moved right to a 2HP pitch to make room, since four columns of jacks do
 // not fit 8HP; then six rows of DIV, MASK and the gate on a plate. Positions
-// are the art's, the top section awaiting the art's update.
+// are the art's (the 2026-10 export), followed as drawn: within a row the
+// jacks, knobs and buttons sit up to 0.17 mm apart vertically.
 // =============================================================================
-static const float CT_X_BTN = 5.08f, CT_X_IN = 13.97f, CT_X_BPM = 24.13f, CT_X_STEPS = 34.29f;
-static const float CT_Y_TOP = 34.25f, CT_Y_CV = 48.3f;
+static const float CT_X_BTN = 5.12f, CT_X_IN = 13.93f, CT_X_BPM = 24.08f, CT_X_STEPS = 34.24f;
+static const float CT_Y_RUN = 34.24f, CT_Y_CLOCK = 34.33f, CT_Y_KNOB = 34.16f;   // the top row
+static const float CT_Y_RST = 48.21f, CT_Y_CV = 48.29f;                           // the second
 static const float CT_X_DIV = 11.47f, CT_X_MASK = 21.63f, CT_X_OUT = 32.97f;
 static const float CT_Y_OUT[CT_N] = {63.5f, 75.0f, 86.4f, 97.8f, 109.2f, 120.7f};
 
@@ -352,15 +354,15 @@ struct CountWidget : ModuleWidget {
 		disp->box.size = mm2px(Vec(35.47f, 15.24f));
 		addChild(disp);
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_TOP)), module, Count::CLOCK_INPUT));
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_BPM, CT_Y_TOP)), module, Count::BPM_PARAM));
-		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_STEPS, CT_Y_TOP)), module, Count::STEPS_PARAM));
+		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_CLOCK)), module, Count::CLOCK_INPUT));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_BPM, CT_Y_KNOB)), module, Count::BPM_PARAM));
+		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_STEPS, CT_Y_KNOB)), module, Count::STEPS_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_CV)), module, Count::RESET_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_BPM, CT_Y_CV)), module, Count::BPM_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_STEPS, CT_Y_CV)), module, Count::STEPS_INPUT));
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
-			mm2px(Vec(CT_X_BTN, CT_Y_TOP)), module, Count::RUN_PARAM, Count::RUN_LIGHT));
-		addParam(createParamCentered<VCVButton>(mm2px(Vec(CT_X_BTN, CT_Y_CV)), module, Count::RESET_PARAM));
+			mm2px(Vec(CT_X_BTN, CT_Y_RUN)), module, Count::RUN_PARAM, Count::RUN_LIGHT));
+		addParam(createParamCentered<VCVButton>(mm2px(Vec(CT_X_BTN, CT_Y_RST)), module, Count::RESET_PARAM));
 
 		for (int i = 0; i < CT_N; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_DIV, CT_Y_OUT[i])), module, Count::DIV_PARAM + i));
