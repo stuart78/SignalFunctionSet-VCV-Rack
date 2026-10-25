@@ -193,6 +193,109 @@ int main() {
 		check((int)s[0] == 4 && (int)s[1] == 7 && (int)s[2] == 0,
 		      string::f("second clock, the chord rotates: A %d B %d C %d (want 4 7 0)", (int)s[0], (int)s[1], (int)s[2]));
 	}
+	printf("== notes at real pitches: a set can span octaves ==\n");
+	{
+		auto seq = [](Run& r, int n) { std::string g; for (int i = 0; i < n; i++) { float s[CN_CH]; bool rest[CN_CH]; r.clock(s, rest); g += string::f("%d ", (int)std::round(s[0])); } return g; };
+		{
+			// C4, E5, G3 by key: up plays them low to high
+			Run r; r.m.set[0].count = 0;
+			r.m.toggleAt(0, 0); r.m.toggleAt(0, 16); r.m.toggleAt(0, -5);
+			std::string g = seq(r, 6);
+			check(g == "-5 0 16 -5 0 16 ", "G3 C4 E5, up:                     got  " + g);
+		}
+		{
+			// the same pitch class in two octaves is two notes; clicking one removes only it
+			Run r; r.m.set[0].count = 0;
+			r.m.toggleAt(0, 0); r.m.toggleAt(0, 12);
+			bool two = r.m.set[0].count == 2;
+			r.m.toggleAt(0, 12);
+			check(two && r.m.set[0].count == 1 && r.m.noteRel(r.m.set[0].n[0]) == 0, "C4 and C5 are two notes, and removing C5 leaves C4");
+		}
+		{
+			// a patch saved before octaves: no "oct" key, every note in the root's octave
+			Run r;
+			json_t* j = json_loads("{\"sets\": [[{\"deg\": 0, \"chrom\": 0, \"free\": false}, {\"deg\": 2, \"chrom\": 0, \"free\": false}], [], [], []]}", 0, nullptr);
+			r.m.dataFromJson(j); json_decref(j);
+			check(r.m.set[0].count == 2 && r.m.set[0].n[0].oct == 0 && r.m.set[0].n[1].oct == 0, "an old patch loads with every note at octave 0");
+			// and an octave round-trips through the patch
+			r.m.set[0].n[1].oct = 1;
+			json_t* o = r.m.dataToJson(); Run q; q.m.dataFromJson(o); json_decref(o);
+			check(q.m.set[0].n[1].oct == 1, "a note's octave is saved and loaded");
+		}
+		{
+			// LEARN keeps the octave each note was held in
+			Run r; sfs::previewConnect(r.m.inputs[Canon::LEARN_INPUT], 3);
+			const float v[3] = {-1.f, 4.f / 12.f, 1.f + 7.f / 12.f};          // C3, E4, G5
+			for (int k = 0; k < 3; k++) r.m.inputs[Canon::LEARN_INPUT].setVoltage(v[k], k);
+			r.m.params[Canon::LEARN_PARAM].setValue(1.f); r.tick(); r.m.params[Canon::LEARN_PARAM].setValue(0.f); r.tick();
+			const CanonSet& S = r.m.set[0];
+			check(S.count == 3 && r.m.noteRel(S.n[0]) == -12 && r.m.noteRel(S.n[1]) == 4 && r.m.noteRel(S.n[2]) == 19,
+			      string::f("LEARN C3 E4 G5 -> %d %d %d (want -12 4 19)", S.count > 0 ? r.m.noteRel(S.n[0]) : 99, S.count > 1 ? r.m.noteRel(S.n[1]) : 99, S.count > 2 ? r.m.noteRel(S.n[2]) : 99));
+		}
+		{
+			// moving a set by an octave, and refusing to move one off the range
+			Run r;
+			r.m.shiftSet(0, 1);
+			std::string g = seq(r, 3);
+			check(g == "12 16 19 ", "set 1 moved up an octave plays 12 16 19: got " + g);
+			r.m.shiftSet(0, 1); r.m.shiftSet(0, 1);
+			check(!r.m.canShift(0, 1) && r.m.set[0].n[0].oct == CN_OCT_HI, "and will not go past the top of the range");
+		}
+		{
+			// a spread voicing, read by pattern, and the wander still keeps to the chord's notes
+			Run r;
+			int count; const Canon::Voicing* V = Canon::voicings(count);
+			int open = -1; for (int i = 0; i < count; i++) if (std::string(V[i].name).find("Open triad") == 0) open = i;
+			r.m.applyVoicing(0, open);
+			std::string g = seq(r, 3);
+			check(g == "0 7 16 ", "the open triad in C plays C4 G4 E5: got " + g);
+		}
+	}
+
+	printf("== how often a channel plays a note ==\n");
+	{
+		auto play = [](Run& r, int n, int& rests, std::string* g) { rests = 0;
+			for (int i = 0; i < n; i++) { float s[CN_CH]; bool rest[CN_CH]; r.clock(s, rest);
+				if (rest[0]) rests++; else if (g) *g += string::f("%d ", (int)std::round(s[0])); } };
+		{
+			Run r; r.m.set[0].n[1].prob[0] = 0.f;              // E never, for channel A
+			int rests; std::string g; play(r, 9, rests, &g);
+			check(rests == 3 && g == "0 7 0 7 0 7 ", string::f("E at 0%%: rests on every E (%d of 9), plays C G: %s", rests, g.c_str()));
+		}
+		{
+			Run r; for (int k = 0; k < 3; k++) r.m.set[0].n[k].prob[0] = 0.5f;
+			int rests; play(r, 600, rests, nullptr);
+			check(rests > 240 && rests < 360, string::f("every note at 50%%: %d rests in 600 steps", rests));
+		}
+		{
+			// the chance is per channel: B is untouched by A's
+			Run r; r.m.set[0].n[0].prob[0] = 0.f;
+			r.m.ch[1].offset = 0;
+			int restsB = 0;
+			for (int i = 0; i < 9; i++) { float s[CN_CH]; bool rest[CN_CH]; r.clock(s, rest); if (rest[1]) restsB++; }
+			check(restsB == 0, string::f("channel B still plays C when A's chance for it is 0 (%d rests)", restsB));
+		}
+		{
+			// with "plays the next note instead", a miss moves on within the step
+			Run r; r.m.missSkips = true; r.m.set[0].n[1].prob[0] = 0.f;   // E never, for channel A
+			int rests; std::string g; play(r, 6, rests, &g);
+			check(rests == 0 && g == "0 7 0 7 0 7 ", string::f("E at 0%%, next note instead: no rests, C G C G: %s", g.c_str()));
+			Run q; q.m.missSkips = true; for (int k = 0; k < 3; k++) q.m.set[0].n[k].prob[0] = 0.f;
+			play(q, 4, rests, nullptr);
+			check(rests == 4, string::f("and every note at 0%%: once round the pattern, then a rest (%d of 4)", rests));
+		}
+		{
+			Run r; r.m.set[0].n[2].prob[3] = 0.25f;
+			json_t* o = r.m.dataToJson(); Run q; q.m.dataFromJson(o); json_decref(o);
+			check(std::fabs(q.m.set[0].n[2].prob[3] - 0.25f) < 1e-6f && q.m.set[0].n[0].prob[3] == 1.f, "a chance is saved and loaded; full ones stay full");
+		}
+		{
+			Run r; r.m.set[0].count = 0;
+			for (int k = 0; k < 20; k++) r.m.toggleAt(0, k);
+			check(r.m.set[0].count == CN_MAXN && CN_MAXN == 16, string::f("a set holds %d notes", r.m.set[0].count));
+		}
+	}
+
 	printf("\n%d failure(s)\n", fails);
 	return fails ? 1 : 0;
 }

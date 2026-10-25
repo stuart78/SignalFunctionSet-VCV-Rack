@@ -791,12 +791,13 @@ A narrow clock. Set a tempo (or patch a clock) and a number of STEPS, and each o
 - **Euclidean masks take their density from STEPS**, which is why there is no second selector.
 - **Locks to an external clock** at one pulse per beat, landing each beat exactly on the pulse.
 - **Rotate each cycle** (context menu) walks a mask round the bar; an offset shifts it once.
+- **RUN and RST buttons.** RUN stops and starts the clock: stopped, the beat holds where it is, the outputs stay low and an external clock is ignored, and it carries on from there when RUN comes back on (or from the top, with "Reset when RUN starts" in the menu). RST does what the RESET jack does.
 
-**Controls:** BPM, Steps, and a Rate and Mask per output.
+**Controls:** BPM, Steps, Run, Reset, and a Rate and Mask per output.
 **Inputs:** BPM CV, Steps CV, Clock, Reset.
 **Outputs:** Six gates.
 
-**Context menu:** Gate length (a gate of half the pulse by default, or a 5 ms trigger), per-output rotation and offset.
+**Context menu:** Gate length (a gate of half the pulse by default, or a 5 ms trigger), reset when RUN starts, per-output rotation and offset.
 
 #### Beat
 
@@ -916,17 +917,19 @@ Four arpeggiators reading one chord progression. Canon holds four chords (sets) 
 
 **Features:**
 - **Chords are stored as scale degrees**, so a progression follows ROOT and SCALE. A note chosen outside the scale is kept as a semitone from the root.
+- **A tab per set over one four-octave keyboard.** Each note sits at a real pitch, from C3 to B6, so a set can be a spread voicing that the patterns climb through. Click a tab to open a set (the screen follows the set playing, except for a few seconds after you click it); the playing set's tab is outlined in orange, and each channel's last note is marked on the keys. A set holds up to sixteen notes.
+- **How often each channel plays each note.** Four rows of bars under the keyboard, one per channel, a bar under every note of the open set. At full (the default) the arpeggio plays as written; drag a bar down and that channel only sometimes plays that note. A miss is a rest, or, with "A note that misses its chance: plays the next note instead" in the menu, the channel moves on to the next note of its pattern in the same step. Double-click a bar to put it back to full.
 - **Eight pattern families**: up, down, up-down, converge, diverge, pedal, random and as-played, over one or two octaves.
 - **WANDER strays to chord tones, extensions and colour notes**, never so far that the channels stop agreeing.
 - **Gates normal left to right**, so one clock runs all four channels until you patch another.
-- **LEARN writes a held poly chord into the current set.** Click a key on screen to add or remove a note; right-click a keyboard for voicings and copying.
+- **LEARN writes a held poly chord into the current set**, in the octaves it was held in. Click a key on screen to add or remove a note; right-click a tab or the keyboard for voicings (including spread ones), moving the set up or down an octave, and copying.
 - **Twenty chord progressions** in the context menu.
 
 **Controls:** Root, Scale, Set, Next, Reset, Learn, and a Pattern, Wander and Octave per channel.
 **Inputs:** Root CV, Scale CV, Set, Set CV, Reset, Learn (poly), and a Gate, Pattern CV, Wander CV and Octave CV per channel.
 **Outputs:** A V/OCT and a Gate per channel.
 
-**Context menu:** Progressions, per-channel step offset, restart on set change, wander may rest.
+**Context menu:** Progressions, per-channel step offset, restart on set change, wander may rest, screen follows the set playing, what a missed note does.
 
 #### Fugue
 

@@ -26,7 +26,7 @@
 
 static const int CN_SETS = 4;
 static const int CN_CH = 4;
-static const int CN_MAXN = 6;       // notes per set
+static const int CN_MAXN = 16;      // notes per set (6 until 2026-10, when a set could span octaves)
 static const int CN_NFAM = 8;       // pattern families; each comes in a 1- and a 2-octave form
 static const int CN_NPAT = CN_NFAM * 2;
 static const float CN_REST = -1000.f;   // a wander that chose silence
@@ -43,7 +43,17 @@ struct CanonNote {
 	int8_t deg = 0;
 	int8_t chrom = 0;
 	bool free = false;
+	// Octaves from the root's (2026-10). A set used to be one octave of pitch
+	// classes; now a note sits at a real pitch, so a set can be a spread
+	// voicing. 0 for every note of a patch saved before, which is the octave
+	// they always played in.
+	int8_t oct = 0;
+	// How often each channel plays this note when its pattern reaches it,
+	// 0..1 (2026-10). 1, the default, is the plain arpeggio; lower, the step
+	// is sometimes a rest. Drawn as four rows of bars under the keyboard.
+	float prob[CN_CH] = {1.f, 1.f, 1.f, 1.f};
 };
+static const int CN_OCT_LO = -2, CN_OCT_HI = 2;   // how far a note's octave may go
 struct CanonSet {
 	CanonNote n[CN_MAXN];
 	int count = 0;
@@ -115,7 +125,12 @@ struct Canon : Module {
 	bool lock = true;                     // Fugue's harmonic lock, across the four channels
 	bool restartOnSet = false;            // a channel keeps its place through a set change
 	bool wanderRest = true;               // WANDER's top tier may substitute a rest
+	bool missSkips = false;               // a note that misses its chance: rest (false) or play the next note
 	int  gateMode = 0;                    // 0 follows the input, 1 a 10 ms trigger
+	// the screen: which set's tab is open, and whether it follows the set
+	// playing (it does, except for a few seconds after you click it)
+	int  viewSet = 0;
+	bool viewFollow = true;
 
 	dsp::SchmittTrigger setTrig, resetTrig, learnTrig;
 	dsp::BooleanTrigger setBtn{}, resetBtn{}, learnBtn{};   // braced: cppcheck cannot see the SDK's own initialisers
@@ -163,14 +178,27 @@ struct Canon : Module {
 	}
 
 	// ── the notes ────────────────────────────────────────────────────────
-	float noteSemis(const CanonNote& n) const {
+	// where a note sits within one period of the root, ignoring its octave
+	float notePcSemis(const CanonNote& n) const {
 		if (n.free) return (float)n.chrom;
 		if (sc.size <= 0) return 0.f;
 		return sc.degree(((n.deg % sc.size) + sc.size) % sc.size);
 	}
+	// and with it: the note's pitch, semitones from the root
+	float noteSemis(const CanonNote& n) const { return notePcSemis(n) + (float)n.oct * sc.period; }
 	// the pitch class a note lands on, for the screen and for toggling
 	int notePc(const CanonNote& n) const {
-		return (((int)std::round(noteSemis(n)) + root) % 12 + 12) % 12;
+		return (((int)std::round(notePcSemis(n)) + root) % 12 + 12) % 12;
+	}
+	// the key a note sits on, semitones from the root (12 to the octave: the
+	// screen is a keyboard)
+	int noteRel(const CanonNote& n) const { return (int)std::round(notePcSemis(n)) + 12 * n.oct; }
+	// a note at `rel` semitones from the root, in any octave
+	CanonNote noteAt(int rel) const {
+		int o = (int)std::floor(rel / 12.f);
+		CanonNote n = noteFromPc(((rel - 12 * o + root) % 12 + 12) % 12);
+		n.oct = (int8_t)clamp(o, CN_OCT_LO, CN_OCT_HI);
+		return n;
 	}
 	// A pitch class (0 = C) as a note of the key: a degree when the scale has
 	// one there, a free semitone otherwise.
@@ -184,33 +212,53 @@ struct Canon : Module {
 		n.free = true; n.chrom = (int8_t)semis;
 		return n;
 	}
-	void toggleNote(int s, int pc) {
+	// add or remove the note `rel` semitones from the root (a key on the screen)
+	void toggleAt(int s, int rel) {
 		CanonSet& S = set[s];
 		for (int k = 0; k < S.count; k++) {
-			if (notePc(S.n[k]) == pc) {
+			if (noteRel(S.n[k]) == rel) {
 				for (int j = k; j + 1 < S.count; j++) S.n[j] = S.n[j + 1];
 				S.count--;
 				return;
 			}
 		}
 		if (S.count >= CN_MAXN) return;
-		S.n[S.count++] = noteFromPc(pc);
+		S.n[S.count++] = noteAt(rel);
+	}
+	// the same in the root's octave, by pitch class (0 = C)
+	void toggleNote(int s, int pc) { toggleAt(s, ((pc - root) % 12 + 12) % 12); }
+	// the whole set up or down an octave, if every note still fits
+	bool canShift(int s, int d) const {
+		for (int k = 0; k < set[s].count; k++) {
+			int o = set[s].n[k].oct + d;
+			if (o < CN_OCT_LO || o > CN_OCT_HI) return false;
+		}
+		return set[s].count > 0;
+	}
+	void shiftSet(int s, int d) {
+		if (!canShift(s, d)) return;
+		for (int k = 0; k < set[s].count; k++) set[s].n[k].oct = (int8_t)(set[s].n[k].oct + d);
 	}
 
 	// ── the pattern: the ordered notes a channel walks ────────────────────
 	// `semis` receives the set's notes in the family's order, expanded over
 	// one or two octaves; `seq` the order they are visited. Random is drawn
 	// at step time, so its sequence is the plain list.
-	int buildSequence(int pattern, const CanonSet& S, float* semis, int* seq) const {
+	// `src`, when given, receives which of the set's notes each entry is.
+	int buildSequence(int pattern, const CanonSet& S, float* semis, int* seq, int* src = nullptr) const {
 		int fam = pattern % CN_NFAM, octs = (pattern >= CN_NFAM) ? 2 : 1;
 		int n = S.count;
 		if (n <= 0) return 0;
-		float base[CN_MAXN];
-		for (int k = 0; k < n; k++) base[k] = noteSemis(S.n[k]);
-		if (fam != 7) std::sort(base, base + n);          // as-played keeps entry order
+		int order[CN_MAXN];
+		for (int k = 0; k < n; k++) order[k] = k;
+		if (fam != 7)                                      // as-played keeps entry order
+			std::stable_sort(order, order + n, [&](int a, int b) { return noteSemis(S.n[a]) < noteSemis(S.n[b]); });
 		int N = 0;
 		for (int o = 0; o < octs; o++)
-			for (int k = 0; k < n; k++) semis[N++] = base[k] + (float)o * sc.period;
+			for (int k = 0; k < n; k++) {
+				if (src) src[N] = order[k];
+				semis[N++] = noteSemis(S.n[order[k]]) + (float)o * sc.period;
+			}
 		int L = 0;
 		switch (fam) {
 			case 0: case 6: case 7:                        // up, random, as played
@@ -252,8 +300,8 @@ struct Canon : Module {
 		float t = randFloat(r);
 		if (t < 0.45f && S.count > 1) {
 			int k = (int)(randFloat(r) * S.count) % S.count;
-			float s = noteSemis(S.n[k]) + oct;
-			if (std::fabs(s - base) < 0.01f) s = noteSemis(S.n[(k + 1) % S.count]) + oct;
+			float s = notePcSemis(S.n[k]) + oct;
+			if (std::fabs(s - base) < 0.01f) s = notePcSemis(S.n[(k + 1) % S.count]) + oct;
 			return s;
 		}
 		if (t < 0.75f && sc.size > 0) {
@@ -261,7 +309,7 @@ struct Canon : Module {
 			for (int d = 0; d < sc.size; d++) {
 				bool used = false;
 				for (int k = 0; k < S.count; k++)
-					if (std::fabs(noteSemis(S.n[k]) - sc.intervals[d]) < 0.5f) used = true;
+					if (std::fabs(notePcSemis(S.n[k]) - sc.intervals[d]) < 0.5f) used = true;
 				if (!used) cand[nc++] = d;
 			}
 			if (nc > 0) return sc.intervals[cand[(int)(randFloat(r) * nc) % nc]] + oct;
@@ -319,12 +367,13 @@ struct Canon : Module {
 		if (n <= 0) return;
 		CanonSet& S = set[cur];
 		S.count = 0;
+		// in the octaves they were held in, 0 V being the root's octave at C4
 		for (int k = 0; k < n; k++) {
-			int semi = (int)std::round(inputs[LEARN_INPUT].getVoltage(k) * 12.f);
-			int pc = ((semi % 12) + 12) % 12;
+			int rel = (int)std::round(inputs[LEARN_INPUT].getVoltage(k) * 12.f) - root;
+			CanonNote N = noteAt(rel);
 			bool dup = false;
-			for (int j = 0; j < S.count; j++) if (notePc(S.n[j]) == pc) dup = true;
-			if (!dup) S.n[S.count++] = noteFromPc(pc);
+			for (int j = 0; j < S.count; j++) if (noteRel(S.n[j]) == noteRel(N)) dup = true;
+			if (!dup) S.n[S.count++] = N;
 		}
 	}
 
@@ -382,7 +431,7 @@ struct Canon : Module {
 			} else {
 				int size = std::max(sc.size, 1);
 				for (int k = 0; k < p.n; k++) {
-					CanonNote N; N.free = false; N.deg = (int8_t)((p.a[s][0] + 2 * k) % size);
+					CanonNote N; N.free = false; N.deg = (int8_t)((p.a[s][0] + 2 * k) % size);   // oct 0
 					S.n[S.count++] = N;
 				}
 			}
@@ -391,12 +440,17 @@ struct Canon : Module {
 	}
 
 	// ── voicings: fill one set ────────────────────────────────────────────
-	struct Voicing { const char* name; int n; int deg[6]; };
+	struct Voicing { const char* name; int n; int deg[6]; int oct[6]; };
 	static const Voicing* voicings(int& count) {
 		static const Voicing V[] = {
-			{"Triad", 3, {0, 2, 4}}, {"Seventh", 4, {0, 2, 4, 6}}, {"Ninth", 5, {0, 2, 4, 6, 1}},
-			{"Sus2", 3, {0, 1, 4}}, {"Sus4", 3, {0, 3, 4}}, {"Add9", 4, {0, 2, 4, 1}},
-			{"Sixth", 4, {0, 2, 4, 5}}, {"Quartal", 4, {0, 3, 6, 2}}, {"Root and fifth", 2, {0, 4}},
+			{"Triad", 3, {0, 2, 4}, {}}, {"Seventh", 4, {0, 2, 4, 6}, {}}, {"Ninth", 5, {0, 2, 4, 6, 1}, {}},
+			{"Sus2", 3, {0, 1, 4}, {}}, {"Sus4", 3, {0, 3, 4}, {}}, {"Add9", 4, {0, 2, 4, 1}, {}},
+			{"Sixth", 4, {0, 2, 4, 5}, {}}, {"Quartal", 4, {0, 3, 6, 2}, {}}, {"Root and fifth", 2, {0, 4}, {}},
+			// spread across octaves
+			{"Open triad (root, fifth, tenth)", 3, {0, 4, 2}, {0, 0, 1}},
+			{"Drop 2 seventh", 4, {4, 0, 2, 6}, {-1, 0, 0, 0}},
+			{"Spread ninth", 4, {0, 4, 1, 2}, {0, 0, 1, 1}},
+			{"Two octaves of root and fifth", 4, {0, 4, 0, 4}, {0, 0, 1, 1}},
 		};
 		count = (int)(sizeof(V) / sizeof(V[0]));
 		return V;
@@ -406,7 +460,11 @@ struct Canon : Module {
 		if (setIdx < 0 || setIdx >= CN_SETS || which < 0 || which >= count) return;
 		CanonSet& S = set[setIdx];
 		S.count = 0;
-		for (int k = 0; k < V[which].n; k++) { S.n[S.count].deg = (int8_t)V[which].deg[k]; S.n[S.count].free = false; S.count++; }
+		for (int k = 0; k < V[which].n; k++) {
+			CanonNote& N = S.n[S.count++];
+			N = CanonNote();
+			N.deg = (int8_t)V[which].deg[k]; N.free = false; N.chrom = 0; N.oct = (int8_t)V[which].oct[k];
+		}
 	}
 
 	float gateVoltage(int c) {
@@ -424,13 +482,25 @@ struct Canon : Module {
 		                                  + inputs[PATTERN_INPUT + c].getVoltage()), 0, CN_NPAT - 1);
 		float w = clamp(params[WANDER_PARAM + c].getValue() + inputs[WANDER_INPUT + c].getVoltage() * 0.2f, 0.f, 1.f);
 		int oct = clamp((int)std::round(params[OCTAVE_PARAM + c].getValue() + inputs[OCTAVE_INPUT + c].getVoltage()), -4, 4);
-		float semis[2 * CN_MAXN]; int seq[4 * CN_MAXN];
-		int L = buildSequence(pattern, S, semis, seq);
+		float semis[2 * CN_MAXN]; int seq[4 * CN_MAXN], src[2 * CN_MAXN];
+		int L = buildSequence(pattern, S, semis, seq, src);
 		if (L <= 0) { C.rest = true; C.sounding = false; return; }
 		int pos = ((C.idx % L) + L) % L;
-		int at = ((pos + C.offset) % L + L) % L;          // the offset moves where it reads, not where it counts
-		int which = (pattern % CN_NFAM == 6) ? (int)(randFloat(C.rng) * L) % L : seq[at];
-		C.idx = pos + 1;
+		// The note's chance for this channel (no draw at all at 1, so a plain
+		// arpeggio is exactly what it was). A miss is a rest, or, with "A
+		// missed note plays the next one", the pattern moves on to the next
+		// note within the same step, and so on until one hits; once round the
+		// whole pattern without a hit, it rests.
+		int which = 0;
+		for (int tries = 0;; tries++) {
+			int at = ((pos + C.offset) % L + L) % L;      // the offset moves where it reads, not where it counts
+			which = (pattern % CN_NFAM == 6) ? (int)(randFloat(C.rng) * L) % L : seq[at];
+			pos = pos + 1;
+			float p = S.n[src[which]].prob[c];
+			if (!(p < 1.f && randFloat(C.rng) >= p)) break;
+			if (!missSkips || tries + 1 >= L) { C.idx = pos; C.rest = true; C.sounding = false; return; }
+		}
+		C.idx = pos;
 		float base = semis[which] + (float)oct * sc.period;
 		float pick = choose(c, base, S, w);
 		if (pick == CN_REST) { C.rest = true; C.sounding = false; return; }
@@ -480,6 +550,14 @@ struct Canon : Module {
 				json_object_set_new(n, "deg", json_integer(set[s].n[k].deg));
 				json_object_set_new(n, "chrom", json_integer(set[s].n[k].chrom));
 				json_object_set_new(n, "free", json_boolean(set[s].n[k].free));
+				if (set[s].n[k].oct) json_object_set_new(n, "oct", json_integer(set[s].n[k].oct));
+				bool any = false;
+				for (int c = 0; c < CN_CH; c++) any = any || set[s].n[k].prob[c] < 1.f;
+				if (any) {
+					json_t* pr = json_array();
+					for (int c = 0; c < CN_CH; c++) json_array_append_new(pr, json_real(set[s].n[k].prob[c]));
+					json_object_set_new(n, "prob", pr);
+				}
 				json_array_append_new(a, n);
 			}
 			json_array_append_new(sets, a);
@@ -490,6 +568,9 @@ struct Canon : Module {
 		json_object_set_new(r, "restartOnSet", json_boolean(restartOnSet));
 		json_object_set_new(r, "wanderRest", json_boolean(wanderRest));
 		json_object_set_new(r, "gateMode", json_integer(gateMode));
+		json_object_set_new(r, "viewSet", json_integer(viewSet));
+		json_object_set_new(r, "missSkips", json_boolean(missSkips));
+		json_object_set_new(r, "viewFollow", json_boolean(viewFollow));
 		json_t* offs = json_array();
 		for (int c = 0; c < CN_CH; c++) json_array_append_new(offs, json_integer(ch[c].offset));
 		json_object_set_new(r, "offset", offs);
@@ -503,9 +584,15 @@ struct Canon : Module {
 				for (int k = 0; k < (int)json_array_size(a) && k < CN_MAXN; k++) {
 					json_t* n = json_array_get(a, k);
 					CanonNote& N = set[s].n[set[s].count++];
+					N = CanonNote();
 					N.deg = (int8_t)json_integer_value(json_object_get(n, "deg"));
 					N.chrom = (int8_t)json_integer_value(json_object_get(n, "chrom"));
 					N.free = json_boolean_value(json_object_get(n, "free"));
+					json_t* o = json_object_get(n, "oct");    // absent before 2026-10: the root's octave
+					N.oct = (int8_t)(o ? clamp((int)json_integer_value(o), CN_OCT_LO, CN_OCT_HI) : 0);
+					if (json_t* pr = json_object_get(n, "prob"))
+						for (int c = 0; c < CN_CH && c < (int)json_array_size(pr); c++)
+							N.prob[c] = clamp((float)json_number_value(json_array_get(pr, c)), 0.f, 1.f);
 				}
 			}
 		}
@@ -514,6 +601,9 @@ struct Canon : Module {
 		if (json_t* j = json_object_get(r, "restartOnSet")) restartOnSet = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "wanderRest")) wanderRest = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "viewSet")) viewSet = clamp((int)json_integer_value(j), 0, CN_SETS - 1);
+		if (json_t* j = json_object_get(r, "missSkips")) missSkips = json_boolean_value(j);
+		if (json_t* j = json_object_get(r, "viewFollow")) viewFollow = json_boolean_value(j);
 		if (json_t* offs = json_object_get(r, "offset"))
 			for (int c = 0; c < CN_CH && c < (int)json_array_size(offs); c++)
 				ch[c].offset = clamp((int)json_integer_value(json_array_get(offs, c)), 0, 11);
@@ -535,6 +625,12 @@ static Canon* canonPreview() {
 	m->params[Canon::PATTERN_PARAM + 3].setValue(5.f);
 	m->params[Canon::OCTAVE_PARAM + 3].setValue(-1.f);
 	m->params[Canon::WANDER_PARAM + 2].setValue(0.3f);
+	// a few notes some channels only sometimes play, so the bars show
+	for (int st = 0; st < CN_SETS; st++) {
+		m->set[st].n[1].prob[1] = 0.55f;
+		m->set[st].n[2].prob[2] = 0.3f;
+		m->set[st].n[0].prob[3] = 0.75f;
+	}
 	rack::engine::Module::ProcessArgs a = sfs::previewArgs();
 	int64_t frame = 0;
 	for (int i = 0; i < 48000; i++) {
@@ -551,9 +647,14 @@ static Canon* canonPreview() {
 }
 
 // =============================================================================
-// The screen: four keyboards, one per set, the set in force framed, and each
-// channel's sounding note marked on it in the channel's colour. Click a key
-// to add or remove that note from the set.
+// The screen: a tab per set along the top, and one four-octave keyboard below
+// showing the set whose tab is open. It used to be four one-octave keyboards
+// side by side, which read as one keyboard four octaves wide: the sets looked
+// like octaves. A tab makes each set one thing, and a single keyboard lets a
+// note sit at a real pitch. Each channel's last note is marked on the keys in
+// the channel's colour while the open set is the one playing. Click a key to
+// add or remove that note; click a tab to open it; right-click either for the
+// set's menu.
 // =============================================================================
 // The plugin's four channel colours, as Trace's lanes and Spool's tapes wear them.
 static const NVGcolor CN_CH_COL[CN_CH] = {
@@ -565,166 +666,298 @@ static const NVGcolor CN_CH_COL[CN_CH] = {
 static const int CN_WHITE_PC[7] = {0, 2, 4, 5, 7, 9, 11};
 static const int CN_BLACK_AFTER[5] = {0, 1, 3, 4, 5};    // a black key sits after these white keys
 static const int CN_BLACK_PC[5] = {1, 3, 6, 8, 10};
+// The keyboard: four octaves from C3, so key k is k - 12 semitones from C4
+// (0 V). A note in the root's octave sits in the second.
+static const int CN_KB_OCTS = 4, CN_KB_LOW = -12;
+static const double CN_VIEW_HOLD = 5.0;                  // s the screen stays on a set you clicked
 
 struct CanonDisplay : OpaqueWidget {
 	Canon* module = nullptr;
 	std::shared_ptr<Font> font;
+	double lastClick = -1e9;
 
-	// keyboard geometry, in px: four keyboards across the screen
-	void kbRect(int s, float& x, float& y, float& w, float& h) const {
-		float pad = mm2px(2.5f), gap = mm2px(2.5f);
-		float top = mm2px(7.5f);
-		w = (box.size.x - 2.f * pad - 3.f * gap) / 4.f;
-		x = pad + s * (w + gap);
-		y = top;
-		h = box.size.y - top - mm2px(6.0f);
+	float pad() const { return mm2px(2.5f); }
+	void tabRect(int s, float& x, float& y, float& w, float& h) const {
+		float gap = mm2px(1.5f);
+		w = (box.size.x - 2.f * pad() - 3.f * gap) / (float)CN_SETS;
+		x = pad() + s * (w + gap);
+		y = mm2px(7.0f);
+		h = mm2px(6.0f);
 	}
-	// which set and pitch class is under a point, or -1
-	int hitKey(Vec p, int& setOut) const {
-		for (int s = 0; s < CN_SETS; s++) {
-			float x, y, w, h; kbRect(s, x, y, w, h);
-			if (p.x < x || p.x >= x + w || p.y < y || p.y >= y + h) continue;
-			setOut = s;
-			float kw = w / 7.f;
-			float rel = p.x - x;
-			if (p.y < y + h * 0.6f) {
-				for (int b = 0; b < 5; b++) {
-					float bx = x + (CN_BLACK_AFTER[b] + 1) * kw;
-					if (p.x >= bx - kw * 0.3f && p.x < bx + kw * 0.3f) return CN_BLACK_PC[b];
-				}
+	void kbRect(float& x, float& y, float& w, float& h) const {
+		x = pad(); w = box.size.x - 2.f * pad();
+		y = mm2px(15.5f);
+		h = mm2px(14.0f);
+	}
+	// the chance rows under the keyboard, one per channel
+	void probRow(int c, float& y, float& h) const { y = mm2px(32.6f + 3.7f * c); h = mm2px(3.3f); }
+	// the bar under key k: centred on the key, narrow enough that a black
+	// key's bar and its neighbours' never meet
+	void probCell(int k, float& x, float& w) const {
+		float kx, ky, kwid, kh; kbRect(kx, ky, kwid, kh);
+		float kw = kwid / (7.f * CN_KB_OCTS);
+		bool black; float cx; keyAt(k, cx, black);
+		w = kw * 0.45f; x = cx - w * 0.5f;
+	}
+	// the open set's note and channel under a point, or -1
+	int hitProb(Vec p, int& chanOut) const {
+		const CanonSet& S = module->set[clamp(module->viewSet, 0, CN_SETS - 1)];
+		for (int c = 0; c < CN_CH; c++) {
+			float y, h; probRow(c, y, h);
+			if (p.y < y || p.y >= y + h) continue;
+			for (int n = 0; n < S.count; n++) {
+				int k = noteKey(S.n[n]); if (k < 0) continue;
+				float x, w; probCell(k, x, w);
+				if (p.x >= x - mm2px(0.3f) && p.x < x + w + mm2px(0.3f)) { chanOut = c; return n; }
 			}
-			int wi = clamp((int)(rel / kw), 0, 6);
-			return CN_WHITE_PC[wi];
 		}
 		return -1;
 	}
-	// which keyboard is under a point, or -1
-	int hitSet(Vec p) const {
+	int dragNote = -1, dragChan = 0;
+	void setProb(Vec p) {
+		CanonSet& S = module->set[clamp(module->viewSet, 0, CN_SETS - 1)];
+		if (dragNote < 0 || dragNote >= S.count) return;
+		float y, h; probRow(dragChan, y, h);
+		S.n[dragNote].prob[dragChan] = clamp(1.f - (p.y - y) / h, 0.f, 1.f);
+	}
+	// key k's centre and whether it is black
+	void keyAt(int k, float& cx, bool& black) const {
+		float x, y, w, h; kbRect(x, y, w, h);
+		float kw = w / (7.f * CN_KB_OCTS);
+		int o = k / 12, pc = k % 12;
+		black = false;
+		for (int b = 0; b < 5; b++) if (CN_BLACK_PC[b] == pc) { black = true; cx = x + (o * 7 + CN_BLACK_AFTER[b] + 1) * kw; }
+		if (!black) { int wi = 0; for (int i = 0; i < 7; i++) if (CN_WHITE_PC[i] == pc) wi = i; cx = x + (o * 7 + wi + 0.5f) * kw; }
+	}
+	int hitKey(Vec p) const {
+		float x, y, w, h; kbRect(x, y, w, h);
+		if (p.x < x || p.x >= x + w || p.y < y || p.y >= y + h) return -1;
+		float kw = w / (7.f * CN_KB_OCTS);
+		if (p.y < y + h * 0.6f)
+			for (int o = 0; o < CN_KB_OCTS; o++)
+				for (int b = 0; b < 5; b++) {
+					float bx = x + (o * 7 + CN_BLACK_AFTER[b] + 1) * kw;
+					if (p.x >= bx - kw * 0.3f && p.x < bx + kw * 0.3f) return 12 * o + CN_BLACK_PC[b];
+				}
+		int wi = clamp((int)((p.x - x) / kw), 0, 7 * CN_KB_OCTS - 1);
+		return 12 * (wi / 7) + CN_WHITE_PC[wi % 7];
+	}
+	int hitTab(Vec p) const {
 		for (int s = 0; s < CN_SETS; s++) {
-			float x, y, w, h; kbRect(s, x, y, w, h);
-			if (p.x >= x - mm2px(1.f) && p.x < x + w + mm2px(1.f) && p.y >= y - mm2px(1.f) && p.y < y + h + mm2px(4.f)) return s;
+			float x, y, w, h; tabRect(s, x, y, w, h);
+			if (p.x >= x && p.x < x + w && p.y >= y && p.y < y + h) return s;
 		}
 		return -1;
 	}
+	// the key a note of the open set sits on, or -1 off the keyboard
+	int noteKey(const CanonNote& n) const {
+		int k = module->root + module->noteRel(n) - CN_KB_LOW;
+		return (k >= 0 && k < 12 * CN_KB_OCTS) ? k : -1;
+	}
+	// the set's number and notes, sorted by pitch as the arpeggio reads them,
+	// cut short with a count of the rest where they will not fit in `maxW`
+	std::string setText(NVGcontext* vg, int s, float maxW) const {
+		const CanonSet& S = module->set[s];
+		if (S.count <= 0) return string::f("%d  empty", s + 1);
+		int rel[CN_MAXN]; for (int k = 0; k < S.count; k++) rel[k] = module->noteRel(S.n[k]);
+		std::sort(rel, rel + S.count);
+		std::string t = string::f("%d ", s + 1);
+		for (int k = 0; k < S.count; k++) {
+			std::string next = t + " " + CN_NOTE_NAMES[((rel[k] + module->root) % 12 + 12) % 12];
+			std::string tail = (k + 1 < S.count) ? string::f("  +%d", S.count - k - 1) : "";
+			float b[4]; nvgTextBounds(vg, 0, 0, (next + tail).c_str(), NULL, b);
+			if (b[2] - b[0] > maxW) return t + string::f("  +%d", S.count - k);
+			t = next;
+		}
+		return t;
+	}
+
+	void setMenu(int s) {
+		Canon* m = module;
+		Menu* menu = createMenu();
+		menu->addChild(createMenuLabel(string::f("Set %d", s + 1)));
+		if (s != m->cur) menu->addChild(createMenuItem("Play this set now", "", [=]() { m->selectSet(s); }));
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuLabel("Fill with a voicing"));
+		int count; const Canon::Voicing* V = Canon::voicings(count);
+		for (int i = 0; i < count; i++) {
+			int idx = i;
+			menu->addChild(createMenuItem(V[i].name, "", [=]() { m->applyVoicing(s, idx); }));
+		}
+		menu->addChild(new MenuSeparator);
+		menu->addChild(createMenuItem("Move this set up an octave", "", [=]() { m->shiftSet(s, 1); }, !m->canShift(s, 1)));
+		menu->addChild(createMenuItem("Move this set down an octave", "", [=]() { m->shiftSet(s, -1); }, !m->canShift(s, -1)));
+		menu->addChild(createMenuItem("Copy from the set playing", "", [=]() { if (s != m->cur) m->set[s] = m->set[m->cur]; }, s == m->cur));
+		menu->addChild(createMenuItem("Clear this set", "", [=]() { m->set[s].count = 0; }));
+	}
+
 	void onButton(const ButtonEvent& e) override {
 		OpaqueWidget::onButton(e);
 		if (!module || e.action != GLFW_PRESS) return;
-		if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			int s = -1; int pc = hitKey(e.pos, s);
-			if (pc >= 0) { module->toggleNote(s, pc); e.consume(this); }
+		pressPos = e.pos;
+		int t = hitTab(e.pos);
+		int k = t < 0 ? hitKey(e.pos) : -1;
+		int pc = 0, pn = (t < 0 && k < 0) ? hitProb(e.pos, pc) : -1;
+		if (t < 0 && k < 0 && pn < 0) return;
+		e.consume(this);
+		lastClick = system::getTime();
+		// a chance bar: press sets it from where you press, dragging moves it
+		if (pn >= 0 && e.button == GLFW_MOUSE_BUTTON_LEFT) {
+			dragNote = pn; dragChan = pc; dragY = e.pos.y; setProb(Vec(e.pos.x, dragY));
 			return;
 		}
-		// A RIGHT-CLICK IS ABOUT THE SET UNDER THE MOUSE, not the one playing:
-		// the keyboard you point at is the one you mean.
-		if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
-			int s = hitSet(e.pos);
-			if (s < 0) return;
-			e.consume(this);
-			Canon* m = module;
-			Menu* menu = createMenu();
-			menu->addChild(createMenuLabel(string::f("Set %d", s + 1)));
-			if (s != m->cur) menu->addChild(createMenuItem("Play this set now", "", [=]() { m->selectSet(s); }));
-			menu->addChild(new MenuSeparator);
-			menu->addChild(createMenuLabel("Fill with a voicing"));
-			int count; const Canon::Voicing* V = Canon::voicings(count);
-			for (int i = 0; i < count; i++) {
-				int idx = i;
-				menu->addChild(createMenuItem(V[i].name, "", [=]() { m->applyVoicing(s, idx); }));
-			}
-			menu->addChild(new MenuSeparator);
-			menu->addChild(createMenuItem("Copy from the set playing", "", [=]() { if (s != m->cur) m->set[s] = m->set[m->cur]; }));
-			menu->addChild(createMenuItem("Clear this set", "", [=]() { m->set[s].count = 0; }));
-		}
+		if (t >= 0) module->viewSet = t;
+		if (e.button == GLFW_MOUSE_BUTTON_LEFT && k >= 0)
+			module->toggleAt(module->viewSet, k + CN_KB_LOW - module->root);
+		// A RIGHT-CLICK IS ABOUT THE SET YOU POINT AT, not the one playing
+		if (e.button == GLFW_MOUSE_BUTTON_RIGHT) setMenu(module->viewSet);
+	}
+	float dragY = 0.f;
+	Vec pressPos;
+	void onDragStart(const DragStartEvent& e) override { if (e.button == GLFW_MOUSE_BUTTON_LEFT) e.consume(this); }
+	void onDragMove(const DragMoveEvent& e) override {
+		if (dragNote < 0 || !module) return;
+		dragY += e.mouseDelta.y / getAbsoluteZoom();
+		lastClick = system::getTime();
+		setProb(Vec(0.f, dragY));
+	}
+	void onDragEnd(const DragEndEvent& e) override { dragNote = -1; }
+	void onDoubleClick(const DoubleClickEvent& e) override {
+		// back to always
+		int c = 0, n = module ? hitProb(pressPos, c) : -1;   // (the event carries no position)
+		if (n >= 0) { module->set[clamp(module->viewSet, 0, CN_SETS - 1)].n[n].prob[c] = 1.f; e.consume(this); }
+	}
+	void step() override {
+		OpaqueWidget::step();
+		// follow the set playing, unless you clicked the screen a moment ago
+		if (module && module->viewFollow && system::getTime() - lastClick > CN_VIEW_HOLD) module->viewSet = module->cur;
 	}
 
 	void draw(const DrawArgs& args) override {
-		if (!module) { module = canonPreview(); draw(args); module = nullptr; return; }
+		if (!module) { module = canonPreview(); module->viewSet = module->cur; draw(args); module = nullptr; return; }
 		NVGcontext* vg = args.vg;
 		if (!font || font->handle < 0) font = sfs::screenFontFace();
 		float W = box.size.x, H = box.size.y;
+		bool hasFont = font && font->handle >= 0;
 		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, W, H, mm2px(1.f));
 		nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 		nvgSave(vg); nvgScissor(vg, 0, 0, W, H);
+		int vs = clamp(module->viewSet, 0, CN_SETS - 1);
 
-		// header: the key
-		if (font && font->handle >= 0) {
+		// header: the key and the hint
+		if (hasFont) {
 			sfs::screenFont(vg, font);
 			nvgFillColor(vg, sfs::SCREEN_TEXT);
 			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 			std::string key = std::string(CN_NOTE_NAMES[module->root]) + " ";
 			if (module->sc.index >= 0 && module->sc.index < sfs::NUM_SCALES) key += sfs::SCALES[module->sc.index].longName;
-			nvgText(vg, mm2px(2.5f), mm2px(3.8f), key.c_str(), NULL);
+			nvgText(vg, pad(), mm2px(3.5f), key.c_str(), NULL);
 			nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
 			nvgFillColor(vg, sfs::SCREEN_DIM);
-			nvgText(vg, W - mm2px(2.5f), mm2px(3.8f), "CLICK A KEY TO ADD OR REMOVE A NOTE", NULL);
-			// the channels, in their colours
-			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-			for (int c = 0; c < CN_CH; c++) {
-				float lx = W * 0.5f + (c - 1.5f) * mm2px(5.f);
-				nvgBeginPath(vg); nvgCircle(vg, lx - mm2px(1.6f), mm2px(3.8f), mm2px(0.9f));
-				nvgFillColor(vg, CN_CH_COL[c]); nvgFill(vg);
-				nvgFillColor(vg, sfs::SCREEN_TEXT);
-				char L[2] = {(char)('A' + c), 0};
-				nvgText(vg, lx + mm2px(0.4f), mm2px(3.8f), L, NULL);
-			}
+			nvgText(vg, W - pad(), mm2px(3.5f), "CLICK A KEY TO ADD A NOTE, DRAG A BAR FOR HOW OFTEN IT PLAYS", NULL);
+			// (the channels are named in their colours on the chance rows below)
 		}
 
+		// the tabs: the open one filled, the playing one outlined in orange
 		for (int s = 0; s < CN_SETS; s++) {
-			float x, y, w, h; kbRect(s, x, y, w, h);
-			float kw = w / 7.f;
-			const CanonSet& S = module->set[s];
-			bool inSet[12] = {};
-			for (int k = 0; k < S.count; k++) inSet[module->notePc(S.n[k])] = true;
-			// white keys
-			for (int i = 0; i < 7; i++) {
-				nvgBeginPath(vg);
-				nvgRect(vg, x + i * kw + 0.5f, y, kw - 1.f, h);
-				nvgFillColor(vg, inSet[CN_WHITE_PC[i]] ? sfs::SCREEN_BLUE : sfs::SCREEN_PURP);
-				nvgFill(vg);
-			}
-			// black keys
-			for (int b = 0; b < 5; b++) {
-				float bx = x + (CN_BLACK_AFTER[b] + 1) * kw;
-				nvgBeginPath(vg);
-				nvgRect(vg, bx - kw * 0.3f, y, kw * 0.6f, h * 0.6f);
-				nvgFillColor(vg, inSet[CN_BLACK_PC[b]] ? sfs::SCREEN_DEEP : sfs::SCREEN_BG);
-				nvgFill(vg);
-				nvgStrokeColor(vg, sfs::SCREEN_PMID); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
-			}
-			// WHERE EACH CHANNEL IS. A marker per channel on the note it last
-			// played, and it STAYS there until the next step: drawn only while
-			// the gate was high, the markers blinked with the clock and read
-			// as stray flashes. Each channel has its own row down the key, so
-			// four channels on one note are four marks, not one.
-			if (s == module->cur) {
-				for (int c = 0; c < CN_CH; c++) {
-					const Canon::Ch& C = module->ch[c];
-					if (!C.played || C.rest) continue;
-					int pc = (((int)std::round(C.semi) + module->root) % 12 + 12) % 12;
-					float cx, cy;
-					bool black = false; int bi = 0;
-					for (int b = 0; b < 5; b++) if (CN_BLACK_PC[b] == pc) { black = true; bi = b; }
-					if (black) { cx = x + (CN_BLACK_AFTER[bi] + 1) * kw; cy = y + h * (0.12f + 0.11f * c); }
-					else {
-						int wi = 0; for (int i = 0; i < 7; i++) if (CN_WHITE_PC[i] == pc) wi = i;
-						cx = x + (wi + 0.5f) * kw; cy = y + h * (0.64f + 0.1f * c);
-					}
-					nvgBeginPath(vg); nvgCircle(vg, cx, cy, mm2px(1.0f));
-					nvgFillColor(vg, CN_CH_COL[c]); nvgFill(vg);
-					nvgStrokeColor(vg, sfs::SCREEN_BG); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
-				}
-				nvgBeginPath(vg);
-				nvgRect(vg, x - mm2px(0.8f), y - mm2px(0.8f), w + mm2px(1.6f), h + mm2px(1.6f));
-				nvgStrokeColor(vg, sfs::SCREEN_HOT); nvgStrokeWidth(vg, 1.2f); nvgStroke(vg);
-			}
-			// the set's number and its notes
-			if (font && font->handle >= 0) {
+			float x, y, w, h; tabRect(s, x, y, w, h);
+			bool open = s == vs, playing = s == module->cur;
+			nvgBeginPath(vg); nvgRoundedRect(vg, x, y, w, h, mm2px(0.6f));
+			nvgFillColor(vg, open ? sfs::SCREEN_DEEP : sfs::SCREEN_PURP); nvgFill(vg);
+			if (playing) { nvgStrokeColor(vg, sfs::SCREEN_HOT); nvgStrokeWidth(vg, 1.2f); nvgStroke(vg); }
+			if (hasFont) {
 				sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
 				nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-				nvgFillColor(vg, s == module->cur ? sfs::SCREEN_HOT : sfs::SCREEN_DIM);
-				std::string t = string::f("%d ", s + 1);
-				for (int k = 0; k < S.count; k++) { t += CN_NOTE_NAMES[module->notePc(S.n[k])]; if (k + 1 < S.count) t += " "; }
-				nvgText(vg, x, y + h + mm2px(3.2f), t.c_str(), NULL);
+				nvgFillColor(vg, open || playing ? sfs::SCREEN_TEXT : sfs::SCREEN_DIM);
+				float room = w - mm2px(3.f) - (playing ? mm2px(11.f) : 0.f);
+				nvgText(vg, x + mm2px(1.5f), y + h * 0.5f, setText(vg, s, room).c_str(), NULL);
+				if (playing) {
+					nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+					nvgFillColor(vg, sfs::SCREEN_HOT);
+					nvgText(vg, x + w - mm2px(1.5f), y + h * 0.5f, "PLAYING", NULL);
+				}
+			}
+		}
+		// a line from the open tab down to its keyboard, so the two read as one
+		{
+			float tx, ty, tw, th; tabRect(vs, tx, ty, tw, th);
+			float x, y, w, h; kbRect(x, y, w, h);
+			nvgBeginPath(vg); nvgMoveTo(vg, x, y - mm2px(1.2f)); nvgLineTo(vg, x + w, y - mm2px(1.2f));
+			// from below the tab's own outline (the orange one, when it is playing)
+			nvgMoveTo(vg, tx + tw * 0.5f, ty + th + 1.4f); nvgLineTo(vg, tx + tw * 0.5f, y - mm2px(1.2f));
+			nvgStrokeColor(vg, sfs::SCREEN_LINE); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
+		}
+
+		// the keyboard, the open set's notes lit
+		float x, y, w, h; kbRect(x, y, w, h);
+		float kw = w / (7.f * CN_KB_OCTS);
+		const CanonSet& S = module->set[vs];
+		bool lit[12 * CN_KB_OCTS] = {};
+		for (int k = 0; k < S.count; k++) { int kk = noteKey(S.n[k]); if (kk >= 0) lit[kk] = true; }
+		for (int i = 0; i < 7 * CN_KB_OCTS; i++) {
+			int kk = 12 * (i / 7) + CN_WHITE_PC[i % 7];
+			nvgBeginPath(vg); nvgRect(vg, x + i * kw + 0.5f, y, kw - 1.f, h);
+			nvgFillColor(vg, lit[kk] ? sfs::SCREEN_BLUE : sfs::SCREEN_PURP); nvgFill(vg);
+		}
+		for (int o = 0; o < CN_KB_OCTS; o++)
+			for (int b = 0; b < 5; b++) {
+				float bx = x + (o * 7 + CN_BLACK_AFTER[b] + 1) * kw;
+				nvgBeginPath(vg); nvgRect(vg, bx - kw * 0.3f, y, kw * 0.6f, h * 0.6f);
+				nvgFillColor(vg, lit[12 * o + CN_BLACK_PC[b]] ? sfs::SCREEN_DEEP : sfs::SCREEN_BG); nvgFill(vg);
+				// the outline inside the key, so it ends where the key does
+				// (stroked on the edge it stood half a stroke proud of it)
+				nvgBeginPath(vg); nvgRect(vg, bx - kw * 0.3f + 0.3f, y + 0.3f, kw * 0.6f - 0.6f, h * 0.6f - 0.6f);
+				nvgStrokeColor(vg, sfs::SCREEN_PMID); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
+			}
+		// WHERE EACH CHANNEL IS, while the open set is the one playing. A
+		// marker on the note it last played, kept until its next step (drawn
+		// only while the gate was high they blinked with the clock), each
+		// channel on its own row down the key so four on one note are four.
+		if (vs == module->cur) {
+			for (int c = 0; c < CN_CH; c++) {
+				const Canon::Ch& C = module->ch[c];
+				if (!C.played || C.rest) continue;
+				int kk = module->root + (int)std::round(C.semi) - CN_KB_LOW;
+				if (kk < 0 || kk >= 12 * CN_KB_OCTS) continue;           // an OCT that takes it off the keys
+				float cx; bool black; keyAt(kk, cx, black);
+				float cy = black ? y + h * (0.12f + 0.11f * c) : y + h * (0.64f + 0.1f * c);
+				nvgBeginPath(vg); nvgCircle(vg, cx, cy, mm2px(1.0f));
+				nvgFillColor(vg, CN_CH_COL[c]); nvgFill(vg);
+				nvgStrokeColor(vg, sfs::SCREEN_BG); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
+			}
+		}
+		// the octaves, named at each C (0 V is C4)
+		if (hasFont) {
+			sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
+			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+			for (int o = 0; o < CN_KB_OCTS; o++) {
+				int oct = 4 + (CN_KB_LOW / 12) + o;
+				nvgFillColor(vg, sfs::SCREEN_DIM);
+				nvgText(vg, x + o * 7 * kw + mm2px(0.4f), y + h + mm2px(1.6f), string::f("C%d", oct).c_str(), NULL);
+			}
+		}
+		// HOW OFTEN EACH CHANNEL PLAYS EACH NOTE: a row per channel, a bar
+		// under every note of the open set, full is always. Drag a bar to set
+		// it; double-click puts it back to full.
+		for (int c = 0; c < CN_CH; c++) {
+			float ry, rh; probRow(c, ry, rh);
+			if (hasFont) {
+				sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
+				nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+				nvgFillColor(vg, CN_CH_COL[c]);
+				char L[2] = {(char)('A' + c), 0};
+				nvgText(vg, pad() * 0.5f, ry + rh * 0.5f, L, NULL);
+			}
+			nvgBeginPath(vg); nvgMoveTo(vg, x, ry + rh); nvgLineTo(vg, x + w, ry + rh);
+			nvgStrokeColor(vg, sfs::SCREEN_PURP); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
+			for (int n = 0; n < S.count; n++) {
+				int kk = noteKey(S.n[n]); if (kk < 0) continue;
+				float cx, cw; probCell(kk, cx, cw);
+				float pr = S.n[n].prob[c];
+				nvgBeginPath(vg); nvgRect(vg, cx, ry, cw, rh);
+				nvgFillColor(vg, sfs::SCREEN_PURP); nvgFill(vg);
+				nvgBeginPath(vg); nvgRect(vg, cx, ry + rh * (1.f - pr), cw, rh * pr);
+				nvgFillColor(vg, CN_CH_COL[c]); nvgFill(vg);
 			}
 		}
 		nvgRestore(vg);
@@ -793,6 +1026,9 @@ struct CanonWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem("Harmonic lock (channels choose notes that agree)", "", &m->lock));
 		menu->addChild(createBoolPtrMenuItem("Restart channels on set change", "", &m->restartOnSet));
 		menu->addChild(createBoolPtrMenuItem("Wander may rest", "", &m->wanderRest));
+		menu->addChild(createBoolPtrMenuItem("Screen follows the set playing", "", &m->viewFollow));
+		menu->addChild(createIndexSubmenuItem("A note that misses its chance", {"Rests", "Plays the next note instead"},
+			[=]() { return m->missSkips ? 1 : 0; }, [=](int v) { m->missSkips = v == 1; }));
 		menu->addChild(createIndexPtrSubmenuItem("Gate out", {"Follows the gate in", "10 ms trigger"}, &m->gateMode));
 		// STEP OFFSET, per channel: how many steps ahead of its count the
 		// channel reads. Four channels on one clock with the same pattern and
