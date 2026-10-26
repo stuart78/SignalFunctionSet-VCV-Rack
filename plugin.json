@@ -211,8 +211,7 @@
       "manualUrl": "https://signalfunctionset.com/projects/muse/",
       "tags": [
         "Sequencer",
-        "Random",
-        "Hardware clone"
+        "Random"
       ]
     },
     {
@@ -593,7 +592,7 @@
       "description": "Reverb modelled on real rooms, scanned or built from plans.",
       "tags": [
         "Reverb",
-        "Stereo"
+        "Effect"
       ]
     }
   ]

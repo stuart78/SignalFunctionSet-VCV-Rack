@@ -115,7 +115,12 @@ else
     fi
 fi
 
-total=$((n + tn))
+# The manifest, which the Library checks at the same time: tags it knows, and
+# a modularGridUrl on every Hardware clone.
+"$ROOT/tools/check-manifest.sh"
+mn=$?
+
+total=$((n + tn + mn))
 echo
-echo "$n cppcheck + $tn clang-tidy = $total finding(s) in our own sources."
+echo "$n cppcheck + $tn clang-tidy + $mn manifest = $total finding(s) in our own sources."
 exit "$total"

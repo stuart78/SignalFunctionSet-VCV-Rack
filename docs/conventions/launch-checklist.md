@@ -50,7 +50,10 @@ applies until it comes out.
 
 - [ ] **Tags are real Rack tags.** The Library rejects anything not on its list,
       and it rejects it at submission, after the release is cut. "Drone" is not
-      a tag; that one nearly shipped.
+      a tag; that one nearly shipped. "Stereo" is not one either, and it did
+      ship, on Cistern in 2.23.0. `tools/check-manifest.sh` (run by
+      `static-check.sh`) checks every tag against libRack's own list, and that a
+      module tagged Hardware clone has a `modularGridUrl`.
 
 - [ ] **Description is one short line**, about 85 characters at most. It is a
       browser subtitle, not a summary.
