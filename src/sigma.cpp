@@ -56,6 +56,9 @@ static const int SG_MAXP   = 64;
 // response at the partial and an equal-power pan, for each of up to 64
 // partials -- which put one voice at 60% of the device.
 static const int SG_MM_CTRL = 16;
+// A routed envelope steeper than this (full range per second) is resolved every
+// sample: 50/s is the whole range in 20 ms, a quarter of a 30 Hz LFO's slope.
+static const float SG_ENV_FAST = 50.f;
 static const int SG_VOICES = 16;
 static const int SG_NCOUNT = 3;
 static const int SG_COUNTS[SG_NCOUNT] = {16, 32, 64};
@@ -1473,12 +1476,23 @@ struct Sigma : Module {
 			// the peak half an octave per 16 samples, which is a different
 			// pluck (measured: 3 dB in an octave band). The LFOs, at a few tens
 			// of Hz at most, are nowhere near 3 kHz and hold fine.
+			// Only a FAST segment, though: an envelope crossing its whole range
+			// in under 20 ms. Anything slower moves no faster than an LFO already
+			// held for 16 samples, and a mono gate's notes spend nearly all their
+			// time in attack, decay or release, so resolving every sample there
+			// put each ringing voice at five times its cost (issue #14: ENV->PAN
+			// with a 1.4 s release, 3% of a core became 14%).
+			float envSlope = V.mStage == ST_ATT ? 1.f / std::max(A, 1e-4f)
+			               : V.mStage == ST_DEC ? (1.f - S) / std::max(D, 1e-4f)
+			               : V.mStage == ST_REL ? V.mRelFrom / std::max(R, 1e-4f) : 0.f;
 			const bool envMoving = envRouted
 			    && (V.mStage == ST_ATT || V.mStage == ST_DEC || V.mStage == ST_REL);
 			// Routed ONLY to CUT, a moving envelope changes nothing per partial
 			// except the lowpass's gain at that partial, so that alone is
-			// re-evaluated every sample and the rest keeps the usual 16.
-			const bool resolve = (envMoving && !envCutOnly) || (V.ctl-- <= 0);
+			// re-evaluated every sample (at any speed: it is cheap) and the
+			// rest keeps the usual 16.
+			const bool resolve = (envMoving && envSlope > SG_ENV_FAST && !envCutOnly)
+			                  || (V.ctl-- <= 0);
 			if (resolve) V.ctl = SG_MM_CTRL - 1;
 			const bool filterOnly = envMoving && envCutOnly && !resolve;
 			// The per-partial envelopes: advance() without a branch per
