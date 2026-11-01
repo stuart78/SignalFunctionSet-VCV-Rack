@@ -1,10 +1,9 @@
 #pragma once
-// Concrete's two expanders, over the expander bus, once per sample.
+// Concrete's expander, over the expander bus, once per sample.
 //
-//   Concrete In  (LEFT of Concrete):  the four lanes' recording inputs and REC states.
-//   Concrete Out (RIGHT of Concrete): the four lanes' stereo outputs.
+//   Concrete In (LEFT of Concrete): the four lanes' recording inputs and REC states.
 //
-// Both expanders are dumb: the take buffers and the clips live in Concrete, which
+// The expander is dumb: the take buffers and the clips live in Concrete, which
 // is the only thing that reads or writes them.
 static const int CONCRETE_LANES = 4;
 
@@ -19,9 +18,4 @@ struct ConcreteInMessage {
 struct ConcreteBackMessage {
 	bool recording[CONCRETE_LANES] = {};
 	bool running = false;
-};
-
-// Concrete -> Concrete Out
-struct ConcreteOutMessage {
-	float l[CONCRETE_LANES] = {}, r[CONCRETE_LANES] = {};   // volts, after VOL, FILTER and PAN
 };

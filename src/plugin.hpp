@@ -64,5 +64,4 @@ extern Model* modelCistern;
 extern Model* modelHocket;
 extern Model* modelConcrete;
 extern Model* modelConcreteIn;
-extern Model* modelConcreteOut;
 extern Model* modelWheel;

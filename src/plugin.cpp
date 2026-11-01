@@ -62,7 +62,6 @@ void init(Plugin* p) {
 	p->addModel(modelHocket);
 	p->addModel(modelConcrete);
 	p->addModel(modelConcreteIn);
-	p->addModel(modelConcreteOut);
 	p->addModel(modelWheel);
 
 	// Add modules here

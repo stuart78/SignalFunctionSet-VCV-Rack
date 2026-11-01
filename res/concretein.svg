@@ -16,21 +16,21 @@
     </g>
   </g>
   <g id="Reticules" style="display:none">
-    <circle cx="11.43" cy="30.48" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="11.43" cy="55.88" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="11.43" cy="81.28" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="11.43" cy="106.68" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="21.59" cy="30.48" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="21.59" cy="55.88" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="21.59" cy="81.28" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="21.59" cy="106.68" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="31.75" cy="30.48" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="31.75" cy="55.88" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="31.75" cy="81.28" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="31.75" cy="106.68" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="41.91" cy="30.48" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="41.91" cy="55.88" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="41.91" cy="81.28" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="41.91" cy="106.68" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="11.43" cy="31.56" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="11.43" cy="48.96" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="11.43" cy="66.36" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="11.43" cy="83.76" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="21.59" cy="31.56" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="21.59" cy="48.96" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="21.59" cy="66.36" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="21.59" cy="83.76" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="31.75" cy="31.56" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="31.75" cy="48.96" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="31.75" cy="66.36" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="31.75" cy="83.76" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="41.91" cy="31.56" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="41.91" cy="48.96" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="41.91" cy="66.36" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="41.91" cy="83.76" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
   </g>
 </svg>

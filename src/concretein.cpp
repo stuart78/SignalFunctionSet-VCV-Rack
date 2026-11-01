@@ -66,9 +66,12 @@ struct ConcreteIn : Module {
 };
 
 // Panel: 10HP, code-drawn. One row per lane: REC (latch over nothing, its gate
-// beside it), then the stereo input.
+// beside it), then the stereo input. The rows sit level with the lanes on
+// Concrète's screen (ConcreteDisplay: the screen at y 10.16 mm, 83.82 mm tall,
+// 0.254 mm per design unit, lanes from 50 units down to 6 above the bottom), so
+// each row reads as that lane's input.
 static const float RI_X_NUM = 3.81f, RI_X_REC = 11.43f, RI_X_GATE = 21.59f, RI_X_L = 31.75f, RI_X_R = 41.91f;
-static const float RI_Y0 = 30.48f, RI_PITCH = 25.4f;
+static const float RI_Y0 = 31.56f, RI_PITCH = 17.4f;
 
 struct ConcreteInWidget : ModuleWidget {
 	ConcreteInWidget(ConcreteIn* module) {
@@ -77,7 +80,7 @@ struct ConcreteInWidget : ModuleWidget {
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
-		lbl->title("CONCRETE IN");
+		lbl->title("CONCRÈTE IN");
 		lbl->trim(RI_X_REC, RI_Y0, "REC");
 		lbl->jack(RI_X_GATE, RI_Y0, "GATE");
 		lbl->jack(RI_X_L, RI_Y0, "IN L");

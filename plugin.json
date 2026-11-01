@@ -608,7 +608,7 @@
     },
     {
       "slug": "Concrete",
-      "name": "Concrete",
+      "name": "Concrète",
       "description": "Four-lane clip sampler on a 1-8 bar tape loop with automation.",
       "tags": [
         "Sampler",
@@ -619,20 +619,10 @@
     },
     {
       "slug": "ConcreteIn",
-      "name": "Concrete In",
-      "description": "Expander for Concrete that records each lane from its own input.",
+      "name": "Concrète In",
+      "description": "Expander for Concrète that records each lane from its own input.",
       "tags": [
         "Sampler",
-        "Expander"
-      ],
-      "hidden": true
-    },
-    {
-      "slug": "ConcreteOut",
-      "name": "Concrete Out",
-      "description": "Expander for Concrete with a stereo output for each lane.",
-      "tags": [
-        "Mixer",
         "Expander"
       ],
       "hidden": true

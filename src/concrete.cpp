@@ -21,7 +21,7 @@
 // Tempo: CLOCK and BAR when they are patched (clocks per bar are counted
 // between BARs), BAR alone, or the BPM knob. A clock drives the playhead and a
 // clock that stops stops the tape. Concrete In, on the left, records into the
-// lanes; Concrete Out, on the right, carries each lane's stereo output.
+// lanes. Each lane has its own stereo output beside the mix.
 // Design: docs/concrete-design.md.
 // =============================================================================
 #include "plugin.hpp"
@@ -210,7 +210,8 @@ static inline float ccHermite(float y0, float y1, float y2, float y3, float f) {
 struct Concrete : Module {
 	enum ParamId { BPM_PARAM, LENGTH_PARAM, PLAY_PARAM, RESET_PARAM, PARAMS_LEN };
 	enum InputId { CLOCK_INPUT, BAR_INPUT, PLAY_INPUT, RESET_INPUT, INPUTS_LEN };
-	enum OutputId { L_OUTPUT, R_OUTPUT, OUTPUTS_LEN };
+	// the lane outputs follow the mix, so a patch saved before they existed keeps its mix cables
+	enum OutputId { L_OUTPUT, R_OUTPUT, ENUMS(LANE_L_OUTPUT, CC_N), ENUMS(LANE_R_OUTPUT, CC_N), OUTPUTS_LEN };
 	enum LightId { PLAY_LIGHT, LIGHTS_LEN };
 
 	// ── the tape ────────────────────────────────────────────────────────
@@ -277,19 +278,19 @@ struct Concrete : Module {
 		configInput(RESET_INPUT, "Reset");
 		configOutput(L_OUTPUT, "Left mix");
 		configOutput(R_OUTPUT, "Right mix");
+		for (int l = 0; l < CC_N; l++) {
+			configOutput(LANE_L_OUTPUT + l, string::f("Lane %d left", l + 1));
+			configOutput(LANE_R_OUTPUT + l, string::f("Lane %d right", l + 1));
+		}
 		for (int i = 0; i < CC_SMPS; i++) { smp[i].store(nullptr); unrefSince[i] = 0.0; }
 		for (int l = 0; l < CC_N; l++) { panSet[l] = 2.f; panL[l] = panR[l] = 1.f; }
 		resetCurves();
-		rightExpander.producerMessage = new ConcreteOutMessage();
-		rightExpander.consumerMessage = new ConcreteOutMessage();
 		leftExpander.producerMessage = new ConcreteBackMessage();
 		leftExpander.consumerMessage = new ConcreteBackMessage();
 	}
 	~Concrete() override {
 		for (int i = 0; i < CC_SMPS; i++) delete smp[i].load();
 		for (auto& g : grave) delete g.first;
-		delete (ConcreteOutMessage*)rightExpander.producerMessage;
-		delete (ConcreteOutMessage*)rightExpander.consumerMessage;
 		delete (ConcreteBackMessage*)leftExpander.producerMessage;
 		delete (ConcreteBackMessage*)leftExpander.consumerMessage;
 	}
@@ -649,18 +650,15 @@ struct Concrete : Module {
 			else { filt[l].ic1[0] = filt[l].ic1[1] = filt[l].ic2[0] = filt[l].ic2[1] = 0.f; }
 			xl *= panL[l]; xr *= panR[l];
 			laneL[l] = xl; laneR[l] = xr;
+			outputs[LANE_L_OUTPUT + l].setVoltage(xl);
+			outputs[LANE_R_OUTPUT + l].setVoltage(xr);
 			sumL += xl; sumR += xr;
 		}
 		outputs[L_OUTPUT].setVoltage(ccSoftClip(sumL));
 		outputs[R_OUTPUT].setVoltage(ccSoftClip(sumR));
 		lights[PLAY_LIGHT].setBrightness(running ? 1.f : 0.f);
 
-		// ── the expanders ──
-		if (rightExpander.module && rightExpander.module->model == modelConcreteOut) {
-			auto* m = (ConcreteOutMessage*)rightExpander.producerMessage;
-			for (int l = 0; l < CC_N; l++) { m->l[l] = laneL[l]; m->r[l] = laneR[l]; }
-			rightExpander.requestMessageFlip();
-		}
+		// ── the expander ──
 		if (leftExpander.module && leftExpander.module->model == modelConcreteIn) {
 			auto* m = (ConcreteBackMessage*)leftExpander.producerMessage;
 			for (int l = 0; l < CC_N; l++) m->recording[l] = recNow[l];
@@ -1950,12 +1948,13 @@ struct ConcreteDisplay : OpaqueWidget {
 // =============================================================================
 // Panel: 32HP, code-drawn until the Figma pass. The screen across the top;
 // under it the tempo (BPM, or CLOCK under it), the loop LENGTH (BAR under it),
-// PLAY and RESET over their jacks, and the mix on a plate at the right.
+// PLAY and RESET over their jacks, then each lane's output, L over R, and the
+// mix on its own plate at the right.
 // =============================================================================
 static const float CC_SX = 5.08f, CC_SY = 10.16f, CC_SW = 152.4f, CC_SH = 83.82f;
 static const float CC_Y_CTL = 104.14f, CC_Y_JACK = 119.38f;
 static const float CC_C1 = 12.7f, CC_C2 = 27.94f, CC_C3 = 43.18f, CC_C4 = 55.88f;
-static const float CC_X_L = 142.24f, CC_X_R = 152.4f;
+static const float CC_X_LANE = 96.52f, CC_X_LPITCH = 12.7f, CC_X_MIX = 151.13f, CC_X_LR = 86.36f;
 
 struct ConcreteWidget : ModuleWidget {
 	ConcreteWidget(Concrete* module) {
@@ -1964,7 +1963,7 @@ struct ConcreteWidget : ModuleWidget {
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
-		lbl->title("CONCRETE");
+		lbl->title("CONCRÈTE");
 
 		ConcreteDisplay* disp = new ConcreteDisplay();
 		disp->module = module;
@@ -1990,10 +1989,18 @@ struct ConcreteWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C2, CC_Y_JACK)), module, Concrete::BAR_INPUT));
 		lbl->jack(CC_C2, CC_Y_JACK, "BAR");
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_L, CC_Y_JACK)), module, Concrete::L_OUTPUT));
-		lbl->jackOnPlate(CC_X_L, CC_Y_JACK, "L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_R, CC_Y_JACK)), module, Concrete::R_OUTPUT));
-		lbl->jackOnPlate(CC_X_R, CC_Y_JACK, "R");
+		// the outputs: L on the control row, R on the jack row
+		lbl->add(CC_X_LR, CC_Y_CTL + 0.83f, "L");
+		lbl->add(CC_X_LR, CC_Y_JACK + 0.83f, "R");
+		for (int l = 0; l < CC_N; l++) {
+			float x = CC_X_LANE + CC_X_LPITCH * l;
+			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, CC_Y_CTL)), module, Concrete::LANE_L_OUTPUT + l));
+			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, CC_Y_JACK)), module, Concrete::LANE_R_OUTPUT + l));
+			lbl->jackOnPlate(x, CC_Y_CTL, string::f("%d", l + 1));
+		}
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_MIX, CC_Y_CTL)), module, Concrete::L_OUTPUT));
+		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_MIX, CC_Y_JACK)), module, Concrete::R_OUTPUT));
+		lbl->jackOnPlate(CC_X_MIX, CC_Y_CTL, "MIX");
 	}
 
 	void step() override {

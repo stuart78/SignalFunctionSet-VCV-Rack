@@ -18,7 +18,6 @@
 #include <string>
 rack::plugin::Plugin* pluginInstance = nullptr;
 Model* modelConcreteIn = nullptr;
-Model* modelConcreteOut = nullptr;
 
 static const float SR = 48000.f;
 static int fails = 0;
@@ -102,6 +101,18 @@ int main() {
 		double held = r.m.P;
 		r.run(4800);
 		check(r.m.P == held, "stopped, the playhead holds");
+	}
+
+	printf("\n== the lane outputs ==\n");
+	{
+		Rig r; r.put(0, dc(0.2f, 10.f), 0.f); r.put(2, dc(0.1f, 10.f), 0.f); r.play(); r.run(4800);
+		float lane0 = r.m.outputs[Concrete::LANE_L_OUTPUT + 0].getVoltage(), lane2 = r.m.outputs[Concrete::LANE_L_OUTPUT + 2].getVoltage();
+		float sum = 0.f;
+		for (int l = 0; l < CC_N; l++) sum += r.m.outputs[Concrete::LANE_L_OUTPUT + l].getVoltage();
+		check(lane0 > 0.5f && lane2 > 0.2f && r.m.outputs[Concrete::LANE_L_OUTPUT + 1].getVoltage() == 0.f,
+			string::f("each lane has its own output (%.3f, 0, %.3f V)", lane0, lane2));
+		check(std::fabs(sum - r.m.outputs[Concrete::L_OUTPUT].getVoltage()) < 0.05f,
+			string::f("below the clip, the lanes sum to the mix (%.3f against %.3f V)", sum, r.m.outputs[Concrete::L_OUTPUT].getVoltage()));
 	}
 
 	printf("\n== a clip on its bar ==\n");

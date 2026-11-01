@@ -1,8 +1,10 @@
-# Concrete
+# Concrète
 
-Four lanes of samples on one tape loop (32HP), with two expanders: **Concrete In**
-(10HP, on the left) records into the lanes, and **Concrete Out** (10HP, on the right)
-carries each lane's stereo output.
+Four lanes of samples on one tape loop (32HP), with each lane's stereo output on
+the panel (L over R) beside the mix, and one expander: **Concrète In** (10HP, on
+the left) records into the lanes. Its rows sit level with the lanes on the
+screen. (Concrete Out, a 10HP expander for the lane outputs, was folded into the
+panel on 2026-11-01. The slugs stay ASCII: `Concrete`, `ConcreteIn`.)
 
 ## The tape
 
@@ -97,8 +99,8 @@ A curve is **points joined by straight lines**, edited like vector art:
 The points are rendered into 64 values a bar for the audio thread, and the
 curves are slewed by 5 ms, so a step does not click.
 
-The chain per lane is **clip → VOL → FILTER → PAN**. That is what Concrete Out
-carries, and the four lanes sum to Concrete's L/R mix. The mix is soft-clipped:
+The chain per lane is **clip → VOL → FILTER → PAN**. That is what each lane's
+output carries, unclipped, and the four lanes sum to Concrete's L/R mix. The mix is soft-clipped:
 linear to 6 V, asymptotic to 10 V.
 
 ## Editing on the screen (CLIPS tab)
