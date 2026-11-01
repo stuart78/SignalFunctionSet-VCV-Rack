@@ -486,6 +486,8 @@ PLATES = {
     "strata": [(44.45, 110.49, 72.39, 16.51)],
     # the two outputs at the foot
     "cistern": [(80.01, 110.49, 26.67, 16.51)],
+    # the CV, GATE, L and R columns of the eight channel rows
+    "hocket": [(65.53, 12.70, 41.66, 114.30)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -530,6 +532,7 @@ MODULES = {
     "carillon":    ("Carillon",    "src/carillon.cpp",    "res/carillon.svg",    {}),
     "strata":      ("Strata",      "src/strata.cpp",      "res/strata.svg",      {}),
     "cistern":     ("Cistern",     "src/cistern.cpp",     "res/cistern.svg",     {}),
+    "hocket":      ("Hocket",      "src/hocket.cpp",      "res/hocket.svg",      {"HK_N": 8}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),

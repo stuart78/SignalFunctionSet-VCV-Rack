@@ -594,6 +594,17 @@
         "Reverb",
         "Effect"
       ]
+    },
+    {
+      "slug": "Hocket",
+      "name": "Hocket",
+      "description": "Deals one line of notes or audio across eight channels.",
+      "tags": [
+        "Switch",
+        "Sequencer",
+        "Random"
+      ],
+      "hidden": true
     }
   ]
 }

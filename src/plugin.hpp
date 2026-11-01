@@ -61,4 +61,5 @@ extern Model* modelCount;
 extern Model* modelCarillon;
 extern Model* modelStrata;
 extern Model* modelCistern;
+extern Model* modelHocket;
 extern Model* modelWheel;
