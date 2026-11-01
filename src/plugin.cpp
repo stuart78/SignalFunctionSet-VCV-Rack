@@ -60,6 +60,9 @@ void init(Plugin* p) {
 	p->addModel(modelStrata);
 	p->addModel(modelCistern);
 	p->addModel(modelHocket);
+	p->addModel(modelConcrete);
+	p->addModel(modelConcreteIn);
+	p->addModel(modelConcreteOut);
 	p->addModel(modelWheel);
 
 	// Add modules here

@@ -488,6 +488,11 @@ PLATES = {
     "cistern": [(80.01, 110.49, 26.67, 16.51)],
     # the CV, GATE, L and R columns of the eight channel rows
     "hocket": [(65.53, 12.70, 41.66, 114.30)],
+    # the mix pair at the foot right
+    "concrete": [(135.89, 109.22, 22.86, 17.78)],
+    "concretein": [],
+    # the eight lane outputs, one block
+    "concreteout": [(14.73, 21.59, 21.34, 92.71)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -533,6 +538,9 @@ MODULES = {
     "strata":      ("Strata",      "src/strata.cpp",      "res/strata.svg",      {}),
     "cistern":     ("Cistern",     "src/cistern.cpp",     "res/cistern.svg",     {}),
     "hocket":      ("Hocket",      "src/hocket.cpp",      "res/hocket.svg",      {"HK_N": 8}),
+    "concrete":    ("Concrete",    "src/concrete.cpp",    "res/concrete.svg",    {}),
+    "concretein":  ("ConcreteIn",  "src/concretein.cpp",  "res/concretein.svg",  {"CONCRETE_LANES": 4}),
+    "concreteout": ("ConcreteOut", "src/concreteout.cpp", "res/concreteout.svg", {"CONCRETE_LANES": 4}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),

@@ -605,6 +605,37 @@
         "Random"
       ],
       "hidden": true
+    },
+    {
+      "slug": "Concrete",
+      "name": "Concrete",
+      "description": "Four lanes of samples on one tape loop, with drawn volume, filter and pan.",
+      "tags": [
+        "Sampler",
+        "Sequencer",
+        "Mixer"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "ConcreteIn",
+      "name": "Concrete In",
+      "description": "Records into Concrete's four lanes. Place it to the left of Concrete.",
+      "tags": [
+        "Sampler",
+        "Expander"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "ConcreteOut",
+      "name": "Concrete Out",
+      "description": "Each of Concrete's four lanes as a stereo output. Place it to the right of Concrete.",
+      "tags": [
+        "Mixer",
+        "Expander"
+      ],
+      "hidden": true
     }
   ]
 }
