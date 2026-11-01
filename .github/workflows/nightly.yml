@@ -84,10 +84,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { runner: macos-14,      sdk: mac-arm64 }
+          # macos-14 images were retired on 2026-11-02 (brownouts cancelled the
+          # mac jobs before that); macos-15 is Apple Silicon too.
+          - { runner: macos-15,      sdk: mac-arm64 }
           # mac-x64 is cross-compiled on the (plentiful) Apple-Silicon runner via
           # clang --target — macos-13 Intel runners are scarce and queue forever.
-          - { runner: macos-14,      sdk: mac-x64, cross: x86_64-apple-darwin }
+          - { runner: macos-15,      sdk: mac-x64, cross: x86_64-apple-darwin }
           - { runner: ubuntu-latest, sdk: lin-x64   }
     steps:
       - name: Check out plugin
