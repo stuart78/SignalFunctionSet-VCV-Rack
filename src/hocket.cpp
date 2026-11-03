@@ -473,7 +473,7 @@ static const float HK_SX = 5.08f, HK_SY = 10.16f, HK_SW = 40.64f, HK_SH = 40.64f
 static const float HK_LX[4] = {10.16f, 20.32f, 30.48f, 40.64f};
 static const float HK_Y_P1 = 64.77f, HK_Y_P2 = 78.74f, HK_Y_P3 = 92.71f, HK_Y_IN = 120.65f;
 static const float HK_RULE_Y = 99.06f;
-static const float HK_X_NUM = 52.07f, HK_X_ON = 60.96f, HK_X_CV = 71.12f, HK_X_GATE = 81.28f;
+static const float HK_X_NUM = 55.88f, HK_X_ON = 60.96f, HK_X_CV = 71.12f, HK_X_GATE = 81.28f;
 static const float HK_X_L = 91.44f, HK_X_R = 101.6f;
 static const float HK_RY0 = 22.86f, HK_RPITCH = 13.97f;
 static const float HK_HEAD_Y = 17.06f;
