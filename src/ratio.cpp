@@ -270,7 +270,7 @@ struct RatioWidget : ModuleWidget {
 		float rowY[RN] = {62.f, 78.f, 94.f, 110.f};
 		for (int i = 0; i < RN; i++) {
 			float y = rowY[i];
-			addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(12.f, y)), module, Ratio::RATIO_PARAM + i));
+			addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(12.f, y)), module, Ratio::RATIO_PARAM + i));
 			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.f, y)), module, Ratio::RATIOCV_INPUT + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(37.f, y)), module, Ratio::SLEW_PARAM + i));
 			addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<RedLight>>>(

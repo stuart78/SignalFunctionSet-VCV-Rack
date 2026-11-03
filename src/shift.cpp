@@ -501,7 +501,7 @@ struct ShiftWidget : ModuleWidget {
 		const float xGate    = 73.66f;
 		for (int i = 0; i < NUM_OUTS; i++) {
 			float y = rowYs[i];
-			addParam(createParamCentered<RoundBlackKnob>(
+			addParam(createParamCentered<Rogan1PWhite>(
 				mm2px(Vec(xPot, y)), module, Shift::N_PARAM_A + i));
 			addInput(createInputCentered<PJ301MPort>(
 				mm2px(Vec(xStepCV, y)), module, Shift::STEP_CV_INPUT_A + i));

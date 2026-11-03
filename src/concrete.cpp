@@ -2218,18 +2218,18 @@ struct ConcreteWidget : ModuleWidget {
 		disp->box.size = mm2px(Vec(CC_SW, CC_SH));
 		addChild(disp);
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(CC_C1, CC_Y_CTL)), module, Concrete::BPM_PARAM));
-		lbl->knob(CC_C1, CC_Y_CTL, "BPM");
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(CC_C2, CC_Y_CTL)), module, Concrete::LENGTH_PARAM));
-		lbl->knob(CC_C2, CC_Y_CTL, "BARS");
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(CC_C1, CC_Y_CTL)), module, Concrete::BPM_PARAM));
+		lbl->rogan(CC_C1, CC_Y_CTL, "BPM");
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(CC_C2, CC_Y_CTL)), module, Concrete::LENGTH_PARAM));
+		lbl->rogan(CC_C2, CC_Y_CTL, "BARS");
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(mm2px(Vec(CC_C3, CC_Y_CTL)), module, Concrete::PLAY_PARAM, Concrete::PLAY_LIGHT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C3, CC_Y_JACK)), module, Concrete::PLAY_INPUT));
 		// on the knobs' baseline, so the row of labels reads as one line
-		lbl->add(CC_C3, CC_Y_CTL - sfs::LABEL_GAP_KNOB, "PLAY");
+		lbl->add(CC_C3, CC_Y_CTL - sfs::LABEL_GAP_ROGAN, "PLAY");
 		lbl->link(CC_C3, CC_Y_CTL, CC_C3, CC_Y_JACK);
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CC_C4, CC_Y_CTL)), module, Concrete::RESET_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C4, CC_Y_JACK)), module, Concrete::RESET_INPUT));
-		lbl->add(CC_C4, CC_Y_CTL - sfs::LABEL_GAP_KNOB, "RESET");
+		lbl->add(CC_C4, CC_Y_CTL - sfs::LABEL_GAP_ROGAN, "RESET");
 		lbl->link(CC_C4, CC_Y_CTL, CC_C4, CC_Y_JACK);
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C1, CC_Y_JACK)), module, Concrete::CLOCK_INPUT));
 		lbl->jack(CC_C1, CC_Y_JACK, "CLOCK");

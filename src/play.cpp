@@ -1371,8 +1371,8 @@ struct PlayWidget : ModuleWidget {
 		disp->box.size = mm2px(Vec(73.f, 57.f));
 		addChild(disp);
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 81.18f)), module, Play::INSTR_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 101.50f)), module, Play::LEVEL_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 81.18f)), module, Play::INSTR_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 101.50f)), module, Play::LEVEL_PARAM));
 
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 81.18f)), module, Play::INSTR_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 101.50f)), module, Play::LEVEL_CV_INPUT));

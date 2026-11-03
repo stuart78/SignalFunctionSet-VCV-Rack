@@ -1011,9 +1011,9 @@ struct SliceWidget : ModuleWidget {
 
 		// ── the controls, one row ────────────────────────────────────────────
 		const float CY = 81.28f, TY = 80.39f;
-		addParam(createParamCentered<RoundLargeBlackKnob>(mm2px(Vec(8.47f,  CY)), module, Slice::EFFECT_PARAM));
-		addParam(createParamCentered<RoundLargeBlackKnob>(mm2px(Vec(23.71f, CY)), module, Slice::RATIO_PARAM));
-		addParam(createParamCentered<RoundLargeBlackKnob>(mm2px(Vec(38.95f, CY)), module, Slice::SHAPE_PARAM));
+		addParam(createParamCentered<Rogan2PWhite>(mm2px(Vec(8.47f,  CY)), module, Slice::EFFECT_PARAM));
+		addParam(createParamCentered<Rogan2PWhite>(mm2px(Vec(23.71f, CY)), module, Slice::RATIO_PARAM));
+		addParam(createParamCentered<Rogan2PWhite>(mm2px(Vec(38.95f, CY)), module, Slice::SHAPE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(54.99f, TY)), module, Slice::DEPTH_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(66.84f, TY)), module, Slice::LENGTH_PARAM));
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(

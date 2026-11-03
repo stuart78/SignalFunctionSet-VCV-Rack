@@ -23,11 +23,11 @@
     </g>
   </g>
   <g id="Reticules" style="display:none">
-    <circle cx="60.00" cy="94.49" r="17.82" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
-    <circle cx="180.00" cy="94.49" r="17.82" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
-    <circle cx="45.00" cy="159.45" r="14.03" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
+    <circle cx="60.00" cy="94.49" r="16.98" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
+    <circle cx="180.00" cy="94.49" r="16.98" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
+    <circle cx="45.00" cy="159.45" r="15.54" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
     <circle cx="75.00" cy="159.45" r="11.73" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
-    <circle cx="165.00" cy="159.45" r="14.03" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
+    <circle cx="165.00" cy="159.45" r="15.54" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
     <circle cx="195.00" cy="159.45" r="11.73" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
     <circle cx="40.28" cy="218.50" r="11.73" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>
     <circle cx="93.43" cy="218.50" r="11.73" fill="none" stroke="#b2b2b2" stroke-width="0.50"/>

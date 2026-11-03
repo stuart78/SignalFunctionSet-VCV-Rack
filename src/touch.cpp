@@ -316,26 +316,29 @@ struct TouchWidget : ModuleWidget {
 		auto* lab = new sfs::PanelLabels();
 		lab->box.size = box.size;
 		lab->title("TOUCH");
+		addChild(lab);
 
-		addParam(createParamCentered<RoundLargeBlackKnob>(
+		addParam(createParamCentered<Rogan2PWhite>(
 			mm2px(Vec(X_KNOB_L, Y_STYLE)), module, Touch::STYLEA_PARAM));
-		addParam(createParamCentered<RoundLargeBlackKnob>(
+		addParam(createParamCentered<Rogan2PWhite>(
 			mm2px(Vec(X_KNOB_R, Y_STYLE)), module, Touch::STYLEB_PARAM));
 		lab->knobLarge(X_KNOB_L, Y_STYLE, "STYLE A");
 		lab->knobLarge(X_KNOB_R, Y_STYLE, "STYLE B");
 
 		// pot and its CV two cells apart on the same row, joined by a hairline
-		addParam(createParamCentered<RoundBlackKnob>(
+		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(X_KNOB_L - 5.08f, Y_MB)), module, Touch::MORPH_PARAM));
 		addInput(createInputCentered<PJ301MPort>(
 			mm2px(Vec(X_KNOB_L + 5.08f, Y_MB)), module, Touch::MORPH_CV_INPUT));
-		lab->pair(X_KNOB_L - 5.08f, Y_MB, "MORPH");
+		lab->rogan(X_KNOB_L - 5.08f, Y_MB, "MORPH");
+		lab->link(X_KNOB_L - 5.08f, Y_MB, X_KNOB_L + 5.08f, Y_MB);
 
-		addParam(createParamCentered<RoundBlackKnob>(
+		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(X_KNOB_R - 5.08f, Y_MB)), module, Touch::BIAS_PARAM));
 		addInput(createInputCentered<PJ301MPort>(
 			mm2px(Vec(X_KNOB_R + 5.08f, Y_MB)), module, Touch::BIAS_CV_INPUT));
-		lab->pair(X_KNOB_R - 5.08f, Y_MB, "BIAS");
+		lab->rogan(X_KNOB_R - 5.08f, Y_MB, "BIAS");
+		lab->link(X_KNOB_R - 5.08f, Y_MB, X_KNOB_R + 5.08f, Y_MB);
 
 		const char* inLab1[4] = {"V/OCT", "GATE", "ACCENT", "VEL"};
 		const int   inId1[4]  = {Touch::VOCT_INPUT, Touch::GATE_INPUT,
@@ -366,8 +369,6 @@ struct TouchWidget : ModuleWidget {
 			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(X_OUT[i], Y_OUT)), module, outId[i]));
 			lab->jackOnPlate(X_OUT[i], Y_OUT, outLab[i]);
 		}
-
-		addChild(lab);
 	}
 
 	void appendContextMenu(Menu* menu) override {

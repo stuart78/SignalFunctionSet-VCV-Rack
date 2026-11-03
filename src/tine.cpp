@@ -264,7 +264,7 @@ struct TineWidget : ModuleWidget {
 		// 8HP = 40.64mm, 3 columns: 10.16, 20.32, 30.48
 
 		// Freq knob (huge, centered) Y=30.48
-		addParam(createParamCentered<RoundHugeBlackKnob>(
+		addParam(createParamCentered<Rogan3PSWhite>(
 			mm2px(Vec(20.32f, 30.48f)), module, Tine::FREQ_PARAM));
 
 		// Middle row Y=60.96: Damping knob (small), Damp CV (center), Ping (right)

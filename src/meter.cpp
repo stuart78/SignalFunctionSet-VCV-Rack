@@ -1435,8 +1435,8 @@ struct MeterWidget : ModuleWidget {
 		addChild(display);
 
 		// --- LEFT COLUMN: clock/transport controls (positions per Meter SVG) ---
-		// BPM knob (smaller — RoundBlackKnob, was RoundHugeBlackKnob)
-		addParam(createParamCentered<RoundBlackKnob>(
+		// BPM knob
+		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(10.06f, 50.79f)), module, Meter::BPM_PARAM));
 		// BPM CV jack (right of BPM knob)
 		addInput(createInputCentered<PJ301MPort>(
@@ -1446,15 +1446,15 @@ struct MeterWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(
 			mm2px(Vec(10.16f, 71.11f)), module, Meter::EXT_CLOCK_INPUT));
 
-		// NUM + DEN knobs and their CV jacks
-		addParam(createParamCentered<RoundBlackKnob>(
-			mm2px(Vec(10.16f, 88.89f)), module, Meter::NUMERATOR_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(
-			mm2px(Vec(20.32f, 88.89f)), module, Meter::DENOMINATOR_PARAM));
+		// NUM + DEN knobs and their CV jacks, 11.43 mm apart: a Rogan1P is 10.63 across
+		addParam(createParamCentered<Rogan1PWhite>(
+			mm2px(Vec(9.525f, 88.89f)), module, Meter::NUMERATOR_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(
+			mm2px(Vec(20.955f, 88.89f)), module, Meter::DENOMINATOR_PARAM));
 		addInput(createInputCentered<PJ301MPort>(
-			mm2px(Vec(10.16f, 101.59f)), module, Meter::NUMERATOR_INPUT));
+			mm2px(Vec(9.525f, 101.59f)), module, Meter::NUMERATOR_INPUT));
 		addInput(createInputCentered<PJ301MPort>(
-			mm2px(Vec(20.32f, 101.59f)), module, Meter::DENOMINATOR_INPUT));
+			mm2px(Vec(20.955f, 101.59f)), module, Meter::DENOMINATOR_INPUT));
 
 		// Bottom row (y=121.92): RUN button + RUN gate, RST button, RESET out
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(

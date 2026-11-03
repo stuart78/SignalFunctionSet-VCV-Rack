@@ -19,8 +19,8 @@
     </g>
   </g>
   <g id="Reticules" style="display:none">
-    <circle cx="12.70" cy="104.14" r="4.75" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
-    <circle cx="27.94" cy="104.14" r="2.99" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="12.70" cy="104.14" r="5.26" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
+    <circle cx="27.94" cy="104.14" r="5.26" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
     <circle cx="43.18" cy="104.14" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
     <circle cx="43.18" cy="119.38" r="3.97" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>
     <circle cx="55.88" cy="104.14" r="3.02" fill="none" stroke="#b2b2b2" stroke-width="0.17"/>

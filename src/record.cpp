@@ -728,12 +728,12 @@ struct RecordWidget : ModuleWidget {
 		addChild(disp);
 
 		// Knobs: 2 columns (x=10.16, 30.48) × 3 rows (y=79.83, 100.81, 122.16)
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 79.83f)), module, Record::START_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48f, 79.83f)), module, Record::SPACING_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 100.81f)), module, Record::OCTAVES_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48f, 100.81f)), module, Record::VELLAYERS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 122.16f)), module, Record::TAIL_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48f, 122.16f)), module, Record::SUSTAIN_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 79.83f)), module, Record::START_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48f, 79.83f)), module, Record::SPACING_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 100.81f)), module, Record::OCTAVES_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48f, 100.81f)), module, Record::VELLAYERS_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 122.16f)), module, Record::TAIL_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48f, 122.16f)), module, Record::SUSTAIN_PARAM));
 
 		addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(55.88f, 78.14f)), module, Record::AUDITION_PARAM, Record::AUDITION_LIGHT));

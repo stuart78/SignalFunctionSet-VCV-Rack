@@ -95,6 +95,9 @@ LINK_W = 0.169 * MM
 
 # Real component sizes in px, the same table panel_reticules.py works from.
 PARTS = [
+    ("Rogan3PSWhite",       "round", 51.844, 51.844),
+    ("Rogan2PWhite",        "round", 34.293, 34.293),
+    ("Rogan1PWhite",        "round", 31.398, 31.398),
     ("RoundHugeBlackKnob",  "round", 53.859, 53.859),
     ("RoundLargeBlackKnob", "round", 36.000, 36.000),
     ("RoundBlackKnob",      "round", 28.348, 28.348),

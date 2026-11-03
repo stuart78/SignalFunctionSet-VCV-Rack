@@ -509,9 +509,9 @@ struct CycleWidget : ModuleWidget {
 
 		// Globals — left-most column. Knobs top→bottom: PHASE, STAB, FREQ,
 		// each paired with its CV jack to the right.
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 60.95f)), module, Cycle::PHASE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 81.27f)), module, Cycle::STAB_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16f, 101.59f)), module, Cycle::FREQ_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 60.95f)), module, Cycle::PHASE_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 81.27f)), module, Cycle::STAB_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 101.59f)), module, Cycle::FREQ_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 60.95f)), module, Cycle::PHASE_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 81.27f)), module, Cycle::STAB_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 101.59f)), module, Cycle::FREQ_INPUT));

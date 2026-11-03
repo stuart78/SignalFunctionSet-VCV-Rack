@@ -930,26 +930,26 @@ struct WaveWidget : ModuleWidget {
 		const float xL = 14.f, xC = 40.64f, xR = 67.28f;
 
 		// Row 1: Peaks, Bias, Transition (knob + CV)
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xL, 52.f)), module, Wave::PEAKS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xC, 52.f)), module, Wave::BIAS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xR, 52.f)), module, Wave::TRANSITION_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xL, 52.f)), module, Wave::PEAKS_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xC, 52.f)), module, Wave::BIAS_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xR, 52.f)), module, Wave::TRANSITION_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, 64.f)), module, Wave::PEAKS_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xC, 64.f)), module, Wave::BIAS_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 64.f)), module, Wave::TRANSITION_CV_INPUT));
 
 		// Row 2: Skew, Width, Fold
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xL, 78.f)), module, Wave::SKEW_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xC, 78.f)), module, Wave::WIDTH_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(xR, 78.f)), module, Wave::FOLD_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xL, 78.f)), module, Wave::SKEW_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xC, 78.f)), module, Wave::WIDTH_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(xR, 78.f)), module, Wave::FOLD_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, 90.f)), module, Wave::SKEW_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xC, 90.f)), module, Wave::WIDTH_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 90.f)), module, Wave::FOLD_CV_INPUT));
 
 		// Macro row at y=104: WANDER pair, WT VEL pair, ACCEL trimpot, SNAP button + CV
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.f, 104.f)), module, Wave::WANDER_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.f, 104.f)), module, Wave::WANDER_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.f, 104.f)), module, Wave::WANDER_CV_INPUT));
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(33.f, 104.f)), module, Wave::WT_VEL_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(33.f, 104.f)), module, Wave::WT_VEL_PARAM));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(43.f, 104.f)), module, Wave::WT_VEL_CV_INPUT));
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(54.f, 104.f)), module, Wave::ACCEL_PARAM));

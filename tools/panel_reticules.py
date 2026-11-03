@@ -44,6 +44,8 @@ SIZES = {
     "Rogan1PBlue": (31.398, 31.398), "Rogan1PSBlue": (39.684, 39.684),
     "Rogan2PBlue": (34.293, 34.293), "Rogan3PBlue": (41.762, 41.762),
     "Rogan3PSBlue": (51.844, 51.844), "Rogan5PSGray": (59.527, 59.527),
+    "Rogan1PWhite": (31.398, 31.398), "Rogan2PWhite": (34.293, 34.293),
+    "Rogan3PSWhite": (51.844, 51.844),
     "CKSS": (14.0, 20.641), "CKSSThree": (13.457, 28.348),
     "VCVButton": (18.0, 18.0), "VCVLightBezel": (21.26, 21.26),
     "VCVLightLatch": (18.0, 18.0), "VCVSlider": (19.843, 76.535),

@@ -1114,16 +1114,16 @@ struct MetaFugueWidget : ModuleWidget {
 		// ══════════════════════════════════════════════════════════════════════
 
 		// ── Knob row 1: Root, Scale ──
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow1Y)), module, MetaFugue::ROOT_PARAM));
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol2X, knobRow1Y)), module, MetaFugue::SCALE_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol1X, knobRow1Y)), module, MetaFugue::ROOT_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow1Y)), module, MetaFugue::SCALE_PARAM));
 
 		// ── CV row 1: Root CV, Scale CV ──
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow1Y)), module, MetaFugue::ROOT_CV_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow1Y)), module, MetaFugue::SCALE_CV_INPUT));
 
 		// ── Knob row 2: Steps, Slew ──
-		addParam(createParamCentered<RoundBlackSnapKnob>(mm2px(Vec(knobCol1X, knobRow2Y)), module, MetaFugue::STEPS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(knobCol2X, knobRow2Y)), module, MetaFugue::SLEW_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol1X, knobRow2Y)), module, MetaFugue::STEPS_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow2Y)), module, MetaFugue::SLEW_PARAM));
 
 		// ── CV row 2: Steps CV, Slew CV ──
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow2Y)), module, MetaFugue::STEPS_CV_INPUT));

@@ -59,6 +59,9 @@ Taken from Rack's own `res/ComponentLibrary`, in px (÷2.952756 for mm):
 
 | Component | px | Component | px |
 |---|---|---|---|
+| `Rogan3PSWhite` | 51.84 | | |
+| `Rogan2PWhite` | 34.29 | | |
+| `Rogan1PWhite` | 31.40 | | |
 | `RoundHugeBlackKnob` | 53.86 | `PJ301MPort` | 23.70 |
 | `RoundLargeBlackKnob` | 36.00 | `CKSS` | 14.00 × 20.64 |
 | `RoundBlackKnob` | 28.35 | `CKSSThree` | 13.46 × 28.35 |

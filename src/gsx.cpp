@@ -363,15 +363,15 @@ struct GsxWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/gsx.svg")));
 
 
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 28.79)), module, Gsx::PARAMFREQUENCY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 28.79)), module, Gsx::PARAMSTREAMS_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 28.79)), module, Gsx::PARAMSHAPE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 59.27)), module, Gsx::PARAMRANGE_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 59.27)), module, Gsx::PARAMDURATION_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 59.27)), module, Gsx::PARAMDELAY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(10.16, 89.75)), module, Gsx::PARAMDENSITY_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(30.48, 89.75)), module, Gsx::PARAMVARIATION_PARAM));
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(50.8, 89.75)), module, Gsx::PARAMSPREAD_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16, 28.79)), module, Gsx::PARAMFREQUENCY_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48, 28.79)), module, Gsx::PARAMSTREAMS_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(50.8, 28.79)), module, Gsx::PARAMSHAPE_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16, 59.27)), module, Gsx::PARAMRANGE_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48, 59.27)), module, Gsx::PARAMDURATION_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(50.8, 59.27)), module, Gsx::PARAMDELAY_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16, 89.75)), module, Gsx::PARAMDENSITY_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48, 89.75)), module, Gsx::PARAMVARIATION_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(50.8, 89.75)), module, Gsx::PARAMSPREAD_PARAM));
 
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 41.49)), module, Gsx::INFREQUENCY_INPUT));
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 41.49)), module, Gsx::INSTREAMS_INPUT));

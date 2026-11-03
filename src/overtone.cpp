@@ -428,7 +428,7 @@ struct OvertoneWidget : ModuleWidget {
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(43.21f, 77.05f)), module, Overtone::FILTER_INPUT));
 
 		// Frequency knob (Y=101.6mm)
-		addParam(createParamCentered<RoundBlackKnob>(mm2px(Vec(7.62f, 101.6f)), module, Overtone::FREQ_PARAM));
+		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(7.62f, 101.6f)), module, Overtone::FREQ_PARAM));
 
 		// Bottom row (Y=116.84mm)
 		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 116.84f)), module, Overtone::VOCT_INPUT));
