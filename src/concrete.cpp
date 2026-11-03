@@ -15,8 +15,9 @@
 // replaces what was under it and leaves the rest of whatever it landed on in
 // place after it, the way a splice into tape does.
 //
-// Each lane also carries three drawn curves across the loop: VOL, FILTER (a DJ
-// filter, lowpass below the centre, highpass above) and PAN.
+// Each lane also carries four drawn curves across the loop: VOL, FILTER (a DJ
+// filter, lowpass below the centre, highpass above), PAN and PITCH (varispeed,
+// an octave either way).
 //
 // Tempo: CLOCK and BAR when they are patched (clocks per bar are counted
 // between BARs), BAR alone, or the BPM knob. A clock drives the playhead and a
@@ -42,11 +43,12 @@ static const int CC_N = CONCRETE_LANES;
 static const int CC_CLIPS = 32;           // clip slots per lane
 static const int CC_SMPS = 160;           // sample slots
 static const int CC_MAXBARS = 8;
-static const int CC_RES = 64;             // curve points per bar
+static const int CC_RES = 256;            // curve samples per bar: a step ramps over 1/256 bar
 static const int CC_CN = CC_RES * CC_MAXBARS;
-enum CcCurve { CC_VOL, CC_FILT, CC_PAN, CC_NCURVE };
-static const char* CC_CURVE_NAME[CC_NCURVE] = {"volume", "filter", "pan"};
-static const float CC_CURVE_DEF[CC_NCURVE] = {1.f, 0.f, 0.f};
+enum CcCurve { CC_VOL, CC_FILT, CC_PAN, CC_PITCH, CC_NCURVE };
+static const char* CC_CURVE_NAME[CC_NCURVE] = {"volume", "filter", "pan", "pitch"};
+static const float CC_CURVE_DEF[CC_NCURVE] = {1.f, 0.f, 0.f, 0.f};
+static const float CC_PITCH_SEMIS = 12.f; // the pitch curve's top and bottom, in semitones
 static const float CC_FADE = 0.003f;      // s: every clip edge, cut and switch
 static const float CC_VOLTS = 5.f;        // a full-scale sample, in volts
 static const double CC_MAXSEC = 600.0;    // the longest sample loaded
@@ -246,6 +248,8 @@ struct Concrete : Module {
 	float cs[CC_N][CC_NCURVE];
 	CcFilter filt[CC_N];
 	float panSet[CC_N], panL[CC_N], panR[CC_N];
+	float pitchSet[CC_N] = {};
+	double laneRate[CC_N] = {1.0, 1.0, 1.0, 1.0};  // the pitch curve, as a reading speed
 	int ctlDiv = 0;
 	int recK[CC_N] = {-1, -1, -1, -1};
 	bool recNow[CC_N] = {};
@@ -262,7 +266,7 @@ struct Concrete : Module {
 	float viewStart = 0.f, viewLen = 0.f;
 	bool viewFollow = true;                   // a zoomed view pages with the playhead
 	int cpbIdx = 7;                           // clocks per bar with BAR unpatched: 16
-	int tab = 0;                              // screen: 0 clips, 1 VOL, 2 FILTER, 3 PAN
+	int tab = 0;                              // screen: 0 clips, 1 VOL, 2 FILTER, 3 PAN, 4 PITCH
 	int uid = 0, takeNo = 0;
 
 	Concrete() {
@@ -326,6 +330,16 @@ struct Concrete : Module {
 		}
 	}
 
+	// A bar holds two points at most, the value arriving and the value leaving.
+	// Any between them have no effect on the curve, so they go.
+	void pruneCurve(int l, int c) {
+		std::vector<CcPt>& P = pts[l][c];
+		for (size_t k = 1; k + 1 < P.size();) {
+			if (P[k].b == P[k - 1].b && P[k].b == P[k + 1].b) P.erase(P.begin() + k);
+			else k++;
+		}
+	}
+
 	// ── clip arithmetic, shared by the audio thread and the screen ─────
 	ConcreteSample* sampleOf(const ConcreteClip& c) const {
 		return (c.smp >= 0 && c.smp < CC_SMPS) ? smp[c.smp].load(std::memory_order_acquire) : nullptr;
@@ -384,6 +398,27 @@ struct Concrete : Module {
 		return best;
 	}
 
+	// Bars of tape read between bars t0 and t1, with the lane's pitch curve on
+	// the reading speed: a voice started part way through a clip is where it would
+	// have been had it played from the start.
+	double pitchedBars(int l, double t0, double t1) const {
+		if (t1 <= t0) return t1 - t0;
+		const float* cv = curve[l][CC_PITCH];
+		int ia = ccClamp((int)std::floor(t0 * CC_RES), 0, CC_CN - 1), ib = ccClamp((int)std::ceil(t1 * CC_RES), 0, CC_CN - 1);
+		bool flat = true;
+		for (int i = ia; i <= ib && flat; i++) flat = cv[i] == 0.f;
+		if (flat) return t1 - t0;
+		double sum = 0.0;
+		for (int i = ia; i < ib; i++) {
+			double a = std::max(t0, (double)i / CC_RES), b = std::min(t1, (double)(i + 1) / CC_RES);
+			if (b <= a) continue;
+			double f = (0.5 * (a + b) - (double)i / CC_RES) * CC_RES;
+			double v = cv[i] + (cv[i + 1] - cv[i]) * f;
+			sum += (b - a) * std::pow(2.0, v * CC_PITCH_SEMIS / 12.0);
+		}
+		return sum;
+	}
+
 	void startVoice(CcVoice& v, int l, int kind, int idx, uint32_t g) {
 		v = CcVoice();
 		v.kind = kind; v.idx = idx; v.gen = g; v.seek = seekGen;
@@ -396,7 +431,7 @@ struct Concrete : Module {
 			v.b = ccClamp(c.b, v.a + 1.0, (double)s->n);
 			v.dur1 = (v.b - v.a) / v.srS;
 			double sp = clipSpeed(c, s, spbSm);
-			double adv = ((double)P - c.t0) * spbSm * v.srS * sp;
+			double adv = pitchedBars(l, c.t0, P) * spbSm * v.srS * sp;
 			if (adv < 0.0) adv = 0.0;
 			if (adv >= v.b - v.a) { v.fin = true; return; }
 			v.pos = v.rev ? v.b - adv : v.a + adv;
@@ -407,7 +442,7 @@ struct Concrete : Module {
 			if (n < 2) { v.fin = true; return; }
 			v.d = T.buf.data(); v.n = n; v.srS = T.sr;
 			v.a = 0.0; v.b = (double)n;
-			double adv = ((double)P - T.t0) * spbSm * v.srS;
+			double adv = pitchedBars(l, T.t0, P) * spbSm * v.srS;
 			if (adv < 0.0) adv = 0.0;
 			if (adv >= v.b) { v.fin = true; return; }
 			v.pos = adv;
@@ -430,7 +465,8 @@ struct Concrete : Module {
 			double sp = clamp((float)(v.dur1 / (v.fit * spbSm)), CC_MINSPEED, CC_MAXSPEED);
 			v.inc = sp * v.srS / sr * (v.rev ? -1.0 : 1.0);
 		}
-		double rem = (v.rev ? v.pos - v.a : v.b - v.pos) / std::fabs(v.inc);
+		double inc = v.inc * laneRate[l];
+		double rem = (v.rev ? v.pos - v.a : v.b - v.pos) / std::fabs(inc);
 		if (rem <= 0.0) { v.fin = true; return; }
 		float gEnd = (float)std::min(1.0, rem / fadeN);
 		float g = v.env * v.out * gEnd;
@@ -442,7 +478,7 @@ struct Concrete : Module {
 		const float* d = v.d;
 		xl += g * ccHermite(d[2 * i0], d[2 * i1], d[2 * i2], d[2 * i3], f);
 		xr += g * ccHermite(d[2 * i0 + 1], d[2 * i1 + 1], d[2 * i2 + 1], d[2 * i3 + 1], f);
-		v.pos += v.inc;
+		v.pos += inc;
 	}
 
 	void seal(int l, int k, float t1) {
@@ -639,6 +675,10 @@ struct Concrete : Module {
 			}
 			float vol = cs[l][CC_VOL] * cs[l][CC_VOL];
 			if (ctl && std::fabs(cs[l][CC_FILT] - filt[l].pos) > 1e-4f) filt[l].set(cs[l][CC_FILT], sr);
+			if (ctl && cs[l][CC_PITCH] != pitchSet[l]) {
+				pitchSet[l] = cs[l][CC_PITCH];
+				laneRate[l] = std::pow(2.0, pitchSet[l] * CC_PITCH_SEMIS / 12.0);
+			}
 			float p = cs[l][CC_PAN];
 			if (ctl && std::fabs(p - panSet[l]) > 1e-4f) {
 				panSet[l] = p;
@@ -982,7 +1022,7 @@ struct Concrete : Module {
 		if (json_t* j = json_object_get(root, "embed")) embed = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "resetOnPlay")) resetOnPlay = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "cpbIdx")) cpbIdx = clamp((int)json_integer_value(j), 0, CC_NCPB - 1);
-		if (json_t* j = json_object_get(root, "tab")) tab = clamp((int)json_integer_value(j), 0, 3);
+		if (json_t* j = json_object_get(root, "tab")) tab = clamp((int)json_integer_value(j), 0, CC_NCURVE);
 		if (json_t* j = json_object_get(root, "viewStart")) viewStart = (float)json_number_value(j);
 		if (json_t* j = json_object_get(root, "viewLen")) viewLen = (float)json_number_value(j);
 		if (json_t* j = json_object_get(root, "viewFollow")) viewFollow = json_boolean_value(j);
@@ -1047,6 +1087,7 @@ struct Concrete : Module {
 				for (size_t q = 0; q + 1 < json_array_size(pa); q += 2)
 					pts[l][c].push_back({(float)json_number_value(json_array_get(pa, q)), (float)json_number_value(json_array_get(pa, q + 1))});
 				std::stable_sort(pts[l][c].begin(), pts[l][c].end(), [](const CcPt& a, const CcPt& b) { return a.b < b.b; });
+				pruneCurve(l, c);
 				renderCurve(l, c);
 			}
 		}
@@ -1125,6 +1166,8 @@ static const float CC_DESIGN_W = 600.f;
 // The view is a whole number of bars: 1, 2, 4 or the whole loop, on bar lines.
 static const int CC_VIEWS[3] = {1, 2, 4};
 static const float CC_ZX = 290.f, CC_ZW = 24.f;   // the view buttons, design units
+static const float CC_TABW = 50.f;                // a tab and its gap
+static const float CC_PT_XDEAD = 2.5f;            // mm sideways before a dragged curve point leaves its bar
 
 struct ConcreteDisplay : OpaqueWidget {
 	Concrete* module = nullptr;
@@ -1133,6 +1176,9 @@ struct ConcreteDisplay : OpaqueWidget {
 	enum Drag { D_NONE, D_MOVE, D_TRIML, D_TRIMR, D_SPEED, D_POINT, D_PAN };
 	double panStart = 0.0;
 	int dPt = -1;                 // the curve point being dragged
+	float dPtBar = 0.f;           // the bar it was on when grabbed
+	Vec dPtGrab;                  // from the pointer to the point, when grabbed
+	bool dPtXFree = false;        // the drag has gone far enough sideways to move it along the bar line
 	float scrollAcc = 0.f, panAcc = 0.f;
 	int drag = D_NONE, dLane = -1, dClip = -1, dToLane = -1;
 	Vec dPos, dStart;
@@ -1142,6 +1188,11 @@ struct ConcreteDisplay : OpaqueWidget {
 	bool hovering = false;
 	int pendLane = -1;
 	float pendT0 = 0.f;
+	int selLane = -1, selClip = -1;   // the clip last clicked, until the screen loses the selection
+	bool delHeld = false;             // a Delete press removed the selected clip and is still down
+	bool dCopy = false;               // this drag is a Ctrl (Cmd) copy
+	double dFine = 0.0;               // how far a trim has been dragged, in pixels, after the slowdown
+	int modsOverride = -1;            // a harness stands in for the keyboard here
 
 	// geometry, in pixels
 	float sc() const { return box.size.x / CC_DESIGN_W; }
@@ -1196,11 +1247,28 @@ struct ConcreteDisplay : OpaqueWidget {
 		int l = (int)((y - lanesTop()) / laneH());
 		return (l >= 0 && l < CC_N) ? l : -1;
 	}
-	bool snapNow() const { return module && module->snap; }
+	int modsNow() const { return modsOverride >= 0 ? modsOverride : (APP->window->getMods() & RACK_MOD_MASK); }
+	// Ctrl (Cmd) inverts the snap while dragging, except on a copy, where Ctrl is
+	// what asked for the copy
+	bool snapNow() const {
+		if (!module) return false;
+		bool invert = (modsNow() & RACK_MOD_CTRL) && !dCopy;
+		return module->snap != invert;
+	}
 	double snapBar(double b) const {
 		if (!snapNow() || !module) return b;
 		float g = module->gridDiv();
 		return std::round(b * g) / g;
+	}
+	// How much a trim is slowed, as on a Rack knob: Ctrl (Cmd) 1/16, Ctrl+Shift 1/256
+	int fineNow() const {
+		int mods = modsNow();
+		return mods == (RACK_MOD_CTRL | GLFW_MOD_SHIFT) ? 256 : mods == RACK_MOD_CTRL ? 16 : 1;
+	}
+	// a slowed trim leaves the grid, or it could not land between two grid lines
+	double snapEdge(double b) const { return fineNow() > 1 ? b : snapBar(b); }
+	bool selValid() const {
+		return module && module->tab == 0 && selLane >= 0 && selClip >= 0 && module->clip[selLane][selClip].used;
 	}
 
 	// the clip under a point, and which part of it
@@ -1239,6 +1307,8 @@ struct ConcreteDisplay : OpaqueWidget {
 		float v = c == CC_VOL ? u : u * 2.f - 1.f;
 		if (c != CC_VOL && std::fabs(v) < 0.04f) v = 0.f;     // a detent at the centre
 		if (c == CC_VOL && v > 0.97f) v = 1.f;                // and at unity
+		// pitch lands on semitones while the snap is on
+		if (c == CC_PITCH && snapNow()) v = std::round(v * CC_PITCH_SEMIS) / CC_PITCH_SEMIS;
 		return v;
 	}
 	// the point of the open curve under p, or -1
@@ -1255,13 +1325,15 @@ struct ConcreteDisplay : OpaqueWidget {
 		}
 		return best;
 	}
-	void movePoint(int l, int k, Vec p) {
+	// keepBar moves the point straight up or down, on the bar it was grabbed on
+	void movePoint(int l, int k, Vec p, bool keepBar) {
 		Concrete* m = module;
 		int c = m->tab - 1;
 		auto& P = m->pts[l][c];
 		if (k < 0 || k >= (int)P.size()) return;
 		double lo = k > 0 ? P[k - 1].b : 0.0, hi = k + 1 < (int)P.size() ? P[k + 1].b : (double)CC_MAXBARS;
-		P[k].b = (float)ccClamp(snapBar(barOf(clamp(p.x, x0(), x1()))), lo, hi);
+		double b = keepBar ? (double)dPtBar : snapBar(barOf(clamp(p.x, x0(), x1())));
+		P[k].b = (float)ccClamp(b, lo, hi);
 		P[k].v = vOfY(l, c, p.y);
 		m->renderCurve(l, c);
 	}
@@ -1275,6 +1347,16 @@ struct ConcreteDisplay : OpaqueWidget {
 		P.insert(P.begin() + k, {b, vOfY(l, c, p.y)});
 		m->renderCurve(l, c);
 		return k;
+	}
+	// the nearer point of the two on the bar a click at p would land on, or -1
+	int fullBarPoint(int l, Vec p) const {
+		int c = module->tab - 1;
+		const auto& P = module->pts[l][c];
+		float b = (float)ccClamp(snapBar(barOf(clamp(p.x, x0(), x1()))), 0.0, (double)CC_MAXBARS);
+		for (int k = 0; k + 1 < (int)P.size(); k++)
+			if (P[k].b == b && P[k + 1].b == b)
+				return std::fabs(yOfV(l, c, P[k].v) - p.y) <= std::fabs(yOfV(l, c, P[k + 1].v) - p.y) ? k : k + 1;
+		return -1;
 	}
 	void deletePoint(int l, int k) {
 		Concrete* m = module;
@@ -1290,10 +1372,10 @@ struct ConcreteDisplay : OpaqueWidget {
 		Concrete* m = module;
 		Vec p = e.pos;
 		// tabs
-		if (p.y < 22.f * sc() && p.x < 8.f * sc() + 4 * 62.f * sc()) {
+		if (p.y < 22.f * sc() && p.x < 8.f * sc() + (CC_NCURVE + 1) * CC_TABW * sc()) {
 			if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
-				int t = (int)((p.x - 8.f * sc()) / (62.f * sc()));
-				if (t >= 0 && t < 4) m->tab = t;
+				int t = (int)((p.x - 8.f * sc()) / (CC_TABW * sc()));
+				if (t >= 0 && t <= CC_NCURVE) m->tab = t;
 			}
 			e.consume(this);
 			return;
@@ -1345,8 +1427,12 @@ struct ConcreteDisplay : OpaqueWidget {
 		dPos = dStart = p;
 		dLane = dToLane = lane;
 		if (m->tab == 0) {
+			selLane = j >= 0 ? lane : -1;
+			selClip = j;
 			if (j < 0) { e.consume(this); return; }
 			dClip = j;
+			dFine = 0.0;
+			dCopy = false;
 			dOrig = m->clip[lane][j];
 			dOrigLen = m->clipBars(dOrig, m->spbSm);
 			bool shift = (e.mods & RACK_MOD_MASK) == GLFW_MOD_SHIFT;
@@ -1361,14 +1447,25 @@ struct ConcreteDisplay : OpaqueWidget {
 					m->touch(m->clip[lane][k]);
 					m->clip[lane][k].used = true;
 					dClip = k;
+					selClip = k;
+					dCopy = true;
 				}
 			}
 		} else {
-			// a point under the pointer is picked up; anywhere else puts one down
+			// a point under the pointer is picked up; anywhere else puts one down,
+			// unless its bar already has two, when the nearer of those is picked up
 			int k = ptAt(lane, p);
+			if (k < 0) k = fullBarPoint(lane, p);
 			if (k < 0) k = addPoint(lane, p);
 			drag = D_POINT;
 			dPt = k;
+			{
+				int c = m->tab - 1;
+				const auto& P = m->pts[lane][c];
+				dPtBar = P[k].b;
+				dPtGrab = Vec(xOf(P[k].b), yOfV(lane, c, P[k].v)).minus(p);
+				dPtXFree = false;
+			}
 		}
 		e.consume(this);
 	}
@@ -1376,8 +1473,16 @@ struct ConcreteDisplay : OpaqueWidget {
 	void onDragMove(const DragMoveEvent& e) override {
 		if (!module || drag == D_NONE) return;
 		Concrete* m = module;
-		dPos = dPos.plus(e.mouseDelta.div(getAbsoluteZoom()));
-		if (drag == D_POINT) { movePoint(dLane, dPt, dPos); return; }
+		Vec delta = e.mouseDelta.div(getAbsoluteZoom());
+		dPos = dPos.plus(delta);
+		dFine += (double)delta.x / fineNow();
+		if (drag == D_POINT) {
+			// A point stays on its bar until the drag has clearly gone sideways, so
+			// a hand moving up does not also move it along. Shift holds it there.
+			if (std::fabs(dPos.x - dStart.x) > mm2px(CC_PT_XDEAD)) dPtXFree = true;
+			movePoint(dLane, dPt, dPos.plus(dPtGrab), !dPtXFree || (modsNow() & GLFW_MOD_SHIFT));
+			return;
+		}
 		if (drag == D_PAN) {
 			setView(std::round(panStart + (double)(dPos.x - dStart.x) / (x1() - x0()) * loopLen()), vLen());
 			holdUntil = system::getTime() + 3.0;
@@ -1388,13 +1493,14 @@ struct ConcreteDisplay : OpaqueWidget {
 		if (!c.used) { drag = D_NONE; return; }
 		const ConcreteSample* s = m->sampleOf(c);
 		double db = (double)(dPos.x - dStart.x) / (x1() - x0()) * vLen();
+		double dbEdge = dFine / (x1() - x0()) * vLen();
 		double spb = m->spbSm;
 		if (drag == D_MOVE) {
 			c.t0 = (float)ccClamp(snapBar(dOrig.t0 + db), 0.0, (double)CC_MAXBARS - 0.01);
 			int l = laneAt(dPos.y);
 			if (l >= 0) dToLane = l;
 		} else if (drag == D_TRIML && s) {
-			double nt = ccClamp(snapBar(dOrig.t0 + db), 0.0, dOrig.t0 + dOrigLen - 0.01);
+			double nt = ccClamp(snapEdge(dOrig.t0 + dbEdge), 0.0, dOrig.t0 + dOrigLen - 0.01);
 			double d = nt - dOrig.t0;
 			double f = d * spb * s->sr * m->clipSpeed(dOrig, s, spb);
 			double na = dOrig.a, nb = dOrig.b;
@@ -1405,7 +1511,7 @@ struct ConcreteDisplay : OpaqueWidget {
 			c.t0 = (float)(dOrig.t0 + used);
 			if (dOrig.fit > 0.f) c.fit = std::max(0.01f, dOrig.fit - (float)used);
 		} else if (drag == D_TRIMR && s) {
-			double ne = std::max(dOrig.t0 + 0.01, snapBar(dOrig.t0 + dOrigLen + db));
+			double ne = std::max(dOrig.t0 + 0.01, snapEdge(dOrig.t0 + dOrigLen + dbEdge));
 			double d = ne - (dOrig.t0 + dOrigLen);
 			double f = d * spb * s->sr * m->clipSpeed(dOrig, s, spb);
 			if (dOrig.rev) { c.a = ccClamp(dOrig.a - f, 0.0, dOrig.b - 64.0); c.b = dOrig.b; }
@@ -1413,7 +1519,7 @@ struct ConcreteDisplay : OpaqueWidget {
 			if (dOrig.fit > 0.f) c.fit = std::max(0.01f, (float)((c.b - c.a) / s->sr / m->clipSpeed(dOrig, s, spb) / spb));
 		} else if (drag == D_SPEED && s) {
 			// varispeed: the window stays, its length on the tape changes
-			double ne = std::max(dOrig.t0 + 0.01, snapBar(dOrig.t0 + dOrigLen + db));
+			double ne = std::max(dOrig.t0 + 0.01, snapEdge(dOrig.t0 + dOrigLen + dbEdge));
 			double lb = ne - dOrig.t0;
 			if (dOrig.fit > 0.f) c.fit = (float)lb;
 			else c.speed = clamp((float)(((dOrig.b - dOrig.a) / s->sr) / (lb * spb)), CC_MINSPEED, CC_MAXSPEED);
@@ -1438,8 +1544,13 @@ struct ConcreteDisplay : OpaqueWidget {
 				}
 			}
 			m->splice(l, j);
+			selLane = l; selClip = j;
 		}
-		drag = D_NONE; dClip = -1; dPt = -1;
+		if (module && drag == D_POINT && module->tab > 0) {
+			module->pruneCurve(dLane, module->tab - 1);
+			module->renderCurve(dLane, module->tab - 1);
+		}
+		drag = D_NONE; dClip = -1; dPt = -1; dCopy = false;
 	}
 
 	// double-click a point to remove it
@@ -1453,19 +1564,34 @@ struct ConcreteDisplay : OpaqueWidget {
 	void onHover(const HoverEvent& e) override { hover = e.pos; hovering = true; OpaqueWidget::onHover(e); }
 	void onLeave(const LeaveEvent& e) override { hovering = false; OpaqueWidget::onLeave(e); }
 
-	void onHoverKey(const HoverKeyEvent& e) override {
-		if (module && e.action == GLFW_PRESS && (e.key == GLFW_KEY_DELETE || e.key == GLFW_KEY_BACKSPACE)) {
-			int lane, part;
-			if (module->tab == 0) {
-				int j = clipAt(hover, lane, part);
-				if (j >= 0) { module->clip[lane][j].used = false; e.consume(this); return; }
-			} else {
-				lane = laneAt(hover.y);
-				int k = ptAt(lane, hover);
-				if (k >= 0) { deletePoint(lane, k); e.consume(this); return; }
-			}
+	static bool isDeleteKey(int key) { return key == GLFW_KEY_DELETE || key == GLFW_KEY_BACKSPACE; }
+
+	// Rack sends keys to the selected widget before anything else, so while a
+	// clip is selected Delete reaches it wherever the pointer has gone. The
+	// repeats of the press that removed it stop here too.
+	void onSelectKey(const SelectKeyEvent& e) override {
+		if (!isDeleteKey(e.key)) return;
+		if (e.action == GLFW_PRESS) {
+			delHeld = selValid();
+			if (delHeld) { module->clip[selLane][selClip].used = false; selLane = selClip = -1; }
 		}
-		OpaqueWidget::onHoverKey(e);
+		if (delHeld) e.consume(this);
+		if (e.action == GLFW_RELEASE) delHeld = false;
+	}
+	void onDeselect(const DeselectEvent& e) override { selLane = selClip = -1; delHeld = false; }
+
+	// Delete with nothing selected: whatever is under the pointer. Called by
+	// ConcreteWidget, because ModuleWidget acts on this key before its children.
+	void deleteUnder(Vec p) {
+		if (!module) return;
+		int lane, part;
+		if (module->tab == 0) {
+			int j = clipAt(p, lane, part);
+			if (j >= 0) module->clip[lane][j].used = false;
+		} else {
+			lane = laneAt(p.y);
+			deletePoint(lane, ptAt(lane, p));
+		}
 	}
 
 	// Ctrl (Cmd) + scroll: up and down step the view through 1/2/4 bars and the
@@ -1586,7 +1712,7 @@ struct ConcreteDisplay : OpaqueWidget {
 		int c = m->tab - 1;
 		Menu* menu = createMenu();
 		menu->addChild(createMenuLabel(string::f("Lane %d %s", l + 1, CC_CURVE_NAME[c])));
-		menu->addChild(createMenuLabel("Click to add a point, drag to move it, double-click to remove it"));
+		menu->addChild(createMenuLabel("Click to add a point, drag to move it (Shift: up and down only), double-click to remove it"));
 		menu->addChild(createMenuItem("Reset this curve", "", [=]() { m->pts[l][c].clear(); m->renderCurve(l, c); }));
 		menu->addChild(createMenuItem("Copy it to every lane", "", [=]() {
 			for (int k = 0; k < CC_N; k++) if (k != l) { m->pts[k][c] = m->pts[l][c]; m->renderCurve(k, c); }
@@ -1596,6 +1722,11 @@ struct ConcreteDisplay : OpaqueWidget {
 		}));
 	}
 
+	static std::string pitchText(float v) {
+		float st = v * CC_PITCH_SEMIS;
+		return std::fabs(st - std::round(st)) < 0.005f ? string::f("%+d st", (int)std::round(st)) : string::f("%+.2f st", st);
+	}
+
 	void pointMenu(int l, int k) {
 		Concrete* m = module;
 		int c = m->tab - 1;
@@ -1603,7 +1734,8 @@ struct ConcreteDisplay : OpaqueWidget {
 		if (k < 0 || k >= (int)P.size()) return;
 		Menu* menu = createMenu();
 		float v = P[k].v;
-		std::string val = c == CC_VOL ? (v < 1e-3f ? "-inf dB" : string::f("%+.1f dB", 40.f * std::log10(v)))
+		std::string val = c == CC_PITCH ? pitchText(v)
+		                : c == CC_VOL ? (v < 1e-3f ? "-inf dB" : string::f("%+.1f dB", 40.f * std::log10(v)))
 		                : c == CC_PAN ? (std::fabs(v) < 1e-3f ? "centre" : string::f("%.0f%% %s", std::fabs(v) * 100.f, v < 0.f ? "left" : "right"))
 		                : (std::fabs(v) < 0.05f ? "off" : string::f("%s %.0f%%", v < 0.f ? "lowpass" : "highpass", std::fabs(v) * 100.f));
 		menu->addChild(createMenuLabel(string::f("Bar %.2f: %s", P[k].b + 1.f, val.c_str())));
@@ -1654,6 +1786,93 @@ struct ConcreteDisplay : OpaqueWidget {
 		nvgFill(vg);
 	}
 
+	// While a trim is being dragged: where the edge is in the sample, and with
+	// the drag slowed, the audio round it at the scale the mouse is moving, so the
+	// wave slides under the edge line one pixel per pixel. Kept audio is bright,
+	// trimmed audio dim.
+	void drawTrim(NVGcontext* vg, Concrete* m, bool hasFont) {
+		if ((drag != D_TRIML && drag != D_TRIMR) || dClip < 0 || dLane < 0) return;
+		const ConcreteClip& c = m->clip[dLane][dClip];
+		const ConcreteSample* sm = m->sampleOf(c);
+		if (!c.used || !sm || sm->missing || sm->n < 2 || sm->sr <= 0.f) return;
+		float s = sc(), y = laneY(dLane), h = laneH();
+		bool left = drag == D_TRIML;
+		double edge = left == c.rev ? c.b : c.a;
+		double t = c.t0 + (left ? 0.0 : m->clipBars(c, m->spbSm));
+		int fine = fineNow();
+		float top = y + 2.f * s, bot = y + h - 2.f * s, ex = xOf(t);
+		nvgSave(vg);
+		nvgScissor(vg, x0(), y, x1() - x0(), h);
+		float lw = 0.f, lx = ex;
+		if (fine > 1) {
+			lw = 170.f * s;
+			lx = clamp(ex - lw * 0.5f, x0(), x1() - lw);
+			nvgBeginPath(vg);
+			nvgRect(vg, lx, top, lw, bot - top);
+			nvgFillColor(vg, sfs::SCREEN_BG);
+			nvgFill(vg);
+			double perPx = m->spbSm * sm->sr * m->clipSpeed(c, sm, m->spbSm) * vLen() / (x1() - x0()) / fine;
+			double dir = c.rev ? -1.0 : 1.0;
+			int cols = std::max(2, (int)lw);
+			std::vector<float> lo((size_t)cols), hi((size_t)cols);
+			for (int k = 0; k < cols; k++) {
+				double fa = edge + dir * perPx * (lx + k - ex), fb = edge + dir * perPx * (lx + k + 1 - ex);
+				if (fa > fb) std::swap(fa, fb);
+				float mn = 1.f, mx = -1.f;
+				if (fb >= 0.0 && fa < (double)(sm->n - 1)) {
+					int64_t ia = ccClamp((int64_t)std::floor(fa), (int64_t)0, sm->n - 2), ib = ccClamp((int64_t)std::ceil(fb), ia + 1, sm->n - 1);
+					int64_t st = std::max((int64_t)1, (ib - ia) / 32);
+					for (int64_t q = ia; q <= ib; q += st) {
+						float v = 0.5f * (sm->d[2 * q] + sm->d[2 * q + 1]);
+						mn = std::min(mn, v); mx = std::max(mx, v);
+					}
+				}
+				if (mn > mx) mn = mx = 0.f;
+				lo[(size_t)k] = mn; hi[(size_t)k] = mx;
+			}
+			float mid = (top + bot) * 0.5f, hh = (bot - top) * 0.5f - 1.f;
+			int split = clamp((int)(ex - lx), 0, cols - 1);
+			for (int side = 0; side < 2; side++) {
+				int ka = side ? split : 0, kb = side ? cols - 1 : split;
+				if (kb <= ka) continue;
+				nvgBeginPath(vg);
+				for (int k = ka; k <= kb; k++) {
+					float yy = mid - clamp(hi[(size_t)k], -1.f, 1.f) * hh - 0.5f;
+					if (k == ka) nvgMoveTo(vg, lx + k, yy); else nvgLineTo(vg, lx + k, yy);
+				}
+				for (int k = kb; k >= ka; k--) nvgLineTo(vg, lx + k, mid - clamp(lo[(size_t)k], -1.f, 1.f) * hh + 0.5f);
+				nvgClosePath(vg);
+				bool kept = left == (side == 1);
+				nvgFillColor(vg, nvgTransRGBAf(CC_LANE_COL[dLane], kept ? 1.f : 0.28f));
+				nvgFill(vg);
+			}
+			nvgBeginPath(vg);
+			nvgRect(vg, lx + 0.5f, top + 0.5f, lw - 1.f, bot - top - 1.f);
+			nvgStrokeColor(vg, sfs::SCREEN_TEXT);
+			nvgStrokeWidth(vg, 0.8f);
+			nvgStroke(vg);
+		}
+		nvgBeginPath(vg);
+		nvgRect(vg, ex - 0.5f, top, 1.f, bot - top);
+		nvgFillColor(vg, sfs::SCREEN_TEXT);
+		nvgFill(vg);
+		if (hasFont) {
+			std::string txt = string::f("%s %.4f s", left ? "START" : "END", edge / sm->sr);
+			if (fine > 1) txt += string::f("  1/%d", fine);
+			sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
+			float tw = nvgTextBounds(vg, 0.f, 0.f, txt.c_str(), NULL, NULL);
+			float tx = fine > 1 ? lx + 3.f * s : clamp(left ? ex + 3.f * s : ex - tw - 3.f * s, x0() + 1.f, x1() - tw - 1.f);
+			nvgBeginPath(vg);
+			nvgRect(vg, tx - 1.5f * s, top + 0.5f, tw + 3.f * s, 9.f * s);
+			nvgFillColor(vg, sfs::SCREEN_BG);
+			nvgFill(vg);
+			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+			nvgFillColor(vg, sfs::SCREEN_TEXT);
+			nvgText(vg, tx, top + 1.f * s, txt.c_str(), NULL);
+		}
+		nvgRestore(vg);
+	}
+
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1) return;
 		if (!module) { module = concretePreview(); drawLayer(args, layer); module = nullptr; return; }
@@ -1666,18 +1885,18 @@ struct ConcreteDisplay : OpaqueWidget {
 		bool curves = m->tab > 0;
 
 		// header: tabs, then the tempo and the position
-		static const char* TAB[4] = {"CLIPS", "VOL", "FILTER", "PAN"};
-		for (int t = 0; t < 4; t++) {
-			float x = 8.f * s + t * 62.f * s;
+		static const char* TAB[CC_NCURVE + 1] = {"CLIPS", "VOL", "FILTER", "PAN", "PITCH"};
+		for (int t = 0; t <= CC_NCURVE; t++) {
+			float x = 8.f * s + t * CC_TABW * s;
 			nvgBeginPath(vg);
-			nvgRect(vg, x, 5.f * s, 56.f * s, 15.f * s);
+			nvgRect(vg, x, 5.f * s, (CC_TABW - 5.f) * s, 15.f * s);
 			nvgFillColor(vg, t == m->tab ? sfs::SCREEN_DEEP : sfs::SCREEN_PURP);
 			nvgFill(vg);
 			if (hasFont) {
 				sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
 				nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
 				nvgFillColor(vg, t == m->tab ? sfs::SCREEN_TEXT : sfs::SCREEN_DIM);
-				nvgText(vg, x + 28.f * s, 12.5f * s, TAB[t], NULL);
+				nvgText(vg, x + (CC_TABW - 5.f) * 0.5f * s, 12.5f * s, TAB[t], NULL);
 			}
 		}
 		if (hasFont) {
@@ -1693,7 +1912,7 @@ struct ConcreteDisplay : OpaqueWidget {
 			if (anyRec) {
 				nvgFillColor(vg, nvgRGB(0xE0, 0x30, 0x30));
 				nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-				nvgText(vg, 8.f * s + 4 * 62.f * s + 4.f * s, 12.5f * s, "REC", NULL);
+				nvgText(vg, 8.f * s + (CC_NCURVE + 1) * CC_TABW * s + 4.f * s, 12.5f * s, "REC", NULL);
 			}
 		}
 
@@ -1845,8 +2064,9 @@ struct ConcreteDisplay : OpaqueWidget {
 				}
 				nvgBeginPath(vg);
 				nvgRect(vg, xa + 0.5f, y + 2.5f * s, xb - xa - 1.f, h - 5.f * s);
-				nvgStrokeColor(vg, hot ? nvgTransRGBAf(sfs::SCREEN_TEXT, 0.9f * dim) : nvgTransRGBAf(lc, 0.7f * dim));
-				nvgStrokeWidth(vg, hot ? 1.2f : 0.8f);
+				bool sel = selValid() && l == selLane && j == selClip;
+				nvgStrokeColor(vg, sel || hot ? nvgTransRGBAf(sfs::SCREEN_TEXT, (sel ? 1.f : 0.9f) * dim) : nvgTransRGBAf(lc, 0.7f * dim));
+				nvgStrokeWidth(vg, sel ? 1.8f : hot ? 1.2f : 0.8f);
 				nvgStroke(vg);
 				if (hot && hpart != P_BODY && hpart != P_NONE && drag == D_NONE) {
 					float ex = hpart == P_LEFT ? xa : xb - 2.f * s;
@@ -1893,11 +2113,15 @@ struct ConcreteDisplay : OpaqueWidget {
 				float yT = curveTop(l), yB = curveBot(l);
 				auto yOf = [&](float v) { return yOfV(l, c, v); };
 				float yZero = c == CC_VOL ? yB : (yT + yB) * 0.5f;
-				int nPts = Lp * CC_RES;
+				// drawn from the points themselves, so the line goes through every one
+				const auto& Pc = m->pts[l][c];
+				float vFirst = Pc.empty() ? CC_CURVE_DEF[c] : Pc.front().v, vLast = Pc.empty() ? CC_CURVE_DEF[c] : Pc.back().v;
 				nvgBeginPath(vg);
 				nvgMoveTo(vg, xOf(0), yZero);
-				for (int i = 0; i <= nPts; i++) nvgLineTo(vg, xOf((double)i / CC_RES), yOf(m->curve[l][c][std::min(i, CC_CN - 1)]));
-				nvgLineTo(vg, xOf(Lp), yZero);
+				nvgLineTo(vg, xOf(0), yOf(vFirst));
+				for (const auto& q : Pc) nvgLineTo(vg, xOf(q.b), yOf(q.v));
+				nvgLineTo(vg, xOf(CC_MAXBARS), yOf(vLast));
+				nvgLineTo(vg, xOf(CC_MAXBARS), yZero);
 				nvgClosePath(vg);
 				nvgFillColor(vg, nvgTransRGBAf(lc, 0.25f));
 				nvgFill(vg);
@@ -1908,10 +2132,9 @@ struct ConcreteDisplay : OpaqueWidget {
 					nvgFill(vg);
 				}
 				nvgBeginPath(vg);
-				for (int i = 0; i <= nPts; i++) {
-					float x = xOf((double)i / CC_RES), yy = yOf(m->curve[l][c][std::min(i, CC_CN - 1)]);
-					if (i == 0) nvgMoveTo(vg, x, yy); else nvgLineTo(vg, x, yy);
-				}
+				nvgMoveTo(vg, xOf(0), yOf(vFirst));
+				for (const auto& q : Pc) nvgLineTo(vg, xOf(q.b), yOf(q.v));
+				nvgLineTo(vg, xOf(CC_MAXBARS), yOf(vLast));
 				nvgStrokeColor(vg, lc);
 				nvgStrokeWidth(vg, 1.4f);
 				nvgStroke(vg);
@@ -1928,6 +2151,14 @@ struct ConcreteDisplay : OpaqueWidget {
 					nvgStrokeColor(vg, sfs::SCREEN_BG);
 					nvgStrokeWidth(vg, 1.f);
 					nvgStroke(vg);
+					if (hasFont && c == CC_PITCH && drag == D_POINT && dLane == l && dPt == k) {
+						float px = xOf(Pp[k].b);
+						bool toLeft = px > x1() - 40.f * s;
+						sfs::screenFont(vg, font, sfs::TYPE_SCREEN_SMALL);
+						nvgTextAlign(vg, (toLeft ? NVG_ALIGN_RIGHT : NVG_ALIGN_LEFT) | NVG_ALIGN_MIDDLE);
+						nvgFillColor(vg, sfs::SCREEN_TEXT);
+						nvgText(vg, px + (toLeft ? -6.f : 6.f) * s, clamp(yOf(Pp[k].v), y + 6.f * s, y + h - 6.f * s), pitchText(Pp[k].v).c_str(), NULL);
+					}
 				}
 			}
 			nvgRestore(vg);
@@ -1941,6 +2172,7 @@ struct ConcreteDisplay : OpaqueWidget {
 			nvgFillColor(vg, m->moving ? sfs::SCREEN_TEXT : sfs::SCREEN_DIM);
 			nvgFill(vg);
 		}
+		drawTrim(vg, m, hasFont);
 		Widget::drawLayer(args, layer);
 	}
 };
@@ -1957,6 +2189,20 @@ static const float CC_C1 = 12.7f, CC_C2 = 27.94f, CC_C3 = 43.18f, CC_C4 = 55.88f
 static const float CC_X_LANE = 96.52f, CC_X_LPITCH = 12.7f, CC_X_MIX = 151.13f, CC_X_LR = 86.36f;
 
 struct ConcreteWidget : ModuleWidget {
+	ConcreteDisplay* screen = nullptr;
+
+	// ModuleWidget::onHoverKey removes the module on Delete or Backspace, press
+	// or repeat, before it offers the key to its children. Over the screen those
+	// keys mean a clip or a point, so they stop here.
+	void onHoverKey(const HoverKeyEvent& e) override {
+		if (screen && ConcreteDisplay::isDeleteKey(e.key) && screen->box.contains(e.pos)) {
+			if (e.action == GLFW_PRESS) screen->deleteUnder(e.pos.minus(screen->box.pos));
+			e.consume(this);
+			return;
+		}
+		ModuleWidget::onHoverKey(e);
+	}
+
 	ConcreteWidget(Concrete* module) {
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/concrete.svg")));
@@ -1967,6 +2213,7 @@ struct ConcreteWidget : ModuleWidget {
 
 		ConcreteDisplay* disp = new ConcreteDisplay();
 		disp->module = module;
+		screen = disp;
 		disp->box.pos = mm2px(Vec(CC_SX, CC_SY));
 		disp->box.size = mm2px(Vec(CC_SW, CC_SH));
 		addChild(disp);

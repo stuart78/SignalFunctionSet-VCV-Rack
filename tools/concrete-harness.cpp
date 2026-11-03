@@ -334,6 +334,280 @@ int main() {
 		check(at(1.f) == 1.f, "no points is the default");
 	}
 
+	printf("\n== the screen: selection, Delete, trim ==\n");
+	{
+		// Rack's real event routing, round the real display. KeyRoot stands where
+		// ModuleWidget does: a key that nothing consumes reaches it, and in Rack that removes the module.
+		struct KeyRoot : Widget {
+			int reached = 0;
+			void onHoverKey(const HoverKeyEvent& e) override { Widget::onHoverKey(e); if (!e.isConsumed()) reached++; }
+		};
+		rack::contextSet(new rack::Context);
+		APP->event = new rack::widget::EventState;
+		// no window here: the event code only asks a Window's internals whether the
+		// cursor is locked, and all zeros says it is not
+		static char windowInternal[4096] = {};
+		static void* fakeWindow[64] = {windowInternal};
+		APP->window = reinterpret_cast<rack::window::Window*>(fakeWindow);
+		KeyRoot* root = new KeyRoot;
+		root->box.size = Vec(2000, 1000);
+		APP->event->rootWidget = root;
+		Rig r(4);
+		ConcreteDisplay* d = new ConcreteDisplay;
+		d->module = &r.m;
+		d->modsOverride = 0;
+		d->box.size = Vec(1200, 400);           // 2 px per design unit
+		root->addChild(d);
+		r.m.snap = true;
+		auto xBar = [&](double b) { return d->xOf(b); };
+		auto press = [&](Vec p, int mods) { APP->event->handleButton(p, GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS, mods); };
+		auto release = [&](Vec p) { APP->event->handleButton(p, GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE, 0); };
+		auto dragTo = [&](float dx) {
+			Widget::DragMoveEvent e;
+			e.button = GLFW_MOUSE_BUTTON_LEFT;
+			e.mouseDelta = Vec(dx, 0);
+			d->onDragMove(e);
+		};
+		auto key = [&](Vec p, int k, int action) { return APP->event->handleKey(p, k, 0, action, 0); };
+		auto used = [&](int l) { int n = 0; for (int j = 0; j < CC_CLIPS; j++) n += r.m.clip[l][j].used; return n; };
+		float y0 = d->laneY(0) + d->laneH() * 0.5f, y1 = d->laneY(1) + d->laneH() * 0.5f;
+		Vec off(1500, 800);                     // the pointer off the screen, over the rest of the module
+
+		// A press selects; Delete removes that clip wherever the pointer is, and
+		// neither its press nor its repeats reach the module.
+		r.put(0, ramp(1.f), 1.f);
+		r.put(0, ramp(1.f), 2.f);
+		press(Vec(xBar(1.25), y0), 0); release(Vec(xBar(1.25), y0));
+		check(d->selValid() && d->selLane == 0 && r.m.clip[0][d->selClip].t0 == 1.f, "clicking a clip selects it");
+		root->reached = 0;
+		key(off, GLFW_KEY_BACKSPACE, GLFW_PRESS);
+		check(used(0) == 1 && r.m.clip[0][1].used && root->reached == 0, "Delete removes the selected clip, with the pointer off the screen, and stops there");
+		key(off, GLFW_KEY_BACKSPACE, GLFW_REPEAT); key(off, GLFW_KEY_BACKSPACE, GLFW_REPEAT);
+		check(used(0) == 1 && root->reached == 0, "holding Delete removes nothing else and never reaches the module");
+		key(off, GLFW_KEY_BACKSPACE, GLFW_RELEASE);
+		key(off, GLFW_KEY_BACKSPACE, GLFW_PRESS);
+		check(root->reached == 1, "with nothing selected, Delete off the screen is Rack's again");
+		key(off, GLFW_KEY_BACKSPACE, GLFW_RELEASE);
+
+		// clicking away from a clip, or off the screen, ends the selection
+		press(Vec(xBar(2.25), y0), 0); release(Vec(xBar(2.25), y0));
+		check(d->selValid(), "selected again");
+		press(off, 0); release(off);
+		check(!d->selValid(), "clicking off the screen ends the selection");
+		press(Vec(xBar(2.25), y0), 0); release(Vec(xBar(2.25), y0));
+		press(Vec(xBar(0.25), y1), 0); release(Vec(xBar(0.25), y1));
+		check(!d->selValid(), "clicking an empty lane ends the selection");
+		press(off, 0); release(off);
+		d->deleteUnder(Vec(xBar(2.25), y0));
+		check(used(0) == 0, "with nothing selected, Delete removes the clip under the pointer");
+
+		// The grid, then the slowdowns. A 1 s ramp at 120 BPM is half a bar from
+		// t0 = 1: 96000 frames a bar.
+		double pxPerBar = (d->x1() - d->x0()) / d->vLen();
+		auto trimL = [&](int mods, float px) {
+			for (int j = 0; j < CC_CLIPS; j++) r.m.clip[0][j].used = false;
+			r.put(0, ramp(1.f), 1.f);
+			d->modsOverride = 0;
+			Vec p(xBar(1.0) + 0.5f, y0);
+			press(p, 0);
+			check(d->drag == ConcreteDisplay::D_TRIML, string::f("the left edge is grabbed (%d)", mods).c_str());
+			d->modsOverride = mods;
+			dragTo(px);
+			d->modsOverride = 0;
+			double a = r.m.clip[0][d->dClip].a; float t0 = r.m.clip[0][d->dClip].t0;
+			release(p);
+			return std::make_pair(a, (double)t0);
+		};
+		float grid = 1.f / r.m.gridDiv();
+		auto plain = trimL(0, (float)(pxPerBar * 0.1));
+		check(std::fabs(plain.second - std::round((1.0 + 0.1) / grid) * grid) < 1e-5, "a plain trim lands on the clock grid");
+		float wantBars = 0.03f;
+		auto f16 = trimL(RACK_MOD_CTRL, (float)(pxPerBar * wantBars * 16.f));
+		check(std::fabs(f16.second - (1.0 + wantBars)) < 1e-4 && std::fabs(f16.first - wantBars * 96000.0) < 8.0, "Ctrl (Cmd) moves the edge 1/16 of the way, off the grid");
+		auto f256 = trimL(RACK_MOD_CTRL | GLFW_MOD_SHIFT, (float)(pxPerBar * wantBars * 256.f));
+		check(std::fabs(f256.first - wantBars * 96000.0) < 8.0, "Ctrl+Shift moves it 1/256 of the way");
+		auto onePx = trimL(RACK_MOD_CTRL | GLFW_MOD_SHIFT, 1.f);
+		printf("  one pixel at 1/256, whole 4-bar view: %.2f frames\n", onePx.first);
+		check(onePx.first > 0.0 && onePx.first < 8.0, "one pixel at 1/256 is a few frames, across the whole loop");
+
+		// a drag that changes speed part way does not jump: what has been dragged stays
+		for (int j = 0; j < CC_CLIPS; j++) r.m.clip[0][j].used = false;
+		r.put(0, ramp(1.f), 1.f);
+		r.m.snap = false;
+		{
+			Vec p(xBar(1.0) + 0.5f, y0);
+			press(p, 0);
+			dragTo((float)(pxPerBar * 0.05));
+			double a1 = r.m.clip[0][d->dClip].a;
+			d->modsOverride = RACK_MOD_CTRL;
+			dragTo(0.f);
+			double a2 = r.m.clip[0][d->dClip].a;
+			d->modsOverride = 0;
+			check(std::fabs(a1 - a2) < 1e-6, "pressing Ctrl mid-drag leaves the edge where it is");
+			release(p);
+		}
+		// Curve points go straight up. The snap is off, so any sideways movement would show.
+		{
+			r.m.snap = false;
+			r.m.tab = 1 + CC_PITCH;
+			r.m.pts[0][CC_PITCH] = {{1.03f, 0.f}};
+			r.m.renderCurve(0, CC_PITCH);
+			auto dragBy = [&](float dx, float dy) {
+				Widget::DragMoveEvent e;
+				e.button = GLFW_MOUSE_BUTTON_LEFT;
+				e.mouseDelta = Vec(dx, dy);
+				d->onDragMove(e);
+			};
+			float yMid = d->yOfV(0, CC_PITCH, 0.f), lift = (d->curveBot(0) - d->curveTop(0)) * 0.25f;
+			auto& P = r.m.pts[0][CC_PITCH];
+			Vec p(xBar(1.03) + 2.5f, yMid + 2.5f);    // grabbed off-centre
+			press(p, 0);
+			check(d->drag == ConcreteDisplay::D_POINT && P.size() == 1, "pressing near a point picks it up");
+			dragBy(0.f, 0.f);
+			check(P[0].b == 1.03f && std::fabs(P[0].v) < 1e-5f, "grabbing a point off-centre does not move it");
+			dragBy(2.f, -lift);
+			check(P[0].b == 1.03f && std::fabs(P[0].v - 0.5f) < 0.01f, string::f("up with a little drift: straight up (bar %.3f, value %.3f)", P[0].b + 1.f, P[0].v));
+			dragBy(60.f, 0.f);
+			check(P[0].b > 1.03f, "a clear move sideways moves it along");
+			d->modsOverride = GLFW_MOD_SHIFT;
+			dragBy(40.f, lift * 0.5f);
+			check(P[0].b == 1.03f, "Shift keeps it on its bar, however far the mouse goes");
+			d->modsOverride = 0;
+			release(p);
+			// A bar holds two points. A click that would add a third picks up the nearer one.
+			r.m.snap = true;
+			P = {{1.f, -0.5f}, {1.f, 0.5f}};
+			r.m.renderCurve(0, CC_PITCH);
+			Vec miss(xBar(1.0) + 1.f, d->yOfV(0, CC_PITCH, 0.75f));
+			press(miss, 0);
+			check(P.size() == 2 && d->dPt == 1, "a click on a bar with two points adds no third, and picks up the nearer");
+			release(miss);
+			// a point dragged onto a bar with two: the one between them goes when it is let go
+			P = {{0.5f, 0.25f}, {1.f, -0.5f}, {1.f, 0.5f}};
+			r.m.renderCurve(0, CC_PITCH);
+			Vec q(xBar(0.5), d->yOfV(0, CC_PITCH, 0.25f));
+			press(q, 0);
+			dragBy((float)(pxPerBar * 0.6), 0.f);
+			check(P.size() == 3 && P[0].b == 1.f, "dragged sideways it stops at the next bar with points");
+			release(q);
+			check(P.size() == 2 && std::fabs(P[0].v - 0.25f) < 1e-4f && P[1].v == 0.5f, "and on release the one between has gone, the arriving and leaving values kept");
+			// what a patch with stacks goes through on load (dataFromJson needs an engine)
+			{
+				std::vector<Concrete::CcPt>& S = r.m.pts[1][CC_PITCH];
+				S = {{1.f, 0.1f}, {1.f, 0.9f}, {1.f, 0.3f}, {1.f, -0.4f}, {2.f, 0.5f}};
+				r.m.pruneCurve(1, CC_PITCH);
+				check(S.size() == 3 && S[0].v == 0.1f && S[1].v == -0.4f && S[2].b == 2.f, "a stack keeps its first and last point");
+				S.clear();
+			}
+			// a step is sharp: from one value to the other within 1/256 bar of its bar
+			P = {{1.f, -0.5f}, {1.f, 0.5f}};
+			r.m.renderCurve(0, CC_PITCH);
+			check(r.m.curve[0][CC_PITCH][CC_RES - 1] == -0.5f && r.m.curve[0][CC_PITCH][CC_RES + 1] == 0.5f, "a step on a bar lands within a curve sample either side");
+			P.clear();
+			r.m.renderCurve(0, CC_PITCH);
+			r.m.tab = 0;
+		}
+		// the snap's Ctrl inversion, and a copy not inverting it
+		r.m.snap = true;
+		for (int j = 0; j < CC_CLIPS; j++) r.m.clip[0][j].used = false;
+		r.put(0, ramp(1.f), 1.f);
+		{
+			Vec p(xBar(1.25), y0);
+			press(p, 0);
+			d->modsOverride = RACK_MOD_CTRL;
+			dragTo((float)(pxPerBar * 0.0333));
+			float t = r.m.clip[0][d->dClip].t0;
+			d->modsOverride = 0;
+			check(std::fabs(t - 1.0333f) < 1e-3, "Ctrl while moving a clip leaves the grid, as the menu says");
+			dragTo(0.f);
+			release(p);
+		}
+		for (int j = 0; j < CC_CLIPS; j++) r.m.clip[0][j].used = false;
+		r.put(0, ramp(1.f), 1.f);
+		{
+			Vec p(xBar(1.25), y0);
+			press(p, RACK_MOD_CTRL);
+			d->modsOverride = RACK_MOD_CTRL;
+			dragTo((float)(pxPerBar * 2.0333));
+			float t = r.m.clip[0][d->dClip].t0;
+			int k = d->dClip;
+			check(std::fabs(t / grid - std::round(t / grid)) < 1e-3, "a Ctrl copy still lands on the grid");
+			d->modsOverride = 0;
+			release(p);
+			check(d->selClip == k && r.m.clip[0][d->selClip].used, "the copy is what ends up selected");
+		}
+	}
+
+	printf("\n== the pitch curve ==\n");
+	{
+		// how far a lane's voice has read, by the ramp's level: a 4 s ramp at 120 BPM is 2 bars
+		auto level = [](Rig& r) { return r.m.laneL[0] / CC_VOLTS; };
+		auto setPitch = [](Rig& r, std::vector<Concrete::CcPt> P) { r.m.pts[0][CC_PITCH] = P; r.m.renderCurve(0, CC_PITCH); };
+		{
+			Rig r(4); r.put(0, ramp(4.f), 0.f); r.play(); r.runTo(1.0);
+			check(std::fabs(level(r) - 0.5f) < 2e-3f, string::f("flat: one bar in, a 2-bar ramp is half way (%.4f)", level(r)));
+		}
+		{
+			Rig r(4); r.put(0, ramp(4.f), 0.f);
+			setPitch(r, {{0.f, 1.f}});
+			r.run(4800); r.play(); r.runTo(0.5);
+			check(std::fabs(level(r) - 0.5f) < 3e-3f, string::f("+12 st reads at twice the speed (%.4f at bar 1.5)", level(r)));
+			r.runTo(1.1);
+			check(std::fabs(level(r)) < 1e-4f, "and the clip runs out in half the time");
+		}
+		{
+			Rig r(4); r.put(0, ramp(4.f), 0.f);
+			setPitch(r, {{0.f, -1.f}});
+			r.run(4800); r.play(); r.runTo(1.0);
+			check(std::fabs(level(r) - 0.25f) < 3e-3f, string::f("-12 st reads at half the speed (%.4f)", level(r)));
+		}
+		{
+			// a jump to bar 2 lands where playing through would have got to
+			Rig a(4), b(4);
+			a.put(0, ramp(8.f), 0.f); b.put(0, ramp(8.f), 0.f);
+			std::vector<Concrete::CcPt> P = {{0.f, -0.5f}, {2.f, 1.f}};
+			setPitch(a, P); setPitch(b, P);
+			a.run(4800); b.run(4800);
+			a.play(); a.runTo(2.0);
+			float through = level(a);
+			b.play(); b.run(48);
+			b.m.seekReq.store(2.f);
+			b.run(480);
+			float jumped = level(b);
+			check(std::fabs(through - jumped) < 0.01f, string::f("a seek lands where playing through gets to (%.4f, %.4f)", through, jumped));
+		}
+		{
+			// a pitch step is slewed and moves the read speed, not the read position
+			Rig r(4); r.put(0, ramp(4.f), 0.f);
+			setPitch(r, {{1.f, 0.f}, {1.f, 1.f}});
+			r.run(4800); r.play(); r.runTo(0.5);
+			r.maxStep = 0.f;
+			r.runTo(1.5);
+			check(r.maxStep < 0.01f, string::f("a step in the curve does not click (largest step %.4f V)", r.maxStep));
+		}
+		{
+			// semitones while the snap is on, free with it off; the top and bottom are an octave
+			Rig r(4);
+			ConcreteDisplay d;
+			d.module = &r.m; d.modsOverride = 0; d.box.size = Vec(1200, 400);
+			r.m.tab = 1 + CC_PITCH;
+			float yT = d.curveTop(0), yB = d.curveBot(0);
+			float st = d.vOfY(0, CC_PITCH, yT + (yB - yT) * 0.21f) * CC_PITCH_SEMIS;
+			check(std::fabs(st - std::round(st)) < 1e-4f, string::f("a point lands on a semitone (%+.3f)", st));
+			d.modsOverride = RACK_MOD_CTRL;
+			float free = d.vOfY(0, CC_PITCH, yT + (yB - yT) * 0.21f) * CC_PITCH_SEMIS;
+			check(std::fabs(free - std::round(free)) > 1e-3f, string::f("Ctrl (Cmd) leaves it free (%+.3f)", free));
+			d.modsOverride = 0;
+			check(ConcreteDisplay::pitchText(7.f / 12.f) == "+7 st" && ConcreteDisplay::pitchText(-0.5f) == "-6 st", "the readout is in semitones");
+			d.module = nullptr;
+		}
+		{
+			// a new lane reads at its original speed, and renderCurve keeps it there
+			Rig r(4);
+			check(r.m.curve[0][CC_PITCH][10] == 0.f && r.m.laneRate[0] == 1.0, "no pitch points is the original speed");
+		}
+	}
+
 	printf("\n== cost ==\n");
 	{
 		// four lanes busy, every curve moving, one lane at a tempo-following speed
@@ -345,6 +619,7 @@ int main() {
 				r.m.curve[l][CC_VOL][i] = 0.6f + 0.4f * std::sin(i * 0.05f);
 				r.m.curve[l][CC_FILT][i] = 0.8f * std::sin(i * 0.03f + l);
 				r.m.curve[l][CC_PAN][i] = 0.7f * std::sin(i * 0.02f);
+				r.m.curve[l][CC_PITCH][i] = 0.3f * std::sin(i * 0.04f);
 			}
 		r.play();
 		auto t0 = std::chrono::steady_clock::now();

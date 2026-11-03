@@ -75,9 +75,9 @@ is 0.03 V.
 
 ## The curves
 
-Each lane has three curves across the loop (64 points a bar, over all 8 bars,
-so shortening the loop does not lose them). They are drawn on the VOL, FILTER
-and PAN tabs.
+Each lane has four curves across the loop (256 samples a bar, over all 8 bars,
+so shortening the loop does not lose them). They are drawn on the VOL, FILTER,
+PAN and PITCH tabs.
 
 - **VOL** runs from silence to unity, square law.
 - **FILTER** is Phase's DJ filter: lowpass below the centre, highpass above,
@@ -94,12 +94,27 @@ A curve is **points joined by straight lines**, edited like vector art:
 - Before the first point and after the last, the curve holds that point's
   value. With no points, it is the default.
 - Two points on one bar make a step.
-- There are detents at unity (VOL) and at the centre (FILTER, PAN).
+- **PITCH** is varispeed on the whole lane, an octave up or down: the audio
+  reads faster or slower, so pitch and duration change together, as on a tape.
+  A clip under a raised curve runs out before its drawn end, and one under a
+  lowered curve is cut off by the next clip or the loop end. The clip is still
+  drawn at its speed without the curve. A voice started part way through a clip
+  (a seek) integrates the curve to find where playing through would have got to.
+  Points land on semitones while the snap is on, and Ctrl (Cmd) frees them.
+  The read speed updates every 8 samples and moves the read position smoothly,
+  so a step in the curve is a fast glide (slewed 5 ms) and does not click.
+- There are detents at unity (VOL) and at the centre (FILTER, PAN, PITCH).
+- A dragged point stays on its bar until the drag has gone 2.5 mm sideways, so
+  moving it up or down does not also move it along. Shift holds it on its bar.
+- A bar holds two points at most: the value arriving and the value leaving. Any
+  between them would have no effect, so a click that would add a third picks up
+  the nearer of the two, a point dragged onto a full bar removes the one it lands
+  beside on release, and a patch that has stacks loses them on load.
 
 The points are rendered into 64 values a bar for the audio thread, and the
 curves are slewed by 5 ms, so a step does not click.
 
-The chain per lane is **clip → VOL → FILTER → PAN**. That is what each lane's
+PITCH acts where the clip is read. The chain per lane is **clip → VOL → FILTER → PAN**. That is what each lane's
 output carries, unclipped, and the four lanes sum to Concrete's L/R mix. The mix is soft-clipped:
 linear to 6 V, asymptotic to 10 V.
 
@@ -111,15 +126,26 @@ linear to 6 V, asymptotic to 10 V.
   one. The original stays where it was, and the copy splices where it is
   dropped.
 - Drag the left edge to trim the start (the clip's start on the tape moves with
-  it). Drag the right edge to trim the end.
+  it). Drag the right edge to trim the end. The time in the sample is shown
+  while dragging.
+- Hold Ctrl (Cmd) while trimming to move the edge at 1/16 of the mouse's speed,
+  or Ctrl+Shift for 1/256, as on a Rack knob. Either leaves the grid, and shows
+  the audio round the edge at the scale the mouse is moving, with the trimmed
+  side dim. Across a 4-bar loop at 100% zoom, 1/256 is about three frames per pixel.
 - Shift-drag the right edge to change the speed: the window stays and its
   length on the tape changes.
-- Snap to the clock grid is on by default (menu).
+- Snap to the clock grid is on by default (menu). Ctrl (Cmd) while dragging
+  inverts it, except on a copy, where Ctrl is what asks for the copy.
 - Drop WAV or FLAC files on a lane to place them at that bar. Several files go
   one after another.
 - Right-click a clip for speed (presets, octave, semitone), Reverse, Follow the
-  tempo, Restore the whole sample, Duplicate after it and Delete. Delete also
-  works on a hovered clip from the keyboard.
+  tempo, Restore the whole sample, Duplicate after it and Delete.
+- Click a clip to select it. The Delete or Backspace key removes the selected
+  clip, wherever the pointer is. With nothing selected it removes the clip or
+  curve point under the pointer. Over the screen those keys never reach Rack,
+  which would remove the module: `ModuleWidget::onHoverKey` acts on them, press
+  and repeat, before offering them to its children, so `ConcreteWidget` catches
+  them first, and the screen, as the selected widget, hears them before that.
 - Right-click an empty part of a lane to load a sample there.
 
 ## The view
