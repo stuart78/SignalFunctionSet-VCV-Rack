@@ -767,7 +767,13 @@ struct Loom : Module {
 			{
 				bool excited = sustaining || s.burst > 0.f || s.pending >= 0.f;
 				if (s.snooze > 0) s.snooze--;
-				if (excited) { s.hold = 0; s.snooze = 0; }
+				// Excited, it stays awake for a whole trip round its loop after the
+				// excitation ends. A pluck's burst is ~70 samples and a low string's
+				// loop is hundreds: what it plucked hasn't reached the pickup yet,
+				// so `amp` still reads silence, and sleeping now (as this did, with
+				// a hold of 0) left every string below ~670 Hz mute. The longest
+				// loop is LOOM_BUF / 1.62 samples; the hold covers it.
+				if (excited) { s.hold = LOOM_BUF * 3 / 4; s.snooze = 0; }
 				else if (s.amp < 1e-4f) {
 					bool busDrive = coupAmt > 0.f && s.snooze == 0
 					    && std::fabs(couplePrev) * coupAmt * coupAmt * LOOM_COUPLE_MAX > 1e-5f;

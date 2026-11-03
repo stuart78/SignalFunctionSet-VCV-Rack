@@ -989,7 +989,11 @@ struct Slide : Module {
 			// otherwise goes back to sleep and ignores the bridge for 340 ms.
 			bool excited = s.burst > 0.f || s.pending >= 0.f;
 			if (s.snooze > 0) s.snooze--;
-			if (excited) { s.hold = 0; s.snooze = 0; }
+			// Excited, it stays awake for a whole trip round its loop after the
+			// excitation ends: what a pick puts in has not reached the pickup when
+			// the burst finishes, so `amp` still reads silence. The longest loop is
+			// SLIDE_BUF / 1.62 samples; the hold covers it.
+			if (excited) { s.hold = SLIDE_BUF * 3 / 4; s.snooze = 0; }
 			else if (s.amp < 1e-4f) {
 				bool busDrive = coupAmt > 0.f && s.snooze == 0
 				    && std::fabs(couplePrev) * coupAmt * coupAmt * 0.06f > 1e-5f;

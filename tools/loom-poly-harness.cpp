@@ -128,6 +128,40 @@ int main() {
 		check(m->quantScale == -1, "no cable, knob at zero: free tuning");
 	}
 
+	// A string asleep at -80 dB wakes on a pluck, and what the pluck put in has
+	// not reached the pickup when its burst ends. Going back to sleep at that
+	// point left every string below ~670 Hz silent on a short trigger; a held
+	// gate kept the string awake, so nothing above could see it.
+	printf("== a 5 ms trigger from silence\n");
+	for (float v : {-3.f, -2.f, -1.f, 0.f, 1.f, 2.f}) {
+		Rig r; r.poly(1);
+		r.note(0, v);
+		float pk = 0.f;
+		for (int i = 0; i < 48000; i++) {
+			r.gate(0, i < 240);
+			r.run(1);
+			pk = std::max(pk, std::fabs(r.m->outputs[Loom::MIX_L_OUTPUT].getVoltage()));
+		}
+		char buf[64];
+		snprintf(buf, sizeof buf, "V/OCT %+.0f: %.2f V", v, pk);
+		check(pk > 1.f, buf);
+	}
+
+	printf("== the strings still sleep once they have rung out\n");
+	{
+		Rig r; r.poly(1);
+		r.gate(0, true); r.run(240); r.gate(0, false);
+		int waited = 0, awake = LOOM_N;
+		while (awake > 0 && waited < 120) {
+			r.run(48000); waited++;
+			awake = 0;
+			for (int i = 0; i < LOOM_N; i++) awake += !r.m->str[i].asleep;
+		}
+		char buf[64];
+		snprintf(buf, sizeof buf, "all asleep after %d s", waited);
+		check(awake == 0, buf);
+	}
+
 	printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
 	return fails ? 1 : 0;
 }
