@@ -69,7 +69,7 @@ At the bottom of the inset:
 |---|---|
 | **BPM** | 0.01V per BPM → Meter's BPM CV (with "BPM CV absolute" on). |
 | **ROOT** | 1V/oct, semitone-quantized, into Note's or Chance's root CV. |
-| **SCALE** | 1V per scale, into Note's or Chance's scale CV. |
+| **SCALE** | The phrase's whole scale, as Key sends it, and it replaces the SCALE knob of whatever it feeds. Channel 0 is the plain index, 1V per scale. |
 | **PHRASE** | 1V per phrase (phrase 1 = 0V). |
 
 ROOT and SCALE use the shared scale list, so they're interchangeable across Note, Fugue, Muse, Chance, and MetaFugue. One arrangement drives the key of the whole patch.

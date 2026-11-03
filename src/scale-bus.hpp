@@ -36,6 +36,7 @@
 #include "scales.hpp"
 #include <cmath>
 #include <string>
+#include <algorithm>
 
 namespace sfs {
 
@@ -182,10 +183,21 @@ inline void busScaleToOutput(Output& out, const BusScale& s) {
 	int n = std::min(s.size, BUS_MAXDEG);
 	int dropped = clamp(s.dropped + (s.size - n), 0, 127);
 	if (n <= 0) { out.setChannels(1); out.setVoltage((float)s.index); return; }
+	// The harmonic series climbs past its period and the decoder rejects a degree
+	// that does, so it is sent folded into one period, in order, without repeats.
+	float iv[BUS_MAXDEG];
+	for (int k = 0; k < n; k++) iv[k] = s.intervals[k];
+	if (s.period > 0.f && iv[n - 1] >= s.period) {
+		for (int k = 0; k < n; k++) iv[k] = std::fmod(iv[k], s.period);
+		std::sort(iv, iv + n);
+		int w = 0;
+		for (int k = 0; k < n; k++) if (w == 0 || iv[k] - iv[w - 1] > 0.01f) iv[w++] = iv[k];
+		n = w;
+	}
 	out.setChannels(n + 2);
 	out.setVoltage((float)s.index + (float)dropped / 128.f, 0);
 	out.setVoltage(s.period / 12.f, 1);
-	for (int k = 0; k < n; k++) out.setVoltage(s.intervals[k] / 12.f, 2 + k);
+	for (int k = 0; k < n; k++) out.setVoltage(iv[k] / 12.f, 2 + k);
 }
 
 // Snap `semis` (relative to the root, any register) onto the scale.

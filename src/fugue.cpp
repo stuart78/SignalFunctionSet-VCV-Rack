@@ -180,7 +180,7 @@ struct Fugue : Module {
 		configInput(CLOCK_B_INPUT, "Clock B (normalled to A)");
 		configInput(CLOCK_C_INPUT, "Clock C (normalled to B)");
 		configInput(RESET_INPUT, "Reset");
-		configInput(ROOT_CV_INPUT, "Root Note CV");
+		configInput(ROOT_CV_INPUT, "Root CV (1V/oct, semitone-quantized)");
 		configInput(SCALE_CV_INPUT, "Scale CV");
 		configInput(STEPS_CV_INPUT, "Steps CV");
 		configInput(SLEW_CV_INPUT, "Slew CV");
@@ -471,10 +471,10 @@ struct Fugue : Module {
 	void onVoiceStepAdvance(int voiceIdx) {
 		VoiceState& voice = voices[voiceIdx];
 
-		// Read root with CV (1V = 1 semitone, wraps 0-11)
+		// Read root with CV (1V/oct, semitone-quantized, wraps 0-11)
 		int rootNote = (int)std::round(params[ROOT_PARAM].getValue());
 		if (inputs[ROOT_CV_INPUT].isConnected()) {
-			rootNote += (int)std::round(inputs[ROOT_CV_INPUT].getVoltage());
+			rootNote += (int)std::round(inputs[ROOT_CV_INPUT].getVoltage() * 12.f);
 		}
 		rootNote = ((rootNote % 12) + 12) % 12;
 

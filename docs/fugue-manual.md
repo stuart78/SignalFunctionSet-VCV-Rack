@@ -34,7 +34,7 @@ These are located in the top-left section of the panel.
 
 | Control | Range | Default | Description |
 |---------|-------|---------|-------------|
-| Root | C through B | C | Root note for scale quantization. CV: 1V per semitone, wraps around. |
+| Root | C through B | C | Root note for scale quantization. CV: 1V/oct, rounded to the nearest semitone, wraps around. |
 | Scale | 12 scales | Major | Scale selection (see Scale List below). CV: 1V per scale index. |
 | Steps | 1 to 8 | 8 | Number of active steps in the sequence. Steps beyond this count are skipped. CV: 1V per step. |
 | Slew | 0 to 100% | 0% | Portamento between notes. Uses adaptive timing: the slew duration is proportional to the time until the next active gate, so it always resolves before the next note arrives. CV: ±5V maps to ±100%. |

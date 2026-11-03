@@ -112,6 +112,22 @@ int main() {
 		check(r.m->chanStr[0] >= 0 && r.m->chanStr[1] >= 0, "both notes play");
 	}
 
+	printf("\n== SCALE cable ==\n");
+	{
+		// a plain index means the same scale here as on every other module, knob at free tuning
+		Loom* m = new Loom;
+		m->inputs[Loom::SCALE_CV_INPUT].channels = 1;
+		for (int idx : {0, 2, 5, 18}) {
+			m->params[Loom::SCALE_PARAM].setValue(0.f);
+			m->inputs[Loom::SCALE_CV_INPUT].setVoltage((float)idx);
+			m->readKeyControls();
+			check(m->scale.index == idx && m->quantScale == idx, "SCALE CV selects the plugin's scale index");
+		}
+		m->inputs[Loom::SCALE_CV_INPUT].channels = 0;
+		m->readKeyControls();
+		check(m->quantScale == -1, "no cable, knob at zero: free tuning");
+	}
+
 	printf(fails ? "\n%d FAILED\n" : "\nall passed\n", fails);
 	return fails ? 1 : 0;
 }

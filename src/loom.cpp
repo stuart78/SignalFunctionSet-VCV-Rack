@@ -378,7 +378,7 @@ struct Loom : Module {
 		configInput(CLOCK_INPUT,     "Clock — advances the auto pattern");
 		configInput(RESET_INPUT,     "Reset the auto pattern");
 		configInput(PATTERN_CV_INPUT, "Auto pattern CV (1V per pattern)");
-		configInput(SCALE_CV_INPUT,  "Scale CV (1V per scale; 0V = free tuning)");
+		configInput(SCALE_CV_INPUT,  "Scale CV (1V per scale, added to the knob, or Key's scale bus)");
 		configInput(DENSITY_CV_INPUT, "Auto density CV (±5V)");
 
 		configOutput(MIX_L_OUTPUT, "Mix left");
@@ -407,10 +407,10 @@ struct Loom : Module {
 	// SCALE: 0 = free tuning, 1..N = an sfs::SCALES index, so the pot's first
 	// position is "off" and the rest line up with the shared scale list.
 	void readKeyControls() {
-		int sc = (int)std::round(params[SCALE_PARAM].getValue()
-		                        + inputs[SCALE_CV_INPUT].getVoltage());
-		quantScale = clamp(sc, 0, sfs::NUM_SCALES) - 1;      // 0 -> -1 (off)
-		scale = sfs::busResolve(inputs[SCALE_CV_INPUT], std::max(quantScale, 0));
+		int knob = clamp((int)std::round(params[SCALE_PARAM].getValue()), 0, sfs::NUM_SCALES) - 1;   // 0 -> -1 (off)
+		scale = sfs::busResolve(inputs[SCALE_CV_INPUT], std::max(knob, 0));
+		// a cable names a scale, as on every other module, so 0 V is Chromatic
+		quantScale = inputs[SCALE_CV_INPUT].isConnected() ? scale.index : knob;
 	}
 
 	void applyTuning(int t) {

@@ -77,6 +77,24 @@ accepted limitation of a 3-bit index, hence "Chromatic-ish".
 A standalone check of the `museSemis` derivation lives in the commit history
 (compile `scales.hpp` against the rule and assert equality for all entries).
 
+## What a SCALE or ROOT cable does
+
+- **ROOT is 1V/oct, rounded to the nearest semitone**, on every module, and it is
+  added to the ROOT knob. A module wraps it to one octave.
+- **A plain index is added to the SCALE knob.** 2 V with the knob on Chromatic
+  (index 0) is Minor, and with the knob on Major (index 1) it is Pentatonic Major.
+  Modules whose knob defaults to Major (Canon, Fugue, MetaFugue, Carillon, Key,
+  Wheel, Arrange's phrases) therefore read one scale higher until the knob is
+  turned to Chromatic.
+- **The scale bus replaces the knob.** Key, Arrange and Note's relay all send it,
+  so a scale from any of them is the scale that plays, wherever the knob is.
+- On **Loom and Slide** the knob's first position is free tuning and the rest are
+  the list. With a cable in and the knob at free tuning, 0 V is Chromatic; the plain index still
+  adds to the knob above that. Unplug the cable for free tuning.
+- The harmonic series climbs past its period, and the bus cannot carry that, so
+  it travels folded into one octave: six notes, not the twelve its own knob
+  position gives.
+
 ## The scale bus (SCALE CV, extended)
 
 `SCALE` CV has always been **1V per scale** — an index into the canonical list.

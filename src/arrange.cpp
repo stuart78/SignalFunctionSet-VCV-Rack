@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "scales.hpp"
+#include "scale-bus.hpp"
 #include <cmath>
 #include <cstring>
 
@@ -108,7 +109,7 @@ struct Arrange : Module {
 		configOutput(PHRASE_OUTPUT, "Phrase index (1V/phrase, phrase 1 = 0V)");
 		configOutput(BPM_OUTPUT, "BPM CV (0.01V per BPM) — into Meter");
 		configOutput(ROOT_OUTPUT, "Root note CV of the current phrase (1V/oct, semitone-quantized) — into Note/Chance root CV");
-		configOutput(SCALE_OUTPUT, "Scale-select CV of the current phrase (1V per scale) — into Note/Chance scale CV");
+		configOutput(SCALE_OUTPUT, "Scale of the current phrase (1V per scale on channel 0, the full scale behind it): replaces the SCALE knob of whatever it feeds");
 		for (int i = 0; i < NUM_PHRASES; i++)
 			configOutput(PGATE_OUTPUT + i, string::f("Phrase %d gate (high while phrase %d is playing)", i + 1, i + 1));
 		for (int i = 0; i < NUM_PHRASES; i++) {
@@ -184,10 +185,13 @@ struct Arrange : Module {
 
 		outputs[PHRASE_OUTPUT].setVoltage(clamp((float)curPhrase, 0.f, 10.f));
 		outputs[BPM_OUTPUT].setVoltage(clamp(effBpm(curPhrase) * 0.01f, 0.f, 10.f));
-		// Root/Scale of the playing phrase — same convention as Note (1V/oct root, 1V/scale) so
-		// Phrase's ROOT/SCALE out drive Note's or Chance's root/scale CV interchangeably.
+		// Root/Scale of the playing phrase, on the same wires as Key's. SCALE is the whole
+		// scale, not only its index, because a module adds a plain index to its own knob and
+		// a bus replaces the knob: the phrase's scale is the scale that plays.
 		outputs[ROOT_OUTPUT].setVoltage((float)effRoot(curPhrase) / 12.f);
-		outputs[SCALE_OUTPUT].setVoltage((float)effScale(curPhrase));
+		sfs::BusScale phraseScale;
+		sfs::busScaleFromIndex(effScale(curPhrase), phraseScale);
+		sfs::busScaleToOutput(outputs[SCALE_OUTPUT], phraseScale);
 		for (int c = 0; c < NUM_CHANNELS; c++) {
 			outputs[CH_BAR_OUTPUT + c].setVoltage(chBar[c].process(dt) ? 10.f : 0.f);
 			outputs[CH_CLOCK_OUTPUT + c].setVoltage(chClk[c].process(dt) ? 10.f : 0.f);

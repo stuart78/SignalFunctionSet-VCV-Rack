@@ -355,6 +355,8 @@ See **`docs/conventions/panel-reticules.md`** for the rules, the component size 
 ### Scale Conventions
 **Any module exposing a SCALE control MUST use the shared canonical list in `src/scales.hpp`** (namespace `sfs`) — never define its own scale table. The list is append-only; reordering breaks cross-module SCALE CV compatibility and saved patches. Note, Fugue, Fugue's MetaFugue variant, Muse, Chance, and Arrange all alias `sfs::Scale` / `sfs::SCALES[]`, so a SCALE CV (1V/scale) and ROOT CV (1V/oct, semitone-quantized) are interchangeable across all of them. (Fugue was migrated onto the canonical list in 2026-07; a `scaleCanonical` JSON flag + `LEGACY_SCALE_REMAP` translate pre-migration patches.)
 
+**ROOT CV is 1V/oct, semitone-quantized, everywhere** (Fugue and MetaFugue read 1V per semitone until 2026-11). A plain SCALE index is ADDED to the knob, so a module whose knob defaults to Major reads one scale higher; the scale bus REPLACES the knob, and Key, Arrange and Note's relay all send it. `busScaleToOutput()` folds a scale that climbs past its period (the harmonic series), because the decoder rejects one that does not.
+
 See **`docs/conventions/scales.md`** for the 19-scale list, struct fields (longName/shortName/museName, intervals/size, museSemis[8]), and how to add a scale.
 
 ### Drift Module Architecture

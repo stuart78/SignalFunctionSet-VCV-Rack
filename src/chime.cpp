@@ -187,6 +187,7 @@ struct Chime : Module {
 	// The whole scale when one is on the wire, refreshed every block.
 	sfs::BusScale scale;
 	int curScale() {
+		if (scale.extended) return scale.index;
 		float sv = params[SCALE_PARAM].getValue();
 		if (inputs[SCALE_INPUT].isConnected()) sv += inputs[SCALE_INPUT].getVoltage();
 		return clamp((int)std::round(sv), 0, sfs::NUM_SCALES - 1);

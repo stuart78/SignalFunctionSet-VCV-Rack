@@ -455,7 +455,7 @@ struct Slide : Module {
 		configInput(DENSITY_CV_INPUT, "Roll density CV (±5V)");
 		configInput(VOL_INPUT, "Volume pedal, UNIPOLAR 0-10V (overrides SWELL), or bipolar offset by menu");
 		configInput(ROOT_CV_INPUT,  "Root CV (1V/oct, semitone-quantized)");
-		configInput(SCALE_CV_INPUT, "Scale CV (1V per scale; 0V = free)");
+		configInput(SCALE_CV_INPUT, "Scale CV (1V per scale, added to the knob, or Key's scale bus)");
 
 		configOutput(MIX_L_OUTPUT, "Mix left");
 		configOutput(MIX_R_OUTPUT, "Mix right");
@@ -593,9 +593,10 @@ struct Slide : Module {
 		// Resolving the scale bus and snapping to it builds a whole scale; it
 		// happens at control rate and the target is held between.
 		if (ctrl) {
-		curScale = clamp((int)std::round(params[SCALE_PARAM].getValue()
-		                 + inputs[SCALE_CV_INPUT].getVoltage()), 0, sfs::NUM_SCALES) - 1;
-		scale = sfs::busResolve(inputs[SCALE_CV_INPUT], std::max(curScale, 0));
+		int knobScale = clamp((int)std::round(params[SCALE_PARAM].getValue()), 0, sfs::NUM_SCALES) - 1;   // 0 -> -1 (free)
+		scale = sfs::busResolve(inputs[SCALE_CV_INPUT], std::max(knobScale, 0));
+		// a cable names a scale, as on every other module, so 0 V is Chromatic
+		curScale = inputs[SCALE_CV_INPUT].isConnected() ? scale.index : knobScale;
 		// POS is 1V/oct and the trimpot is an offset on it -- the same shape as
 		// V/OCT plus a tune knob everywhere else. The bar position IS pitch here
 		// (fret n is n semitones, because a bar at the 12th halves the string),
