@@ -1329,6 +1329,7 @@ struct ConcreteDisplay : OpaqueWidget {
 	void movePoint(int l, int k, Vec p, bool keepBar) {
 		Concrete* m = module;
 		int c = m->tab - 1;
+		if (l < 0 || l >= CC_N || c < 0 || c >= CC_NCURVE) return;   // the CLIPS tab has no curve
 		auto& P = m->pts[l][c];
 		if (k < 0 || k >= (int)P.size()) return;
 		double lo = k > 0 ? P[k - 1].b : 0.0, hi = k + 1 < (int)P.size() ? P[k + 1].b : (double)CC_MAXBARS;
@@ -1361,6 +1362,7 @@ struct ConcreteDisplay : OpaqueWidget {
 	void deletePoint(int l, int k) {
 		Concrete* m = module;
 		int c = m->tab - 1;
+		if (l < 0 || l >= CC_N || c < 0 || c >= CC_NCURVE) return;   // the CLIPS tab has no curve
 		auto& P = m->pts[l][c];
 		if (k < 0 || k >= (int)P.size()) return;
 		P.erase(P.begin() + k);
@@ -1710,6 +1712,7 @@ struct ConcreteDisplay : OpaqueWidget {
 	void curveMenu(int l) {
 		Concrete* m = module;
 		int c = m->tab - 1;
+		if (l < 0 || l >= CC_N || c < 0 || c >= CC_NCURVE) return;   // the CLIPS tab has no curve
 		Menu* menu = createMenu();
 		menu->addChild(createMenuLabel(string::f("Lane %d %s", l + 1, CC_CURVE_NAME[c])));
 		menu->addChild(createMenuLabel("Click to add a point, drag to move it (Shift: up and down only), double-click to remove it"));

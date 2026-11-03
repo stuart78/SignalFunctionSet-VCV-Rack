@@ -152,12 +152,13 @@ struct Hocket : Module {
 
 	// The next channel by the pattern, from the channels in play.
 	int pick(int pat, const int* act, int N, float v) {
+		if (N < 1 || N > HK_N) return cur;
 		int idx = -1;
 		for (int j = 0; j < N; j++) if (act[j] == cur) idx = j;
 		// the first channel in play above `cur`, and the last below it
 		auto above = [&]() { for (int j = 0; j < N; j++) if (act[j] > cur) return act[j]; return -1; };
 		auto below = [&]() { for (int j = N - 1; j >= 0; j--) if (act[j] < cur) return act[j]; return -1; };
-		auto rnd = [&](int n) { return std::min((int)(random::uniform() * n), n - 1); };
+		auto rnd = [&](int n) { return clamp((int)(random::uniform() * n), 0, std::max(n - 1, 0)); };
 		switch (pat) {
 			case HK_UP:   { int a = above(); return a >= 0 ? a : act[0]; }
 			case HK_DOWN: { int b = (cur < 0) ? -1 : below(); return b >= 0 ? b : act[N - 1]; }
