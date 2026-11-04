@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "pulse-width.hpp"
@@ -209,7 +210,7 @@ struct Note : Module {
 		configInput(CLOCK_INPUT, "Clock (step advance)");
 		configInput(BAR_INPUT,   "Bar (pattern advance)");
 		configInput(RESET_INPUT, "Reset");
-		configInput(ROOT_INPUT,  "Root note CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale select CV (1V/scale)");
 		configInput(OCT_INPUT,   "Octave shift CV (1V/oct)");
 		configOutput(GATE_OUTPUT,     "Gate");
@@ -362,7 +363,7 @@ struct Note : Module {
 		int octK   = (int)std::round(params[OCT_PARAM].getValue());
 
 		int rootCV = inputs[ROOT_INPUT].isConnected()
-			? (int)std::round(inputs[ROOT_INPUT].getVoltage() * 12.f) : 0;
+			? (int)std::round(sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode)) : 0;
 		int scaleCV = inputs[SCALE_INPUT].isConnected()
 			? (int)std::round(inputs[SCALE_INPUT].getVoltage()) : 0;
 		int octCV = inputs[OCT_INPUT].isConnected()
@@ -468,8 +469,11 @@ struct Note : Module {
 		sfs::busScaleToOutput(outputs[SCALE_OUTPUT], scale);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_object_set_new(root, "editPattern", json_integer(editPattern));
 		json_object_set_new(root, "editMode", json_integer(editMode));
 		json_object_set_new(root, "playPattern", json_integer(playPattern));
@@ -512,6 +516,7 @@ struct Note : Module {
 	}
 
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(root, "editPattern"))
 			editPattern = clamp((int)json_integer_value(j), 0, N_PATTERNS - 1);
 		if (json_t* j = json_object_get(root, "editMode"))
@@ -1555,6 +1560,8 @@ struct NoteWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Note* module = dynamic_cast<Note*>(this->module);
 		assert(module);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, module, Note::ROOT_INPUT, module->rootCvMode);
 
 		// What key Note is actually in. The status cell has room for a shape
 		// ("13/31") and no more; the sentence belongs here.

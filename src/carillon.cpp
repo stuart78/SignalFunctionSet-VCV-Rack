@@ -16,6 +16,7 @@
 // Design: docs/carillon-design.md.
 // =============================================================================
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "scale-bus.hpp"
@@ -293,7 +294,7 @@ struct Carillon : Module {
 		paramQuantities[ROOT_PARAM]->snapEnabled = true;
 		std::vector<std::string> names;
 		for (int i = 0; i < sfs::NUM_SCALES; i++) names.push_back(sfs::SCALES[i].longName);
-		configSwitch(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 1.f, "Scale (bells outside it are felted)", names);
+		configSwitch(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 0.f, "Scale (bells outside it are felted)", names);
 		configInput(VOCT_INPUT, "V/OCT (poly): strikes the bell of that note, folded by octaves into the two octaves round the root");
 		configInput(GATE_INPUT, "Trigger / gate (poly): strikes the bell of the V/OCT on the same channel");
 		configInput(VEL_INPUT, "Velocity (poly, 0-10V): how much energy the strike delivers");
@@ -304,7 +305,7 @@ struct Carillon : Module {
 		configInput(DAMP_INPUT, "Damp CV");
 		configInput(REACH_INPUT, "Reach CV");
 		configInput(SPEED_INPUT, "Speed CV");
-		configInput(ROOT_INPUT, "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale, or Key's scale bus)");
 		configOutput(L_OUTPUT, "Left mic");
 		configOutput(R_OUTPUT, "Right mic");
@@ -592,7 +593,7 @@ struct Carillon : Module {
 		// ── control rate ──────────────────────────────────────────────────
 		if ((ctlDiv++ & 63) == 0) {
 			int r = (int)std::round(params[ROOT_PARAM].getValue());
-			if (inputs[ROOT_INPUT].isConnected()) r += (int)std::round(inputs[ROOT_INPUT].getVoltage() * 12.f);
+			if (inputs[ROOT_INPUT].isConnected()) r += (int)std::round(sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode));
 			root = ((r % 12) + 12) % 12;
 			if (layout == PL_KEYS && root != layoutRoot) relayout();   // the keyboard follows the root
 			sc = sfs::busResolve(inputs[SCALE_INPUT], (int)std::round(params[SCALE_PARAM].getValue()));
@@ -750,8 +751,11 @@ struct Carillon : Module {
 			outputs[POLY_OUTPUT].setVoltage(chanBell[c] >= 0 ? sfs::softClip(bell[chanBell[c]].out * 4.f) : 0.f, c);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* r = json_object();
+		sfs::rootCvToJson(r, rootCvMode);
 		json_t* rods = json_array();                  // pairs of BELLS (notes), a < b
 		for (int a = 0; a < PL_N; a++) for (int b = a + 1; b < PL_N; b++)
 			if (hasRod(a, b)) { json_t* pr = json_array(); json_array_append_new(pr, json_integer(a)); json_array_append_new(pr, json_integer(b)); json_array_append_new(rods, pr); }
@@ -767,6 +771,7 @@ struct Carillon : Module {
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
+		sfs::rootCvFromJson(r, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(r, "layout")) layout = clamp((int)json_integer_value(j), 0, PL_NLAYOUT - 1);
 		if (json_t* j = json_object_get(r, "register")) regOct = clamp((int)json_integer_value(j), -1, 1);
 		if (json_t* j = json_object_get(r, "order")) order = clamp((int)json_integer_value(j), 0, PL_NORDER - 1);
@@ -1154,6 +1159,8 @@ struct CarillonWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Carillon* m = dynamic_cast<Carillon*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Carillon::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		std::vector<std::string> ln(PL_LAYOUT_NAME, PL_LAYOUT_NAME + PL_NLAYOUT);
 		menu->addChild(createIndexSubmenuItem("Layout", ln,

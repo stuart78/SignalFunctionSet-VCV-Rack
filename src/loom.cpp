@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
@@ -370,7 +371,7 @@ struct Loom : Module {
 		configInput(DAMP_CV_INPUT,   "Damping CV (±5V)");
 		configInput(PICK_CV_INPUT,   "Pick hardness CV (±5V)");
 		configInput(SPREAD_CV_INPUT, "Strum spread CV (±5V)");
-		configInput(ROOT_CV_INPUT,   "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_CV_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(OCT_CV_INPUT,    "Octave CV (1V per octave)");
 		configInput(VOCT_INPUT,      "V/oct (polyphonic: channel N is the note for GATE channel N)");
 		configInput(GATE_INPUT,      "Gate (polyphonic: each channel plays its own note on the nearest free string)");
@@ -630,7 +631,7 @@ struct Loom : Module {
 		// ── pitch ──────────────────────────────────────────────────────────────
 		float rootSemis = params[ROOT_PARAM].getValue();
 		if (inputs[ROOT_CV_INPUT].isConnected())
-			rootSemis += std::round(inputs[ROOT_CV_INPUT].getVoltage() * 12.f);
+			rootSemis += std::round(sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode));
 		float oct = params[OCT_PARAM].getValue();
 		if (inputs[OCT_CV_INPUT].isConnected()) oct += inputs[OCT_CV_INPUT].getVoltage();
 		// In NEAREST, V/OCT is the note being ASKED FOR, not a transposition of
@@ -1079,8 +1080,11 @@ struct Loom : Module {
 	}
 
 	// ── persistence ────────────────────────────────────────────────────────────
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_object_set_new(root, "tab", json_integer(tab));
 		json_object_set_new(root, "quantScale", json_integer(quantScale));
 		json_object_set_new(root, "voiceMode", json_integer(voiceMode));
@@ -1107,6 +1111,7 @@ struct Loom : Module {
 	}
 
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_CV_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(root, "tab")) tab = clamp((int)json_integer_value(j), 0, 6);
 		// A patch saved before this existed strummed on every gate, so it comes
 		// back strumming. Only a NEW Loom defaults to nearest -- changing what a
@@ -1610,6 +1615,8 @@ struct LoomWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Loom* m = dynamic_cast<Loom*>(this->module);
 		assert(m);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Loom::ROOT_CV_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 
 		menu->addChild(createIndexPtrSubmenuItem("V/OCT + GATE plays",

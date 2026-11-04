@@ -24,6 +24,7 @@
 // =============================================================================
 
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
@@ -152,7 +153,7 @@ struct Chime : Module {
 		configInput(RATE_INPUT, "Rotation rate CV (±5V)");
 		configInput(SPREAD_INPUT, "Rate spread CV (±5V)");
 		configInput(DRIFT_INPUT, "Drift CV (±5V)");
-		configInput(ROOT_INPUT, "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale)");
 		configInput(RESEED_INPUT, "Reseed trigger");
 		configInput(CLOCK_INPUT, "Clock (syncs rotations; RATE knob picks 32/16/8/4/2/1 clocks per rotation)");
@@ -194,7 +195,7 @@ struct Chime : Module {
 	}
 	int curRoot() {
 		float rv = params[ROOT_PARAM].getValue();
-		if (inputs[ROOT_INPUT].isConnected()) rv += inputs[ROOT_INPUT].getVoltage() * 12.f;
+		if (inputs[ROOT_INPUT].isConnected()) rv += sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode);
 		int r = (int)std::round(rv);
 		return ((r % 12) + 12) % 12;
 	}
@@ -374,14 +375,18 @@ struct Chime : Module {
 		outputs[MIX_R_OUTPUT].setVoltage(mixR * mixScale);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_t* arr = json_array();
 		for (int c = 0; c < CHIME_NCH; c++) json_array_append_new(arr, json_real(randMul[c]));
 		json_object_set_new(root, "randMul", arr);
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		if (json_t* arr = json_object_get(root, "randMul"))
 			for (int c = 0; c < CHIME_NCH && c < (int)json_array_size(arr); c++)
 				randMul[c] = (float)json_real_value(json_array_get(arr, c));
@@ -748,6 +753,8 @@ struct ChimeWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Chime* m = dynamic_cast<Chime*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Chime::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Reseed random rates", "", [=]() { m->reseed(); }));
 	}

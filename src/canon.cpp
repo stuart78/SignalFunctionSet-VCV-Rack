@@ -15,6 +15,7 @@
 // from wherever it was. Design: docs/canon-design.md.
 // =============================================================================
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "scale-bus.hpp"
@@ -162,7 +163,7 @@ struct Canon : Module {
 			configOutput(CV_OUTPUT + c, "V/OCT " + L);
 			configOutput(GATE_OUTPUT + c, "Gate " + L);
 		}
-		configInput(ROOT_INPUT, "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale, or Key's scale bus)");
 		configInput(SET_INPUT, "Set: advance to the next set");
 		configInput(SET_CV_INPUT, "Set CV (1V per set; wins when patched)");
@@ -512,7 +513,7 @@ struct Canon : Module {
 	void process(const ProcessArgs& args) override {
 		// the key, in the plugin's convention
 		int r = (int)std::round(params[ROOT_PARAM].getValue());
-		if (inputs[ROOT_INPUT].isConnected()) r += (int)std::round(inputs[ROOT_INPUT].getVoltage() * 12.f);
+		if (inputs[ROOT_INPUT].isConnected()) r += (int)std::round(sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode));
 		root = ((r % 12) + 12) % 12;
 		sc = sfs::busResolve(inputs[SCALE_INPUT], (int)std::round(params[SCALE_PARAM].getValue()));
 
@@ -540,8 +541,11 @@ struct Canon : Module {
 		}
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* r = json_object();
+		sfs::rootCvToJson(r, rootCvMode);
 		json_t* sets = json_array();
 		for (int s = 0; s < CN_SETS; s++) {
 			json_t* a = json_array();
@@ -577,6 +581,7 @@ struct Canon : Module {
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
+		sfs::rootCvFromJson(r, this, ROOT_INPUT, rootCvMode);
 		if (json_t* sets = json_object_get(r, "sets")) {
 			for (int s = 0; s < CN_SETS && s < (int)json_array_size(sets); s++) {
 				json_t* a = json_array_get(sets, s);
@@ -1022,6 +1027,8 @@ struct CanonWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Canon* m = dynamic_cast<Canon*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Canon::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Harmonic lock (channels choose notes that agree)", "", &m->lock));
 		menu->addChild(createBoolPtrMenuItem("Restart channels on set change", "", &m->restartOnSet));

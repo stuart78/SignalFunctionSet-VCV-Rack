@@ -83,7 +83,7 @@ struct Arrange : Module {
 		std::vector<std::string> scaleNames, rootNames = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 		for (int i = 0; i < sfs::NUM_SCALES; i++) scaleNames.push_back(sfs::SCALES[i].longName);
 		for (int i = 0; i < NUM_PHRASES; i++) {
-			configSwitch(SCALE_PARAM + i, 0.f, (float)(sfs::NUM_SCALES - 1), 1.f, string::f("P%d scale", i + 1), scaleNames);
+			configSwitch(SCALE_PARAM + i, 0.f, (float)(sfs::NUM_SCALES - 1), 0.f, string::f("P%d scale", i + 1), scaleNames);
 			configSwitch(ROOT_PARAM + i, 0.f, 11.f, 0.f, string::f("P%d root", i + 1), rootNames);
 			configParam(BPM_PARAM + i, 30.f, 300.f, 120.f, string::f("P%d BPM", i + 1), " BPM");
 			getParamQuantity(SCALE_PARAM + i)->snapEnabled = true;

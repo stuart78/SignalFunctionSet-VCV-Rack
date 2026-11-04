@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "chance-markov.hpp"
@@ -250,7 +251,7 @@ struct Chance : Module {
 		configInput(CLOCK_INPUT, "Clock");
 		configInput(RESET_INPUT, "Reset");
 		configInput(RANDOMIZE_INPUT, "Randomize trigger");
-		configInput(ROOT_CV_INPUT, "Root CV (1V/oct, semitone-quantized) — e.g. Note or Phrase root out");
+		configInput(ROOT_CV_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_CV_INPUT, "Scale-select CV (1V per scale) — e.g. Note or Phrase scale out");
 		configInput(GRAVITY_CV_INPUT, "Gravity CV");
 		configInput(DRIFT_CV_INPUT, "Drift CV");
@@ -497,7 +498,7 @@ struct Chance : Module {
 		                        (int)std::round(params[KEY_PARAM].getValue()));
 		if (scale.extended) curScale = scale.index;
 		int rootKnob = (int)std::round(params[ROOT_PARAM].getValue());
-		int rootCv = inputs[ROOT_CV_INPUT].isConnected() ? (int)std::round(inputs[ROOT_CV_INPUT].getVoltage() * 12.f) : 0;
+		int rootCv = inputs[ROOT_CV_INPUT].isConnected() ? (int)std::round(sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode)) : 0;
 		curRoot = ((rootKnob + rootCv) % 12 + 12) % 12;
 		curGateFrac = rescale(clamp(params[GATE_PARAM].getValue(), 0.f, 1.f), 0.f, 1.f, 0.05f, 0.95f);
 
@@ -575,8 +576,11 @@ struct Chance : Module {
 		if (!started) { if (previewDiv-- <= 0) { previewDiv = 256; computeCycle(); } }
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_t* seeds = json_array();
 		for (int i = 0; i < NUM_NODES; i++) json_array_append_new(seeds, json_integer((json_int_t)patternSeed[i]));
 		json_object_set_new(root, "patternSeeds", seeds);
@@ -595,6 +599,7 @@ struct Chance : Module {
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_CV_INPUT, rootCvMode);
 		if (json_t* a = json_object_get(root, "patternSeeds"))
 			for (int i = 0; i < NUM_NODES; i++) if (json_t* v = json_array_get(a, i)) patternSeed[i] = (uint32_t)json_integer_value(v);
 		if (json_t* a = json_object_get(root, "patternReseed"))
@@ -1039,6 +1044,8 @@ struct ChanceWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Chance* m = dynamic_cast<Chance*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Chance::ROOT_CV_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Pattern cell: click = edit · dbl-click = on/off · boxes = repeats · R = reseed"));
 		menu->addChild(createMenuLabel("Gate row (focused pattern): click = on/off · shift-click = tie"));

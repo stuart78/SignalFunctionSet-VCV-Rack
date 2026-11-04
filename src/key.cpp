@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
 #include "scales.hpp"
@@ -238,7 +239,7 @@ struct Key : Module {
 
 	// ── the key in force ──────────────────────────────────────────────────────
 	int   rootNote = 0;
-	int   scaleIndex = 1;
+	int   scaleIndex = 0;
 	bool  customMask = false;            // the keyboard has been edited by hand
 	uint16_t mask = 0;
 
@@ -315,7 +316,7 @@ struct Key : Module {
 		for (int i = 0; i < sfs::NUM_SCALES; i++)
 			scaleNames.push_back(sfs::SCALES[i].longName);
 		scaleNames.push_back("Scala file");
-		configSwitch(SCALE_PARAM, 0.f, (float)SCALA_INDEX, 1.f, "Scale", scaleNames);
+		configSwitch(SCALE_PARAM, 0.f, (float)SCALA_INDEX, 0.f, "Scale", scaleNames);
 
 		for (int c = 0; c < KEY_NCH; c++) {
 			configParam<KeyOffsetQuantity>(OFFSET_PARAM + c, -12.f, 12.f, 0.f,
@@ -331,7 +332,7 @@ struct Key : Module {
 			configBypass(IN_INPUT + c, OUT_OUTPUT + c);
 		}
 
-		configInput(ROOT_INPUT,  "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale)");
 		for (int c = 0; c < KEY_NCH; c++)
 			configInput(TRIG_CH_INPUT + c, string::f(
@@ -493,7 +494,7 @@ struct Key : Module {
 	void process(const ProcessArgs& args) override {
 		int rootK = (int)std::round(params[ROOT_PARAM].getValue());
 		int rootCV = inputs[ROOT_INPUT].isConnected()
-			? (int)std::round(inputs[ROOT_INPUT].getVoltage() * 12.f) : 0;
+			? (int)std::round(sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode)) : 0;
 		int newRoot = (((rootK + rootCV) % 12) + 12) % 12;
 
 		int scaleK = (int)std::round(params[SCALE_PARAM].getValue());
@@ -635,8 +636,11 @@ struct Key : Module {
 		sfs::busScaleToOutput(outputs[SCALE_OUTPUT], b);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_object_set_new(root, "customMask", json_boolean(customMask));
 		json_object_set_new(root, "mask", json_integer(mask));
 		json_object_set_new(root, "offsetInDegrees", json_boolean(offsetInDegrees));
@@ -672,6 +676,7 @@ struct Key : Module {
 	}
 
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(root, "customMask")) customMask = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "mask")) mask = (uint16_t)json_integer_value(j);
 		if (json_t* j = json_object_get(root, "offsetInDegrees"))
@@ -1248,6 +1253,8 @@ struct KeyWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Key* m = dynamic_cast<Key*>(this->module);
 		assert(m);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Key::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 
 		menu->addChild(createMenuItem("Load Scala file (.scl)…",

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
@@ -260,7 +261,7 @@ struct Spool : Module {
 			{"Speed (varispeed, as a Mellotron does)", "Pitch only (time-stretched)"});
 		configSwitch(DETECT_PARAM, 0.f, 1.f, 0.f, "Pitch detection",
 		             {"Once, when the tape is loaded", "Continuous (tracks, and flattens vibrato)"});
-		configInput(ROOT_INPUT, "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(RESET_INPUT, "Reset (poly: one channel per tape; mono rewinds all)");
 		// +-5 V covers the knob's whole travel, as Slice's DEPTH does. The
 		// envelope is shared by every tape, so these are one CV each and not
@@ -456,7 +457,7 @@ struct Spool : Module {
 		// the nearest voicing of the new key rather than transposing them away.
 		int rootNote = (int)std::round(params[ROOT_PARAM].getValue());
 		if (inputs[ROOT_INPUT].isConnected())
-			rootNote += (int)std::round(inputs[ROOT_INPUT].getVoltage() * 12.f);
+			rootNote += (int)std::round(sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode));
 		rootNote = ((rootNote % 12) + 12) % 12;
 		float rootSemis = (float)rootNote;
 
@@ -886,8 +887,11 @@ struct Spool : Module {
 		t.savedRev = t.rev;
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_t* arr = json_array();
 		for (int i = 0; i < SP_N; i++) {
 			Tape& t = tape[i];
@@ -909,6 +913,7 @@ struct Spool : Module {
 	}
 
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		json_t* arr = json_object_get(root, "tapes");
 		if (!arr) return;
 		std::string dir = getPatchStorageDirectory();
@@ -1329,6 +1334,8 @@ struct SpoolWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Spool* m = dynamic_cast<Spool*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Spool::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		for (int i = 0; i < SP_N; i++) {
 			int idx = i;

@@ -28,6 +28,7 @@
 // wheel, not from the string.
 // =============================================================================
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "scales.hpp"
@@ -349,7 +350,7 @@ struct Wheel : Module {
 
 		configParam<WheelRootQuantity>(ROOT_PARAM, 0.f, 11.f, 0.f, "Root");
 		paramQuantities[ROOT_PARAM]->snapEnabled = true;
-		configParam<WheelScaleQuantity>(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 1.f, "Scale");
+		configParam<WheelScaleQuantity>(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 0.f, "Scale");
 		paramQuantities[SCALE_PARAM]->snapEnabled = true;
 		configParam(CRANK_PARAM, 0.3f, 6.f, 1.6f, "Crank", " rev/s");
 		configParam(COUPS_PARAM, 1.f, (float)WH_MAXCOUPS, 4.f, "Coups per turn");
@@ -380,8 +381,10 @@ struct Wheel : Module {
 				paramQuantities[PITCH_PARAM]->snapEnabled = true;
 			}
 			else {
+				// The fifth and third of the default drone, as degrees of the default
+				// scale (Chromatic), where a degree is a semitone.
 				configParam(PITCH_PARAM + v, 0.f, (float)(WH_MAXDEG - 1),
-				            v == 1 ? 4.f : v == 2 ? 0.f : v == 3 ? 2.f : 0.f,
+				            v == 1 ? 7.f : v == 2 ? 0.f : v == 3 ? 4.f : 0.f,
 				            n + "degree");
 				paramQuantities[PITCH_PARAM + v]->snapEnabled = true;
 				configParam(OCT_PARAM + v, -3.f, 2.f,
@@ -404,7 +407,7 @@ struct Wheel : Module {
 			configInput(LEVELV_INPUT + v, n + "level CV");
 		}
 
-		configInput(ROOT_INPUT,  "Root CV (1V/oct)");
+		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale)");
 		configInput(CRANK_INPUT, "Crank CV");
 		configInput(COUPS_INPUT, "Coups CV");
@@ -474,7 +477,7 @@ struct Wheel : Module {
 		temperLive = wheelIs12TET(scale);
 
 		float rs = params[ROOT_PARAM].getValue();
-		if (inputs[ROOT_INPUT].isConnected()) rs += inputs[ROOT_INPUT].getVoltage() * 12.f;
+		if (inputs[ROOT_INPUT].isConnected()) rs += sfs::rootCvSemis(inputs[ROOT_INPUT].getVoltage(), rootCvMode);
 		rootSemis = (int)std::round(rs);
 
 		float temper = 0.f;
@@ -813,13 +816,17 @@ struct Wheel : Module {
 		lights[COUP_LIGHT].setBrightnessSmooth(dogFlash, args.sampleTime);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* root = json_object();
+		sfs::rootCvToJson(root, rootCvMode);
 		json_object_set_new(root, "coupMask", json_integer(coupMask));
 		json_object_set_new(root, "envToPress", json_boolean(envToPress));
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
+		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(root, "coupMask")) coupMask = (uint8_t)json_integer_value(j);
 		if (json_t* j = json_object_get(root, "envToPress")) envToPress = json_boolean_value(j);
 	}
@@ -1420,6 +1427,8 @@ struct WheelWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Wheel* m = dynamic_cast<Wheel*>(module);
 		if (!m) return;
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Wheel::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Gate presses the string", "", &m->envToPress));
 		menu->addChild(createMenuLabel("  (off: the gate is a plain VCA)"));

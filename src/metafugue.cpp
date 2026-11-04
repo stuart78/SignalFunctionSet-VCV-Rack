@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "pulse-width.hpp"
@@ -279,7 +280,7 @@ struct MetaFugue : Module {
 			std::vector<std::string> scaleNames;
 			for (int i = 0; i < NUM_SCALES_FUGUE; i++)
 				scaleNames.push_back(sfs::SCALES[i].longName);
-			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES_FUGUE - 1), 1.f,
+			configSwitch(SCALE_PARAM, 0.f, (float)(NUM_SCALES_FUGUE - 1), 0.f,
 				"Scale", scaleNames);
 		}
 
@@ -316,7 +317,7 @@ struct MetaFugue : Module {
 		configInput(CLOCK_B_INPUT, "Clock B (normalled to A)");
 		configInput(CLOCK_C_INPUT, "Clock C (normalled to B)");
 		configInput(RESET_INPUT, "Reset");
-		configInput(ROOT_CV_INPUT, "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_CV_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_CV_INPUT, "Scale CV");
 		configInput(STEPS_CV_INPUT, "Steps CV");
 		configInput(SLEW_CV_INPUT, "Slew CV");
@@ -378,8 +379,11 @@ struct MetaFugue : Module {
 
 	// ─── JSON Persistence ────────────────────────────────────────────────────
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
+		sfs::rootCvToJson(rootJ, rootCvMode);
 		json_object_set_new(rootJ, "faderRange", json_real(faderRangeVolts));
 		json_object_set_new(rootJ, "harmonicLock", json_boolean(harmonicLock));
 		json_object_set_new(rootJ, "gateLength", json_real(gateLength));
@@ -391,6 +395,7 @@ struct MetaFugue : Module {
 	}
 
 	void dataFromJson(json_t* rootJ) override {
+		sfs::rootCvFromJson(rootJ, this, ROOT_CV_INPUT, rootCvMode);
 		json_t* j = json_object_get(rootJ, "faderRange");
 		if (j) faderRangeVolts = json_number_value(j);
 		json_t* hlJ = json_object_get(rootJ, "harmonicLock");
@@ -673,10 +678,10 @@ struct MetaFugue : Module {
 	void onVoiceStepAdvanceWithRange(int voiceIdx, float rangeVolts) {
 		VoiceState& voice = voices[voiceIdx];
 
-		// Read root with CV (1V/oct, semitone-quantized, wraps 0-11)
+		// Read root with CV (wraps 0-11)
 		int rootNote = (int)std::round(params[ROOT_PARAM].getValue());
 		if (inputs[ROOT_CV_INPUT].isConnected()) {
-			rootNote += (int)std::round(inputs[ROOT_CV_INPUT].getVoltage() * 12.f);
+			rootNote += (int)std::round(sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode));
 		}
 		rootNote = ((rootNote % 12) + 12) % 12;
 
@@ -1296,6 +1301,8 @@ struct MetaFugueWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		MetaFugue* module = dynamic_cast<MetaFugue*>(this->module);
 		assert(module);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, module, MetaFugue::ROOT_CV_INPUT, module->rootCvMode);
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Fader Range"));

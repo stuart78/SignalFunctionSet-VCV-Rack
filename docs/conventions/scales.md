@@ -81,11 +81,18 @@ A standalone check of the `museSemis` derivation lives in the commit history
 
 - **ROOT is 1V/oct, rounded to the nearest semitone**, on every module, and it is
   added to the ROOT knob. A module wraps it to one octave.
+  That is the default. A module's context menu can change how its input reads,
+  with **ROOT CV** (`src/root-cv.hpp`): 1V/oct, 1 V per semitone (whole semitones),
+  or 0-10 V across the 12 notes (0.91 V per note, 10 V is the eleventh semitone
+  above the knob). A module reads `sfs::rootCvSemis()` and adds the hooks;
+  its ROOT out, if it has one, stays 1V/oct whatever the input is set to.
 - **A plain index is added to the SCALE knob.** 2 V with the knob on Chromatic
   (index 0) is Minor, and with the knob on Major (index 1) it is Pentatonic Major.
-  Modules whose knob defaults to Major (Canon, Fugue, MetaFugue, Carillon, Key,
-  Wheel, Arrange's phrases) therefore read one scale higher until the knob is
-  turned to Chromatic.
+  Every SCALE knob defaults to the bottom of the list (2026-11; six used to
+  default to Major), so on a new module the voltage is the index. The exception
+  is Canon, which stays on Major because its chords are built from scale degrees
+  and on Chromatic a triad is C D E, so there the voltage is one scale below the
+  index. A patch keeps the knob position it was saved with.
 - **The scale bus replaces the knob.** Key, Arrange and Note's relay all send it,
   so a scale from any of them is the scale that plays, wherever the knob is.
 - On **Loom and Slide** the knob's first position is free tuning and the rest are

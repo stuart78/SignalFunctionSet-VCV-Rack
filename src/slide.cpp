@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "fastmath.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
@@ -454,7 +455,7 @@ struct Slide : Module {
 		configInput(PATTERN_CV_INPUT, "Roll CV (±5V sweeps all 16)");
 		configInput(DENSITY_CV_INPUT, "Roll density CV (±5V)");
 		configInput(VOL_INPUT, "Volume pedal, UNIPOLAR 0-10V (overrides SWELL), or bipolar offset by menu");
-		configInput(ROOT_CV_INPUT,  "Root CV (1V/oct, semitone-quantized)");
+		configInput(ROOT_CV_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_CV_INPUT, "Scale CV (1V per scale, added to the knob, or Key's scale bus)");
 
 		configOutput(MIX_L_OUTPUT, "Mix left");
@@ -872,7 +873,7 @@ struct Slide : Module {
 		// ── pitch ─────────────────────────────────────────────────────────────
 		float rootSemis = params[ROOT_PARAM].getValue();
 		if (inputs[ROOT_CV_INPUT].isConnected())
-			rootSemis += std::round(inputs[ROOT_CV_INPUT].getVoltage() * 12.f);
+			rootSemis += std::round(sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode));
 		float basePitch = params[OCT_PARAM].getValue() + rootSemis / 12.f;
 		// In melody mode V/OCT has already been spent placing the bar; adding it
 		// here as well would transpose the note a second time.
@@ -1166,8 +1167,11 @@ struct Slide : Module {
 		mouseWrite = nw;
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* r = json_object();
+		sfs::rootCvToJson(r, rootCvMode);
 		json_object_set_new(r, "playMode", json_integer(playMode));
 		json_object_set_new(r, "autoMovesBar", json_boolean(autoMovesBar));
 		json_object_set_new(r, "pickupType", json_integer(pickupType));
@@ -1182,6 +1186,7 @@ struct Slide : Module {
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
+		sfs::rootCvFromJson(r, this, ROOT_CV_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(r, "playMode")) playMode = (int)json_integer_value(j);
 		if (json_t* j = json_object_get(r, "autoMovesBar")) autoMovesBar = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "pickupType")) pickupType = (int)json_integer_value(j);
@@ -1524,6 +1529,8 @@ struct SlideWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Slide* m = dynamic_cast<Slide*>(this->module);
 		assert(m);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, m, Slide::ROOT_CV_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Auto roll moves the bar", "", &m->autoMovesBar));
 		// A knob would be better and there is no room for one: the panel art is

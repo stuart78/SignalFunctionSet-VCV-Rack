@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include <cmath>
@@ -374,7 +375,7 @@ struct Muse : Module {
 			configInput(INTERVAL_CV_0 + i, string::f("Interval %s CV", nm[i]));
 			configInput(THEME_CV_0 + i,    string::f("Theme %d CV",    i + 1));
 		}
-		configInput(ROOT_CV_INPUT,  "Root CV (1V/oct)");
+		configInput(ROOT_CV_INPUT, sfs::ROOT_CV_FREE_NAME);
 		configInput(SCALE_CV_INPUT, "Scale CV");
 
 		configOutput(VOCT_OUTPUT, "Pitch (V/oct)");
@@ -471,7 +472,7 @@ struct Muse : Module {
 		int oct  = (addr >> 3) & 0x1;
 		float rootSemis = params[ROOT_PARAM].getValue();
 		if (inputs[ROOT_CV_INPUT].isConnected())
-			rootSemis += inputs[ROOT_CV_INPUT].getVoltage() * 12.f;  // 1V/oct
+			rootSemis += sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode);
 		float semis = museDegree(idx3) + busScale.period * (float)oct + rootSemis;
 		return semis / 12.f;
 	}
@@ -663,8 +664,11 @@ struct Muse : Module {
 		outputs[GATE_OUTPUT].setVoltage(gateHi ? 10.f : 0.f);
 	}
 
+	int rootCvMode = sfs::ROOT_CV_VOCT;
+
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
+		sfs::rootCvToJson(rootJ, rootCvMode);
 		json_object_set_new(rootJ, "running", json_boolean(running));
 		json_object_set_new(rootJ, "gateOnChangeOnly", json_boolean(gateOnChangeOnly));
 		json_object_set_new(rootJ, "randomScope", json_integer(randomScope));
@@ -679,6 +683,7 @@ struct Muse : Module {
 	}
 
 	void dataFromJson(json_t* rootJ) override {
+		sfs::rootCvFromJson(rootJ, this, ROOT_CV_INPUT, rootCvMode, sfs::ROOT_CV_FREE_NAME);
 		if (json_t* j = json_object_get(rootJ, "running"))          running = json_boolean_value(j);
 		// Backward compat: pre-SCALE_PARAM patches stored scaleIdx as a JSON int.
 		if (json_t* j = json_object_get(rootJ, "scaleIdx")) {
@@ -1438,6 +1443,8 @@ struct MuseWidget : ModuleWidget {
 	void appendContextMenu(Menu* menu) override {
 		Muse* module = dynamic_cast<Muse*>(this->module);
 		assert(module);
+		menu->addChild(new MenuSeparator);
+		sfs::rootCvMenu(menu, module, Muse::ROOT_CV_INPUT, module->rootCvMode, sfs::ROOT_CV_FREE_NAME);
 
 		// Triadex manual presets (slider snapshots from the original 1972 manual)
 		menu->addChild(new MenuSeparator);
