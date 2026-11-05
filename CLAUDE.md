@@ -353,7 +353,7 @@ Panel SVGs carry **reticules** — the placement guides the art is drawn around.
 python3 tools/panel_reticules.py            # every registered panel
 ```
 
-Controls are drawn at **99%** of the real component as a **single shape**; screens are **full size** filled with the display blue (`#1a1a32`). The tool owns only the `Screens` and `Reticules` layers and never touches the designer's artwork.
+**A panel in `FINISHED` is refused unless you pass `--force`**, named or not: the tool lays its own plate and screen over the art, which covered Slice's output labels in 2.24.0 and 2.24.1 because the plate was drawn on top of the white text. Controls are drawn at **99%** of the real component as a **single shape**; screens are **full size** filled with the display blue (`#1a1a32`). The tool owns only the `Screens` and `Reticules` layers and never touches the designer's artwork.
 
 See **`docs/conventions/panel-reticules.md`** for the rules, the component size table, and the 72dpi-vs-75dpi coordinate-space trap.
 

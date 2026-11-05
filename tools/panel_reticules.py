@@ -493,6 +493,8 @@ PLATES = {
     # each lane's L over R, then the mix on its own plate
     "concrete": [(89.92, 95.25, 51.31, 30.73), (144.53, 95.25, 13.21, 30.73)],
     "concretein": [],
+    # the three outputs at the foot
+    "canopy": [(105.41, 110.49, 34.93, 16.51)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -542,30 +544,32 @@ MODULES = {
     "concretein":  ("ConcreteIn",  "src/concretein.cpp",  "res/concretein.svg",  {"CONCRETE_LANES": 4}),
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
+    "canopy":  ("Canopy",  "src/canopy.cpp",  "res/canopy.svg",  {}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
 }
 
-# Panels whose artwork is hand-made and is now the SOURCE of the layout rather
-# than a target for it. Splicing generated reticules into these would draw
-# circles straight over the design. Named explicitly on the command line they
-# still run, so the guard is against the bare sweep, not against intent.
-NO_SCREEN_SLAB = {"wheel", "flock", "carillon"}
+# Panels drawn on the faceplate, with no screen, so the tool does not fill a slab.
+NO_SCREEN_SLAB = {"wheel", "flock", "carillon", "canopy"}
 
 # Panels whose ART is now the specification: the designer has drawn them, their
 # screens and plates are flattened into the export, and regenerating over one
 # lays a SECOND screen on top of the designer's. opmorph and spool joined the
 # list in 2026-09 -- opmorph twice picked up a stray #1a1a32 rect from a run
 # aimed at another panel, which is exactly the failure this set exists to stop.
+# Naming one is not enough to run over it, only --force is: a run that named
+# slice put a plate over its white output labels, and that shipped in 2.24.0.
 FINISHED = {"crystal", "chime", "loom", "slide", "slidex", "fill", "gravity", "key",
             "slice", "kit", "trace", "sigma", "wheel", "opmorph", "spool", "polykitin", "field",
             "flock", "flockin", "canon", "count", "carillon"}
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    explicit = bool(sys.argv[1:])
-    for key in (sys.argv[1:] or MODULES.keys()):
-        if key in FINISHED and not explicit:
-            print(f"{key}: skipped — finished artwork, layout comes FROM the panel")
+    args = sys.argv[1:]
+    force = "--force" in args
+    keys = [a for a in args if a != "--force"]
+    for key in (keys or MODULES.keys()):
+        if key in FINISHED and not force:
+            print(f"{key}: skipped — finished artwork, layout comes FROM the panel (--force to draw over it)")
             continue
         mod, cpp, svg, defs = MODULES[key]
         src = open(os.path.join(root, cpp)).read()

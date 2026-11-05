@@ -14,7 +14,7 @@ applies until it comes out.
       hides the placement guides. `panel_reticules.py` *generates* a panel from
       the widget source and emits plates and screen only — run it on a finished
       panel and it draws over the artwork. Add the key to `FINISHED` in
-      `panel_reticules.py` so the bare sweep skips it.
+      `panel_reticules.py` so the tool refuses it without `--force`.
       See [panel-design.md](panel-design.md), [panel-reticules.md](panel-reticules.md).
 
 - [ ] **Every control sits on a guide.** `--publish` reports `N/M guides hidden`

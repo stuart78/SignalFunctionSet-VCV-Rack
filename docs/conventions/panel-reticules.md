@@ -76,8 +76,12 @@ small corner radius.
 
 ```
 python3 tools/panel_reticules.py                 # all registered panels
-python3 tools/panel_reticules.py crystal chime   # just these
+python3 tools/panel_reticules.py hocket canopy   # just these
 ```
+
+A panel in `FINISHED` is finished art, and the tool refuses it even when named,
+because it would lay a plate and screen over the designer's labels. That is what
+hid Slice's output labels in 2.24.0 and 2.24.1. `--force` overrides the refusal.
 
 It reads positions **out of the widget constructor** — `mm2px(Vec(...))` calls,
 including those inside `for` loops and those using local constants — so the
