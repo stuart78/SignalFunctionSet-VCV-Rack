@@ -147,6 +147,50 @@ int main() {
 		check(pk > 1.f, buf);
 	}
 
+	printf("== in Auto, a gate steps the pattern and does not strum\n");
+	{
+		Rig r; r.poly(1);
+		r.m->inputs[Loom::VOCT_INPUT].channels = 0;
+		r.m->params[Loom::AUTO_PARAM].setValue(1.f);
+		r.m->params[Loom::PATTERN_PARAM].setValue((float)PAT_UP);
+		r.gate(0, false); r.run(10);
+		int most = 0;
+		for (int step = 0; step < 3; step++) {
+			r.gate(0, true); r.run(480);
+			r.gate(0, false); r.run(7500);
+			int n = 0;
+			for (int i = 0; i < LOOM_N; i++) if (r.m->str[i].amp > 0.02f) n++;
+			most = std::max(most, n - step);
+		}
+		char buf[80];
+		snprintf(buf, sizeof buf, "three gates ring three strings, not eight: %d extra", most - 1);
+		check(most == 1, buf);
+		// and with no cable on anything it still runs on its own
+		Rig q; q.m->inputs[Loom::GATE_INPUT].channels = 0; q.m->inputs[Loom::VOCT_INPUT].channels = 0;
+		q.m->params[Loom::AUTO_PARAM].setValue(1.f);
+		q.run(48000);
+		int rung = 0; for (int i = 0; i < LOOM_N; i++) rung += q.m->str[i].amp > 1e-3f;
+		snprintf(buf, sizeof buf, "unpatched, the internal clock runs: %d strings rung", rung);
+		check(rung >= 3, buf);
+		// Strum is still there if it is what is selected
+		Rig s; s.poly(1); s.m->inputs[Loom::VOCT_INPUT].channels = 0;
+		s.m->params[Loom::AUTO_PARAM].setValue(1.f);
+		s.m->params[Loom::PATTERN_PARAM].setValue((float)PAT_STRUM);
+		s.m->params[Loom::DENSITY_PARAM].setValue(1.f);
+		s.gate(0, false); s.run(10);
+		s.gate(0, true); s.run(24000);
+		rung = 0; for (int i = 0; i < LOOM_N; i++) rung += s.m->str[i].amp > 1e-3f;
+		snprintf(buf, sizeof buf, "the Strum pattern strums: %d strings", rung);
+		check(rung == LOOM_N, buf);
+		// and off Auto, a mono gate still strums as it always did
+		Rig o; o.poly(1); o.m->inputs[Loom::VOCT_INPUT].channels = 0;
+		o.gate(0, false); o.run(10);
+		o.gate(0, true); o.run(24000);
+		rung = 0; for (int i = 0; i < LOOM_N; i++) rung += o.m->str[i].amp > 1e-3f;
+		snprintf(buf, sizeof buf, "off Auto a mono gate strums: %d strings", rung);
+		check(rung == LOOM_N, buf);
+	}
+
 	printf("== the strings still sleep once they have rung out\n");
 	{
 		Rig r; r.poly(1);

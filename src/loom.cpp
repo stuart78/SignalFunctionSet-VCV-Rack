@@ -375,8 +375,8 @@ struct Loom : Module {
 		configInput(OCT_CV_INPUT,    "Octave CV (1V per octave)");
 		configInput(VOCT_INPUT,      "V/oct (polyphonic: channel N is the note for GATE channel N)");
 		configInput(GATE_INPUT,      "Gate (polyphonic: each channel plays its own note on the nearest free string)");
-		configInput(VEL_INPUT,       "Velocity (0–10V; polyphonic: follows the GATE channel when GATE is poly, otherwise channel N → string N)");
-		configInput(CLOCK_INPUT,     "Clock — advances the auto pattern");
+		configInput(VEL_INPUT,       "Velocity (0-10V; polyphonic: follows the GATE channel when GATE is poly, otherwise channel N → string N)");
+		configInput(CLOCK_INPUT,     "Clock (advances the auto pattern; unpatched, a gate advances it, and with no gate the internal rate does)");
 		configInput(RESET_INPUT,     "Reset the auto pattern");
 		configInput(PATTERN_CV_INPUT, "Auto pattern CV (1V per pattern)");
 		configInput(SCALE_CV_INPUT,  "Scale CV (1V per scale, added to the knob, or Key's scale bus)");
@@ -655,6 +655,7 @@ struct Loom : Module {
 		int gch = std::min(inputs[GATE_INPUT].getChannels(), (int)LOOM_CH);
 		bool polyGate = gch > 1;
 		bool anyGate = false;
+		bool gateStep = false;
 		// Every channel's trigger runs every sample, 0V where the cable has no
 		// such channel, so each one is LOW before a channel appears: a trigger
 		// first read HIGH does not fire, and that would drop the first note.
@@ -684,7 +685,10 @@ struct Loom : Module {
 					pluck(best, vel, -1.f);
 				}
 			} else if (c == 0) {
-				strum(1.f, -1.f);
+				// In Auto a gate is a step of the pattern, not the whole instrument:
+				// a strum on every gate buried whatever pattern was selected.
+				if (params[AUTO_PARAM].getValue() > 0.5f) gateStep = true;
+				else strum(1.f, -1.f);
 			}
 		}
 		for (int c = gch; c < LOOM_CH; c++) chanStr[c] = -1;
@@ -699,6 +703,9 @@ struct Loom : Module {
 			bool tick = false;
 			if (inputs[CLOCK_INPUT].isConnected()) {
 				tick = clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
+			}
+			else if (inputs[GATE_INPUT].isConnected() && !nearestOn) {
+				tick = gateStep;
 			}
 			else {
 				intPhase += args.sampleTime * internalHz;
@@ -1623,7 +1630,7 @@ struct LoomWidget : ModuleWidget {
 			{"The nearest string, retuned to the note", "All strings (strum)"},
 			&m->voiceMode));
 		menu->addChild(createBoolPtrMenuItem(
-			"A patched string output leaves the mix", "", &m->soloOnPatch));
+			"A patched string output is removed from the mix", "", &m->soloOnPatch));
 		menu->addChild(new MenuSeparator);
 
 		menu->addChild(createSubmenuItem("Tuning", "", [=](Menu* sub) {
