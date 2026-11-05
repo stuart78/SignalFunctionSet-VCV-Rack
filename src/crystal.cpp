@@ -746,14 +746,14 @@ struct Crystal : Module {
 		}
 		getParamQuantity(MATERIAL_PARAM)->snapEnabled = true;
 		configParam(TAIL_PARAM, 0.f, 1.f, 0.35f, "Tail", "%", 0.f, 100.f);
-		configParam(ROTY_PARAM, -(float)M_PI, (float)M_PI, 0.4f, "View — yaw (drag the display)");
-		configParam(ROTX_PARAM, -1.4f, 1.4f, 0.45f, "View — pitch (drag the display)");
+		configParam(ROTY_PARAM, -(float)M_PI, (float)M_PI, 0.4f, "View yaw (drag the display)");
+		configParam(ROTX_PARAM, -1.4f, 1.4f, 0.45f, "View pitch (drag the display)");
 		configParam(MIX_PARAM, 0.f, 1.f, 0.6f, "Dry / wet", "%", 0.f, 100.f);
 		configParam(EMIT_AZ_PARAM, -(float)M_PI, (float)M_PI, 0.6f, "Emitter azimuth");
 		configParam(EMIT_EL_PARAM, -1.5f, 1.5f, 0.3f, "Emitter elevation");
 		configButton(PING_PARAM, "Ping the crystal (alternates emitter A / B)");
 		configParam(DECAY_PARAM, 0.05f, 4.f, 0.7f, "Ping decay", " s");
-		configParam(ECHOES_PARAM, 2.f, (float)CR_TAPS, 8.f, "Echoes (reflections kept — few = discrete, many = dense)");
+		configParam(ECHOES_PARAM, 2.f, (float)CR_TAPS, 8.f, "Echoes (reflections kept; few are discrete, many are dense)");
 		getParamQuantity(ECHOES_PARAM)->snapEnabled = true;
 		configParam(FEEDBACK_PARAM, 0.f, 0.92f, 0.35f, "Feedback (sound re-enters the emitter)", "%", 0.f, 100.f);
 		configInput(FEEDBACK_INPUT, "Feedback CV (±5V)");
@@ -776,7 +776,7 @@ struct Crystal : Module {
 		}
 		configSwitch(MODE_PARAM, 0.f, 1.f, 0.f, "Mode",
 			{"Chamber (real acoustic scale)", "Delay (geometry sets the rhythm)"});
-		configInput(AUDIO_B_INPUT, "Audio B (enters at emitter B — patch stereo here)");
+		configInput(AUDIO_B_INPUT, "Audio B (enters at emitter B; patch stereo here)");
 		configInput(AX_INPUT, "Emitter A · X velocity (±5V)");
 		configInput(AY_INPUT, "Emitter A · Y velocity (±5V)");
 		configInput(BX_INPUT, "Emitter B · X velocity (±5V)");

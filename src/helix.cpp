@@ -498,7 +498,7 @@ struct HelixWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem("Follow the input's pitch", "", &m->followPitch));
 		menu->addChild(createMenuLabel("(a V/OCT cable overrides it)"));
 		menu->addChild(createIndexPtrSubmenuItem("Step smoothing",
-			{"None (the step is the sound)", "2 ms", "10 ms"}, &m->stepSmooth));
+			{"None (the step alone)", "2 ms", "10 ms"}, &m->stepSmooth));
 		menu->addChild(createBoolPtrMenuItem("Link the channels", "", &m->stereoLink));
 		menu->addChild(createMenuLabel("(unlinked, the right runs half an octave behind)"));
 	}

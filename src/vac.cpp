@@ -115,7 +115,7 @@ struct Vac : Module {
 		configInput(FALL_STAB_CV_INPUT, "Fall stability CV (±5V → ±50%)");
 		configInput(CURVE_CV_INPUT,     "Curve CV (±5V → ±50%)");
 		configOutput(END_OUTPUT,        "End-of-cycle trigger (1ms pulse at end of fall)");
-		configOutput(ENV_OUTPUT,        "Envelope (0–10V)");
+		configOutput(ENV_OUTPUT,        "Envelope (0-10V)");
 	}
 
 	void onReset() override {

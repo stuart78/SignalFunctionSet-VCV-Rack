@@ -260,7 +260,7 @@ struct Kit : Module {
 		configParam<KitMaterialQ>(STIFF_PARAM, 0.f, 1.f, 0.f, "Material");
 		configParam<KitAirQ>(AIR_PARAM, 0.f, 1.f, 0.f, "Air cavity");
 		configParam<KitDecayQ>(DECAY_PARAM, 0.f, 1.f, 0.5f, "Decay");
-		configParam<KitToneQ>(TONE_PARAM, 0.f, 1.f, 0.5f, "Tone (how fast partials die)");
+		configParam<KitToneQ>(TONE_PARAM, 0.f, 1.f, 0.5f, "Tone (how fast the partials decay)");
 		configParam(COUPLE_PARAM, 0.f, 1.f, 0.4f, "Coupling between the two heads", "%", 0.f, 100.f);
 		configParam<KitResoQ>(RESO_PARAM, 0.6f, 1.6f, 1.1f, "Resonant head tuning");
 		configParam<KitExciteQ>(EXCITE_PARAM, 0.f, 1.f, 0.7f, "Beater");
@@ -293,7 +293,7 @@ struct Kit : Module {
 		// and 2N+1 (R). HEAD/SNARE keep their ids -- outputs serialise by index
 		// -- and carry the stereo MIX of all eight. Per-instrument head and wires
 		// are summed, which is the price of eight instruments on one cable.
-		configOutput(OUT_OUTPUT, "Poly: instrument N on channels 2N-1 (L) and 2N (R)");
+		configOutput(OUT_OUTPUT, "Poly (instrument N on channels 2N-1 for left and 2N for right)");
 		configOutput(HEAD_OUTPUT, "Mix L");
 		configOutput(SNARE_OUTPUT, "Mix R");
 		// the hats are built at the rate they will run at
@@ -1686,7 +1686,7 @@ struct KitDisplay : OpaqueWidget {
 					[=]() { m->presetToSlot(tab, KIT_PRESETS[idx]); }));
 			}
 			menu->addChild(new MenuSeparator);
-			menu->addChild(createBoolMenuItem("Hi-hat (two plates, not a membrane)", "",
+			menu->addChild(createBoolMenuItem("Hi-hat (two plates)", "",
 				[=]() { return m->inst[tab].engine == Kit::Inst::HAT; },
 				[=](bool b) { m->setEngine(tab, b ? Kit::Inst::HAT : Kit::Inst::HEAD); }));
 			menu->addChild(createBoolMenuItem("V/OCT: 0V = C4 (Rack standard)", "",

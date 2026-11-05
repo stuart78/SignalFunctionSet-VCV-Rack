@@ -323,7 +323,7 @@ struct Key : Module {
 			            string::f("Channel %d offset", c + 1));
 			getParamQuantity(OFFSET_PARAM + c)->snapEnabled = true;
 			configInput(IN_INPUT + c, string::f(
-				"Channel %d pitch (1V/oct, poly; normals from the channel to its left)", c + 1));
+				"Channel %d pitch (1V/oct, poly; normalled from the channel to its left)", c + 1));
 			configOutput(OUT_OUTPUT + c, string::f("Channel %d quantized pitch", c + 1));
 			// RETIRED: the note-change triggers lost their jacks in the panel
 			// redesign. The enum slots stay, because outputs serialise by index and
@@ -337,8 +337,8 @@ struct Key : Module {
 		for (int c = 0; c < KEY_NCH; c++)
 			configInput(TRIG_CH_INPUT + c, string::f(
 				"Channel %d sample & hold trigger (poly: trigger channel N resamples voice N; "
-				"normals from the channel to its left) — when patched, notes update only on a trigger", c + 1));
-		configOutput(ROOT_OUTPUT,  "Root CV (1V/oct) — drives any module's ROOT input");
+				"normalled from the channel to its left; when patched, notes update only on a trigger)", c + 1));
+		configOutput(ROOT_OUTPUT,  "Root (1V/oct, for any module's ROOT input)");
 		configOutput(SCALE_OUTPUT, "Scale CV (1V per scale on channel 0; the full scale, "
 		                           "including microtonal and Scala, on the further channels)");
 
@@ -1290,7 +1290,7 @@ struct KeyWidget : ModuleWidget {
 			// different scale.
 			if (m->scala.n > sfs::BUS_MAXDEG)
 				menu->addChild(createMenuLabel(string::f(
-					"   SCALE out carries the first %d — %d will not travel",
+					"   SCALE out carries the first %d; the other %d are not sent",
 					sfs::BUS_MAXDEG, m->scala.n - sfs::BUS_MAXDEG)));
 		}
 

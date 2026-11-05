@@ -379,7 +379,7 @@ struct TouchWidget : ModuleWidget {
 		// attack -- PLUCK barely moves across its whole range. What it does is
 		// convert committed slides into hedged ones and into rests. Useful, but
 		// not what a knob labelled with it would promise.
-		menu->addChild(createMenuLabel("Temperature — hedging, not commitment"));
+		menu->addChild(createMenuLabel("Temperature (more slides become hedged slides and rests)"));
 		{
 			auto* sl = new TouchMenuSlider(m->paramQuantities[Touch::TEMP_PARAM]);
 			sl->box.size.x = 200.f;

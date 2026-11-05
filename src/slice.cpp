@@ -349,7 +349,7 @@ struct Slice : Module {
 		// Not just MIXED. The seed feeds every choice the module makes: which earlier
 		// slice SHUFFLE grabs, how far DELAY reaches, whether PITCH goes down or up,
 		// the right channel's own picks when LINK is off, and where MIXED starts.
-		configButton(RESEED_PARAM, "Reseed: roll a new set of choices");
+		configButton(RESEED_PARAM, "Reseed (new random choices)");
 
 		configInput(L_INPUT, "Left audio");
 		configInput(R_INPUT, "Right audio (normalled from left)");

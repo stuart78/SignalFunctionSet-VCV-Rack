@@ -1557,7 +1557,7 @@ struct MeterWidget : ModuleWidget {
 			"Reset on play", "",
 			&module->resetOnPlay));
 		menu->addChild(createBoolPtrMenuItem(
-			"BPM CV absolute (0.01V/BPM — for Arrange)", "",
+			"BPM CV absolute (0.01V/BPM, for Arrange)", "",
 			&module->bpmCvAbsolute));
 
 		menu->addChild(new MenuSeparator);
@@ -1571,7 +1571,7 @@ struct MeterWidget : ModuleWidget {
 				string::f("Detected: %.1f BPM", module->displayedBpm)));
 		} else if (module->extClockConnected && module->extPpqnSuspect) {
 			menu->addChild(new MenuSeparator);
-			menu->addChild(createMenuLabel("Clock is ticking, but not at this PPQN."));
+			menu->addChild(createMenuLabel("Clock is running, but not at this PPQN."));
 			menu->addChild(createMenuLabel("MIDI clock is 24 PPQN. Meter is running"));
 			menu->addChild(createMenuLabel("on its BPM knob until this matches."));
 		}

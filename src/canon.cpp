@@ -153,7 +153,7 @@ struct Canon : Module {
 			std::string L = std::string(1, (char)('A' + c));
 			configParam<CanonPatternQ>(PATTERN_PARAM + c, 0.f, (float)(CN_NPAT - 1), 0.f, "Pattern " + L);
 			paramQuantities[PATTERN_PARAM + c]->snapEnabled = true;
-			configParam(WANDER_PARAM + c, 0.f, 1.f, 0.f, "Wander " + L + " (how far it strays from the chord)", "%", 0.f, 100.f);
+			configParam(WANDER_PARAM + c, 0.f, 1.f, 0.f, "Wander " + L + " (how often it leaves the chord tones)", "%", 0.f, 100.f);
 			configParam(OCTAVE_PARAM + c, -2.f, 2.f, 0.f, "Octave " + L);
 			paramQuantities[OCTAVE_PARAM + c]->snapEnabled = true;
 			configInput(GATE_INPUT + c, "Gate " + L + (c ? " (normalled from the channel to its left)" : ""));
@@ -165,10 +165,10 @@ struct Canon : Module {
 		}
 		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
 		configInput(SCALE_INPUT, "Scale CV (1V per scale, or Key's scale bus)");
-		configInput(SET_INPUT, "Set: advance to the next set");
-		configInput(SET_CV_INPUT, "Set CV (1V per set; wins when patched)");
+		configInput(SET_INPUT, "Next set (each rising edge moves to the next set)");
+		configInput(SET_CV_INPUT, "Set CV (1V per set; added to the SET knob and the NEXT count)");
 		configInput(RESET_INPUT, "Reset");
-		configInput(LEARN_INPUT, "Learn: a polyphonic V/OCT chord");
+		configInput(LEARN_INPUT, "Learn (a polyphonic V/OCT chord)");
 		for (int c = 0; c < CN_CH; c++) ch[c].rng = 0x9E3779B9u * (uint32_t)(c + 1);
 		// a progression to start from: I IV V vi in the key
 		static const int START[CN_SETS][3] = {{0, 2, 4}, {3, 5, 0}, {4, 6, 1}, {5, 0, 2}};
@@ -1030,7 +1030,7 @@ struct CanonWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		sfs::rootCvMenu(menu, m, Canon::ROOT_INPUT, m->rootCvMode);
 		menu->addChild(new MenuSeparator);
-		menu->addChild(createBoolPtrMenuItem("Harmonic lock (channels choose notes that agree)", "", &m->lock));
+		menu->addChild(createBoolPtrMenuItem("Harmonic lock (each channel plays the most consonant of three candidate notes)", "", &m->lock));
 		menu->addChild(createBoolPtrMenuItem("Restart channels on set change", "", &m->restartOnSet));
 		menu->addChild(createBoolPtrMenuItem("Wander may rest", "", &m->wanderRest));
 		menu->addChild(createBoolPtrMenuItem("Screen follows the set playing", "", &m->viewFollow));

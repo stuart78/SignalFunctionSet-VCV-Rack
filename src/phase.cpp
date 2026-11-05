@@ -534,8 +534,8 @@ struct Phase : Module {
 		configParam<PhaseFilterQuantity>(FILTER_B_PARAM, -1.f, 1.f, 0.f, "Filter B (left lowpass, right highpass)");
 		configInput(FILTER_A_INPUT, "Filter A CV (±5 V sweeps the whole knob)");
 		configInput(FILTER_B_INPUT, "Filter B CV (±5 V sweeps the whole knob)");
-		configOutput(POLY_OUTPUT, "Poly: A left, A right, B left, B right");
-		configOutput(SYNC_OUTPUT, "Poly sync: a trigger as A starts its loop, and as B does");
+		configOutput(POLY_OUTPUT, "Poly (A left, A right, B left, B right)");
+		configOutput(SYNC_OUTPUT, "Sync (poly, a trigger on channel 1 as A starts its loop and on channel 2 as B does)");
 
 		// Pre-allocate the record buffers once at construction.
 		// This avoids any allocation on the audio thread when recording starts.

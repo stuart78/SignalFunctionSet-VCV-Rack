@@ -294,10 +294,10 @@ struct Gravity : Module {
 		configOutput(X_OUTPUT, "Tip X");
 		configOutput(Y_OUTPUT, "Tip Y");
 		configOutput(RADIUS_OUTPUT, "Radius (folded -5V .. +5V extended)");
-		configOutput(ANY_GATE_OUTPUT, "Any gate — any ray crossed");
-		configOutput(ODD_GATE_OUTPUT, "Odd gate — rays 1, 3, 5 (ray 1 is 0 deg)");
-		configOutput(EVEN_GATE_OUTPUT, "Even gate — rays 2, 4, 6");
-		configOutput(NEW_GATE_OUTPUT, "New gate — a different ray from the one before");
+		configOutput(ANY_GATE_OUTPUT, "Any gate (any ray crossed)");
+		configOutput(ODD_GATE_OUTPUT, "Odd gate (rays 1, 3, 5; ray 1 is 0 deg)");
+		configOutput(EVEN_GATE_OUTPUT, "Even gate (rays 2, 4, 6)");
+		configOutput(NEW_GATE_OUTPUT, "New gate (a different ray from the one before)");
 		configOutput(ANGLE_OUTPUT, "Angle from gravity (±180° -> ±5V)");
 		for (int i = 0; i < NUM_SECTORS; i++) {
 			configOutput(SECTOR_OUTPUT + i, string::f("Sector %d distance (morph 0-10V, or bipolar +-5V)", i + 1));

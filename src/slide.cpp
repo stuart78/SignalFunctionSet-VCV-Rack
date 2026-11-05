@@ -406,7 +406,7 @@ struct Slide : Module {
 		// down, then swell in PAST the attack so the pick is never heard. That
 		// missing transient is what makes the instrument cry, and it is the one
 		// thing a slide model can get right that a portamento cannot fake.
-		configParam(SWELL_PARAM, 0.f, 1.f, 0.f, "Swell (volume pedal past the pick attack)",
+		configParam(SWELL_PARAM, 0.f, 1.f, 0.f, "Swell (per-note volume rise after the pick attack)",
 		            "%", 0.f, 100.f);
 		configParam(COUPLE_PARAM, 0.f, 1.f, 0.3f, "Sympathetic coupling through the bridge",
 		            "%", 0.f, 100.f);
@@ -441,16 +441,16 @@ struct Slide : Module {
 		configSwitch(AUTO_PARAM, 0.f, 1.f, 0.f, "Auto roll", {"Off", "On"});
 		configButton(RESET_PARAM, "Reset the roll");
 
-		configInput(BAR_CV_INPUT,   "Bar position (1V/oct — POS then transposes it in key)");
+		configInput(BAR_CV_INPUT,   "Bar position (1V/oct; POS transposes it in key)");
 		configInput(SLANT_CV_INPUT, "Slant CV (±5V)");
 		configInput(DECAY_CV_INPUT, "Decay CV (±5V)");
 		configInput(DAMP_CV_INPUT,  "Damping CV (±5V)");
 		configInput(PICK_CV_INPUT,  "Pick hardness CV (±5V)");
 		configInput(TONE_CV_INPUT,  "Tone CV (±5V)");
-		configInput(VOCT_INPUT,     "V/oct — transposes the whole instrument");
+		configInput(VOCT_INPUT,     "V/oct (transposes the whole instrument)");
 		configInput(GATE_INPUT,     "Gate (polyphonic: channel N picks string N; mono picks all)");
-		configInput(VEL_INPUT,      "Velocity (0–10V, polyphonic)");
-		configInput(CLOCK_INPUT,    "Clock — advances the roll");
+		configInput(VEL_INPUT,      "Velocity (0-10V, polyphonic)");
+		configInput(CLOCK_INPUT,    "Clock (advances the roll)");
 		configInput(RESET_INPUT,    "Reset the roll");
 		configInput(PATTERN_CV_INPUT, "Roll CV (±5V sweeps all 16)");
 		configInput(DENSITY_CV_INPUT, "Roll density CV (±5V)");
@@ -460,7 +460,7 @@ struct Slide : Module {
 
 		configOutput(MIX_L_OUTPUT, "Mix left");
 		configOutput(MIX_R_OUTPUT, "Mix right");
-		configOutput(POLY_OUTPUT,  "(retired — per-string audio is on the Slide X expander)");
+		configOutput(POLY_OUTPUT,  "(retired: per-string audio is on the Slide X expander)");
 		configOutput(EVEN_OUTPUT, "Even strings (2, 4, 6, 8) summed");
 		configOutput(ODD_OUTPUT,  "Odd strings (1, 3, 5, 7) summed");
 
@@ -1551,7 +1551,7 @@ struct SlideWidget : ModuleWidget {
 			{"Transposes the whole instrument", "Places the bar and picks the string"},
 			&m->playMode));
 		menu->addChild(createIndexPtrSubmenuItem("Pickup",
-			{"Modern single coil", "Horseshoe (bark and midrange honk)"}, &m->pickupType));
+			{"Modern single coil", "Horseshoe (a broad midrange boost)"}, &m->pickupType));
 		menu->addChild(createIndexPtrSubmenuItem("Mouse",
 			{"Hover strums the strings", "Click and drag only"}, &m->mouseMode));
 		menu->addChild(createBoolPtrMenuItem("VOL offsets the swell (for bipolar CV)", "", &m->volOffset));

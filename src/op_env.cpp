@@ -118,7 +118,7 @@ struct OpEnv : Module {
 			configInput(R1_CV_INPUT + i, string::f("Rate %d CV (±5V)", i + 1));
 			configInput(L1_CV_INPUT + i, string::f("Level %d CV (±5V)", i + 1));
 		}
-		configInput(VOCT_INPUT, "V/oct (rate scaling — faster envelope on higher notes)");
+		configInput(VOCT_INPUT, "V/oct (rate scaling; a faster envelope on higher notes)");
 		configInput(OUTLVL_CV_INPUT, "Output level CV (0-10V)");
 		configInput(LFO_RATE_CV_INPUT, "LFO rate CV (±5V)");
 		configInput(LFO_DEPTH_CV_INPUT, "LFO depth CV (±5V)");
@@ -489,7 +489,7 @@ struct OpEnvWidget : ModuleWidget {
 		if (!m) return;
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Release to 0V", "", &m->releaseToZero));
-		menu->addChild(createMenuLabel("(off = authentic DX7 L4 release level)"));
+		menu->addChild(createMenuLabel("(off = the DX7's L4 release level)"));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Banks"));

@@ -231,9 +231,9 @@ struct Chance : Module {
 			{"1","2","3","4","5","6","7","8"});
 		configSwitch(END_PARAM, 0.f, (float)(NUM_NODES - 1), (float)(NUM_NODES - 1), "End step",
 			{"1","2","3","4","5","6","7","8"});
-		configParam(GRAVITY_PARAM, -1.f, 1.f, 0.f, "Gravity (down – up)");
+		configParam(GRAVITY_PARAM, -1.f, 1.f, 0.f, "Gravity (down to up)");
 		configParam(DRIFT_PARAM, 0.f, 1.f, 0.3f, "Drift (move size)", "%", 0.f, 100.f);
-		configParam(BRANCH_PARAM, 0.f, 1.f, 0.25f, "Branch (stray from core)", "%", 0.f, 100.f);
+		configParam(BRANCH_PARAM, 0.f, 1.f, 0.25f, "Branch (chance of leaving the core melody)", "%", 0.f, 100.f);
 		configParam(GATE_PARAM, 0.f, 1.f, 0.5f, "Gate length", "%", 0.f, 100.f);
 		configParam(RESTS_PARAM, 0.f, 1.f, 0.f, "Odd-note rests", "%", 0.f, 100.f);
 		configParam(EVEN_REST_PARAM, 0.f, 1.f, 0.f, "Even-note rests", "%", 0.f, 100.f);
@@ -252,7 +252,7 @@ struct Chance : Module {
 		configInput(RESET_INPUT, "Reset");
 		configInput(RANDOMIZE_INPUT, "Randomize trigger");
 		configInput(ROOT_CV_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
-		configInput(SCALE_CV_INPUT, "Scale-select CV (1V per scale) — e.g. Note or Phrase scale out");
+		configInput(SCALE_CV_INPUT, "Scale-select CV (1V per scale, such as the SCALE out of Note or Arrange)");
 		configInput(GRAVITY_CV_INPUT, "Gravity CV");
 		configInput(DRIFT_CV_INPUT, "Drift CV");
 		configInput(BRANCH_CV_INPUT, "Branch CV");
@@ -261,10 +261,10 @@ struct Chance : Module {
 		configInput(OCT_CV_INPUT, "Octave leaps CV");
 		configInput(REPEAT_CV_INPUT, "Ratchet CV");
 		configInput(START_CV_INPUT, "Start step CV (1V/step, offsets the trimpot)");
-		configInput(END_CV_INPUT, "End step CV (1V/step, offsets the trimpot) — end before start plays the window backwards");
+		configInput(END_CV_INPUT, "End step CV (1V/step, offsets the trimpot; an end before the start plays backwards)");
 		configOutput(CV_OUTPUT, "CV (1V/oct)");
 		configOutput(GATE_OUTPUT, "Gate");
-		configOutput(HARMONY_OUTPUT, "Harmony CV — the 2nd voice (diatonic interval)");
+		configOutput(HARMONY_OUTPUT, "Harmony CV (the 2nd voice, diatonic interval)");
 		configOutput(HARM_GATE_OUTPUT, "Harmony gate");
 
 		for (int i = 0; i < NUM_NODES; i++) patternSeed[i] = random::u32();

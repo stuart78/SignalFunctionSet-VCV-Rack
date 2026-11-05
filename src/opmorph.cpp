@@ -115,7 +115,7 @@ struct OpMorph : Module {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		// SPEED is always speed; SHAPE is whatever gives that mode its character.
 		configParam(SPEED_PARAM, 0.f, 1.f, 0.15f, "Speed", " slots/s", 0.f, 4.f);
-		configParam(SHAPE_PARAM, 0.f, 1.f, 0.35f, "Shape — heading / turniness / wander / radius");
+		configParam(SHAPE_PARAM, 0.f, 1.f, 0.35f, "Shape (heading, turn rate, wander or radius)");
 		configSwitch(MODE_PARAM, 0.f, (float)(MOVE_COUNT - 1), (float)MOVE_TURTLE, "Movement",
 		             {"Drift", "Turtle", "Random walk", "Circle", "Linear"});
 		getParamQuantity(MODE_PARAM)->snapEnabled = true;
@@ -129,7 +129,7 @@ struct OpMorph : Module {
 		configInput(SHAPE_CV_INPUT, "Shape CV (±5V)");
 		configInput(SPREAD_CV_INPUT, "Depth CV (±5V)");
 		configInput(MODE_CV_INPUT, "Movement CV (1V per mode)");
-		configInput(CLOCK_INPUT, "Clock — steps to the next slot");
+		configInput(CLOCK_INPUT, "Clock (steps to the next slot)");
 		configInput(RESET_INPUT, "Return to the first slot");
 		// A spread of algorithms rather than 1..16: the field is nicer to travel
 		// when neighbours differ, and these run stacks -> pairs -> parallel.
@@ -794,7 +794,7 @@ struct OpMorphWidget : ModuleWidget {
 		OpMorph* m = dynamic_cast<OpMorph*>(module);
 		if (!m) return;
 		menu->addChild(new MenuSeparator);
-		menu->addChild(createMenuLabel("Slots — each holds one algorithm"));
+		menu->addChild(createMenuLabel("Slots (one algorithm per slot)"));
 		std::vector<std::string> algs;
 		for (int i = 0; i < 32; i++) algs.push_back(string::f("Algorithm %d", i + 1));
 		for (int r = 0; r < OPM_ROWS; r++) {

@@ -427,7 +427,7 @@ struct Sigma : Module {
 		// patched a velocity below 10V. A control that is inert out of the box
 		// is not a control.
 		configParam(MORPH_PARAM, -1.f, 1.f, 0.f, "Morph (soft <-> loud), summed with velocity");
-		configParam(ENVRATE_PARAM, 0.f, 1.f, 0.35f, "Envelope rate spread (highs die sooner)");
+		configParam(ENVRATE_PARAM, 0.f, 1.f, 0.35f, "Envelope rate spread (high partials decay sooner)");
 		configParam(ENVSPREAD_PARAM, -1.f, 1.f, 0.f, "Envelope time spread (bloom / onset)");
 
 		// The three ranges are the ones the engine uses, stated once here and
@@ -2486,12 +2486,12 @@ struct SigmaWidget : ModuleWidget {
 			sub->addChild(new ParamSlider(m, Sigma::AMPSENS_PARAM));
 			sub->addChild(new ParamSlider(m, Sigma::AMPCENTER_PARAM));
 			sub->addChild(createMenuLabel("Velocity to timbre. MORPH is its centre;"));
-			sub->addChild(createMenuLabel("past halfway the blend hardens to a switch."));
+			sub->addChild(createMenuLabel("past halfway the blend becomes a switch."));
 			sub->addChild(new ParamSlider(m, Sigma::MORPHSENS_PARAM));
 		}));
 		menu->addChild(createSubmenuItem("LFO delay and random", "", [=](Menu* sub) {
-			sub->addChild(createMenuLabel("RANDOM also frees each voice's phase:"));
-			sub->addChild(createMenuLabel("periodic locks together, aperiodic drifts apart."));
+			sub->addChild(createMenuLabel("RANDOM also gives each voice its own phase."));
+			sub->addChild(createMenuLabel("Periodic LFOs stay in phase; aperiodic ones drift apart."));
 			for (int i = 0; i < 3; i++) {
 				sub->addChild(createMenuLabel(string::f("LFO %d", i + 1)));
 				sub->addChild(new ParamSlider(m, Sigma::LFODELAY_PARAM + i));

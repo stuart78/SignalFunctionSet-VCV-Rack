@@ -103,13 +103,13 @@ struct Arrange : Module {
 			configOutput(CH_RESET_OUTPUT + c, string::f("Channel %d reset (fires on master reset and when the channel re-enables)", c + 1));
 			configOutput(CH_EOC_OUTPUT + c,   string::f("Channel %d end of cycle (arrangement wrap)", c + 1));
 		}
-		configInput(BAR_INPUT, "Bar (one pulse per bar — e.g. Meter's BAR out; advances the arrangement)");
-		configInput(CLOCK_INPUT, "Clock (master clock — divided per channel)");
+		configInput(BAR_INPUT, "Bar (one pulse per bar, such as Meter's BAR out; advances the arrangement)");
+		configInput(CLOCK_INPUT, "Clock (master clock, divided per channel)");
 		configInput(RESET_INPUT, "Reset");
 		configOutput(PHRASE_OUTPUT, "Phrase index (1V/phrase, phrase 1 = 0V)");
-		configOutput(BPM_OUTPUT, "BPM CV (0.01V per BPM) — into Meter");
-		configOutput(ROOT_OUTPUT, "Root note CV of the current phrase (1V/oct, semitone-quantized) — into Note/Chance root CV");
-		configOutput(SCALE_OUTPUT, "Scale of the current phrase (1V per scale on channel 0, the full scale behind it): replaces the SCALE knob of whatever it feeds");
+		configOutput(BPM_OUTPUT, "BPM CV (0.01V per BPM, for Meter's BPM CV input)");
+		configOutput(ROOT_OUTPUT, "Root note of the current phrase (1V/oct, semitone-quantized)");
+		configOutput(SCALE_OUTPUT, "Scale of the current phrase (1V per scale on channel 0, the full scale on the further channels; replaces the SCALE knob of the module it feeds)");
 		for (int i = 0; i < NUM_PHRASES; i++)
 			configOutput(PGATE_OUTPUT + i, string::f("Phrase %d gate (high while phrase %d is playing)", i + 1, i + 1));
 		for (int i = 0; i < NUM_PHRASES; i++) {

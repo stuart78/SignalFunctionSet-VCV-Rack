@@ -185,12 +185,12 @@ struct Bell : Module {
 		configParam(MORPH_PARAM, 0.f, 1.f, 0.f, "Algorithm morph", "%", 0.f, 100.f);
 		configParam(ALGOB_PARAM, 0.f, 31.f, 0.f, "Morph target algorithm", "", 0.f, 1.f, 1.f);
 		getParamQuantity(ALGOB_PARAM)->snapEnabled = true;
-		configInput(MORPH_CV_INPUT, "Algorithm morph CV (0–10V)");
+		configInput(MORPH_CV_INPUT, "Algorithm morph CV (0-10V)");
 		configInput(ALGOB_CV_INPUT, "Morph target algorithm CV (0.32V per algorithm)");
 		configInput(FEEDBACK_CV_INPUT, "Feedback CV (±5V)");
-		configOutput(AUDIO_OUTPUT, "VCA — voice audio with its internal envelope (poly)");
-		configOutput(VCO_OUTPUT, "VCO — raw tone, no internal envelope (poly)");
-		configOutput(ENV_OUTPUT, "Envelope follower — 0-10V tracking the audio amplitude (poly)");
+		configOutput(AUDIO_OUTPUT, "VCA (voice audio with its internal envelope, poly)");
+		configOutput(VCO_OUTPUT, "VCO (raw tone with no internal envelope, poly)");
+		configOutput(ENV_OUTPUT, "Envelope follower (0-10V tracking the audio amplitude, poly)");
 
 		// Seed with the engine's built-in default bank (Brian Eno DX7 patches).
 		LoadedBank def;
@@ -914,10 +914,10 @@ struct BellWidget : ModuleWidget {
 		// note. e.g. Notes mode: C4 = first, C#4 = second… (play drum kits with one Operator).
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createIndexSubmenuItem("Bank CV",
-			{"0–10V (full range)", "0–1.6V (0.1V / bank)", "Notes (1V/oct, C4 = 1st)"},
+			{"0-10V (full range)", "0-1.6V (0.1V / bank)", "Notes (1V/oct, C4 = 1st)"},
 			[m]() { return m->bankCvMode; }, [m](int i) { m->bankCvMode = i; }));
 		menu->addChild(createIndexSubmenuItem("Voice CV",
-			{"0–10V (full range)", "0–3.2V (0.1V / voice)", "Notes (1V/oct, C4 = 1st)"},
+			{"0-10V (full range)", "0-3.2V (0.1V / voice)", "Notes (1V/oct, C4 = 1st)"},
 			[m]() { return m->voiceCvMode; }, [m](int i) { m->voiceCvMode = i; }));
 	}
 };

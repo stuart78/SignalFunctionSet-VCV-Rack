@@ -255,8 +255,8 @@ struct Flock : Module {
 		configButton(STARTLE_PARAM, "Startle (a hawk through the flock)");
 		configParam(VARIETY_PARAM, 0.f, 1.f, 0.5f, "Variety (how far the birds differ: syllables and voices)", "%", 0.f, 100.f);
 
-		configInput(VOCT_INPUT, "Pitch (1V/oct): the roost the flock leans toward");
-		configInput(GATE_INPUT, "Gate: high and the flock flies and calls");
+		configInput(VOCT_INPUT, "Pitch (1V/oct, the point the flock moves toward)");
+		configInput(GATE_INPUT, "Gate (while high, the flock flies and calls)");
 		configInput(STARTLE_INPUT, "Startle trigger");
 		configInput(WEIGHT_INPUT, "Weight CV (+-5V = full range)");
 		configInput(LATITUDE_INPUT, "Latitude CV");
@@ -272,9 +272,9 @@ struct Flock : Module {
 		configInput(VARIETY_INPUT, "Variety CV");
 		configOutput(L_OUTPUT, "Left");
 		configOutput(R_OUTPUT, "Right");
-		configOutput(CENTRE_OUTPUT, "Pitch: where the flock actually is, its centre as 1V/oct");
-		configOutput(DENSITY_OUTPUT, "Density: calls per second (10V = 200/s)");
-		configOutput(HAWK_OUTPUT, "Hawk: gate while the predator is in the flock");
+		configOutput(CENTRE_OUTPUT, "Pitch (the centre of the flock as 1V/oct)");
+		configOutput(DENSITY_OUTPUT, "Density (calls per second; 10V = 200/s)");
+		configOutput(HAWK_OUTPUT, "Hawk (gate while the predator is in the flock)");
 		bufL.assign(FL_BUFN, 0.f);
 		bufR.assign(FL_BUFN, 0.f);
 		seedBirds();

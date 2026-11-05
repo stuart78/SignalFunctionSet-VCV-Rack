@@ -282,10 +282,10 @@ struct Carillon : Module {
 
 	Carillon() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam<CarillonSizeQ>(SIZE_PARAM, 0.f, 1.f, 0.5f, "Size (the weight of the bells: how long they ring and how heavy the clapper; never the pitch)");
-		configParam<CarillonDampQ>(DAMP_PARAM, 0.f, 1.f, 0.36f, "Damp (free-hanging plates at the bottom, a hand on every bell at the top)");
-		configParam(SHAPE_PARAM, 0.f, 1.f, 0.f, "Shape (a cast bell to a metal bar)", "%", 0.f, 100.f);
-		configParam(BRIGHT_PARAM, 0.f, 1.f, 0.5f, "Bright (a soft clapper to a hard one, and the tilt of the partials)", "%", 0.f, 100.f);
+		configParam<CarillonSizeQ>(SIZE_PARAM, 0.f, 1.f, 0.5f, "Size (how long the bells ring and how heavy the clapper is; the pitch stays the same)");
+		configParam<CarillonDampQ>(DAMP_PARAM, 0.f, 1.f, 0.36f, "Damp (how quickly the bells stop ringing)");
+		configParam(SHAPE_PARAM, 0.f, 1.f, 0.f, "Shape (cast bell to metal bar)", "%", 0.f, 100.f);
+		configParam(BRIGHT_PARAM, 0.f, 1.f, 0.5f, "Brightness (soft clapper to hard clapper)", "%", 0.f, 100.f);
 		configInput(SHAPE_INPUT, "Shape CV");
 		configInput(BRIGHT_INPUT, "Bright CV");
 		configParam<CarillonReachQ>(REACH_PARAM, 0.f, 1.f, 0.5f, "Reach (how much of the energy crosses a rod)");
@@ -295,12 +295,12 @@ struct Carillon : Module {
 		std::vector<std::string> names;
 		for (int i = 0; i < sfs::NUM_SCALES; i++) names.push_back(sfs::SCALES[i].longName);
 		configSwitch(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 0.f, "Scale (bells outside it are felted)", names);
-		configInput(VOCT_INPUT, "V/OCT (poly): strikes the bell of that note, folded by octaves into the two octaves round the root");
-		configInput(GATE_INPUT, "Trigger / gate (poly): strikes the bell of the V/OCT on the same channel");
-		configInput(VEL_INPUT, "Velocity (poly, 0-10V): how much energy the strike delivers");
+		configInput(VOCT_INPUT, "V/OCT (poly, strikes the bell of that note; a note out of range moves by octaves into range)");
+		configInput(GATE_INPUT, "Trigger or gate (poly, strikes the bell at the V/OCT on the same channel)");
+		configInput(VEL_INPUT, "Velocity (poly, 0-10V sets the strength of the strike)");
 		configInput(STRIKE_INPUT, "Strike (retired)");
 		configInput(BELL_INPUT, "Bell (retired)");
-		configInput(CLOCK_INPUT, "Clock: with it patched, a crossing is one pulse per neighbour spacing of rod");
+		configInput(CLOCK_INPUT, "Clock (when patched, a crossing lasts one pulse per neighbour spacing of rod)");
 		configInput(SIZE_INPUT, "Size CV");
 		configInput(DAMP_INPUT, "Damp CV");
 		configInput(REACH_INPUT, "Reach CV");
@@ -1172,7 +1172,7 @@ struct CarillonWidget : ModuleWidget {
 		std::vector<std::string> rn(PL_REGISTER_NAME, PL_REGISTER_NAME + 3);
 		menu->addChild(createIndexSubmenuItem("Register", rn,
 			[=]() { return m->regOct + 1; }, [=](int v) { m->regOct = clamp(v - 1, -1, 1); }));
-		menu->addChild(createBoolPtrMenuItem("Lift the felts (every bell sounds, whatever the key)", "", &m->unmask));
+		menu->addChild(createBoolPtrMenuItem("Remove the felts (every bell sounds in every key)", "", &m->unmask));
 		menu->addChild(createMenuLabel("Rods"));
 		static const char* RN[6] = {"A chain along the layout", "Every bell to its neighbours", "A star from the middle",
 		                            "Octaves", "Fifths", "Clear"};

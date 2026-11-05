@@ -157,9 +157,9 @@ struct Chime : Module {
 		configInput(SCALE_INPUT, "Scale CV (1V per scale)");
 		configInput(RESEED_INPUT, "Reseed trigger");
 		configInput(CLOCK_INPUT, "Clock (syncs rotations; RATE knob picks 32/16/8/4/2/1 clocks per rotation)");
-		configInput(EXCITE_INPUT, "Excitation CV (0–10V, bow → strike)");
+		configInput(EXCITE_INPUT, "Excitation CV (0-10V, bow → strike)");
 		configInput(OCT_INPUT, "Octave CV (1V per octave)");
-		configInput(RELATE_INPUT, "Relate CV (0–10V across the four modes)");
+		configInput(RELATE_INPUT, "Relate CV (0-10V across the four modes)");
 		configInput(SHAPE_INPUT, "Rotation curve CV (±5V)");
 		configInput(DECAY_INPUT, "Ring / bloom time CV (1 s/V)");
 		configOutput(MIX_L_OUTPUT, "Mix left");

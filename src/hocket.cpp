@@ -100,7 +100,7 @@ struct Hocket : Module {
 		configSwitch(PATTERN_PARAM, 0.f, (float)(HK_NPAT - 1), 0.f, "Pattern", HK_PAT_NAME);
 		configParam(COUNT_PARAM, 1.f, (float)HK_N, (float)HK_N, "Channels in play (the first N that are on)");
 		paramQuantities[COUNT_PARAM]->snapEnabled = true;
-		configParam(GROUP_PARAM, 1.f, 8.f, 1.f, "Notes each channel takes before handing on");
+		configParam(GROUP_PARAM, 1.f, 8.f, 1.f, "Notes per channel before moving to the next");
 		paramQuantities[GROUP_PARAM]->snapEnabled = true;
 		configParam(STAY_PARAM, 0.f, 1.f, 0.f, "Chance the next note stays on the same channel", "%", 0.f, 100.f);
 		// 0.5 ms to 1 s, exponential: display = 0.5 * 2000^v ms
@@ -114,7 +114,7 @@ struct Hocket : Module {
 			noteOpen[c] = -1;
 		}
 		configInput(CV_INPUT, "Pitch (1V/oct)");
-		configInput(GATE_INPUT, "Gate (each rising edge deals a note, unless TRIG is patched; normalled from TRIG)");
+		configInput(GATE_INPUT, "Gate (each rising edge sends a note to the next channel, unless TRIG is patched; normalled from TRIG)");
 		configInput(AUDIO_L_INPUT, "Audio left");
 		configInput(AUDIO_R_INPUT, "Audio right (normalled from left)");
 		configInput(TRIG_INPUT, "Trigger (when patched, each trigger moves to the next channel)");

@@ -145,8 +145,8 @@ struct Shift : Module {
 		configInput(CV_INPUT,    "CV (data, sampled on each tap fire)");
 		configInput(CLOCK_INPUT, "Clock (advances all taps in parallel mode, "
 		                        "and the cascade chain root)");
-		configInput(N_CV_INPUT,  "N CV (±5V → ±15, summed into every N pot — "
-		                        "global modulator on top of per-lane Step CVs)");
+		configInput(N_CV_INPUT,  "N CV (±5V → ±15, summed into every N pot; "
+		                        "added to the per-lane Step CVs)");
 		configInput(RESET_INPUT, "Reset (clears all counters and held values)");
 		configButton(RESET_PARAM, "Reset (button)");
 		for (int i = 0; i < NUM_OUTS; i++) {

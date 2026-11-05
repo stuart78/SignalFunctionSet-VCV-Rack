@@ -293,7 +293,7 @@ struct Field : Module {
 		configInput(ANIM_INPUT, "Animation CV (1V per mode, added to the knob)");
 		for (int i = 0; i < FD_N; i++)
 			configOutput(OUT_OUTPUT + i, string::f("Jack %d", i + 1));
-		configOutput(POLY_OUTPUT, "Poly: jacks 1-16");
+		configOutput(POLY_OUTPUT, "Poly (jacks 1-16)");
 		size_t nc = fieldCells().size();
 		life.assign(nc, 0); lifeNext.assign(nc, 0); vis.assign(nc, 0.f);
 		wu.assign(nc, 0.f); wuPrev.assign(nc, 0.f);

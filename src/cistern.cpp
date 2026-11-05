@@ -133,8 +133,8 @@ struct Cistern : Module {
 
 	Cistern() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam<SizeQ>(SIZE_PARAM, -2.f, 1.f, 0.f, "Size, against the real room", "", 2.f);
-		configParam<DecayQ>(DECAY_PARAM, DECAY_MIN, 2.f, 0.f, "Decay, against the room's calculated decay", "", 2.f);
+		configParam<SizeQ>(SIZE_PARAM, -2.f, 1.f, 0.f, "Size (relative to the real room)", "", 2.f);
+		configParam<DecayQ>(DECAY_PARAM, DECAY_MIN, 2.f, 0.f, "Decay (relative to the room's calculated decay)", "", 2.f);
 		configParam(SCATTER_PARAM, 0.f, 1.f, 0.5f, "Scatter (how much of each reflection goes diffuse)", "%", 0.f, 100.f);
 		configParam(HUMID_PARAM, 10.f, 90.f, 50.f, "Humidity (drier air absorbs more high frequencies)", "%");
 		configParam(MOD_PARAM, 0.f, 2.f, 1.f, "Movement in the tail", "%", 0.f, 100.f);
@@ -149,7 +149,7 @@ struct Cistern : Module {
 		configInput(HUMID_INPUT, "Humidity CV (1 V = 8%)");
 		configInput(MOD_INPUT, "Movement CV (±5 V = the whole range)");
 		configInput(MIX_INPUT, "Mix CV (±5 V = the whole range)");
-		configInput(FREEZE_INPUT, "Freeze gate (high holds the tail and shuts the input out)");
+		configInput(FREEZE_INPUT, "Freeze gate (high holds the tail and mutes the input)");
 		configInput(SPACE_INPUT, "Space CV (1 V per space)");
 		configInput(IN_L_INPUT, "Left (the L source)");
 		configInput(IN_R_INPUT, "Right (the R source; normalled to left)");
@@ -787,7 +787,7 @@ struct CisternDisplay : OpaqueWidget {
 			Cistern* m = module;
 			int id = spaceId();
 			ui::Menu* menu = createMenu();
-			menu->addChild(createMenuLabel("Drag a source or the listener; shift-drag lifts it"));
+			menu->addChild(createMenuLabel("Drag a source or the listener; shift-drag changes its height"));
 			menu->addChild(createMenuItem("Reset the positions", "", [=]() { m->resetPositions(id); }));
 			menu->addChild(createMenuItem("Reset the view", "", [=]() { m->camYaw = Cistern::YAW0; m->camPitch = Cistern::PITCH0; }));
 		}
@@ -1218,10 +1218,10 @@ struct CisternWidget : ModuleWidget {
 					[=]() { return (int)std::lround(m->params[Cistern::SPACE_PARAM].getValue()) == i; },
 					[=]() { m->params[Cistern::SPACE_PARAM].setValue((float)i); }));
 		}));
-		menu->addChild(createIndexSubmenuItem("Distance", {"Musical (far sources pulled in past 25 m)", "True (delay and level as the room gives them)"},
+		menu->addChild(createIndexSubmenuItem("Distance", {"Musical (past 25 m, extra distance counts for less)", "True (the delay and level calculated for the room)"},
 			[=]() { return m->trueDistance ? 1 : 0; },
 			[=](size_t i) { m->trueDistance = i == 1; m->posGen++; }));
-		menu->addChild(createMenuLabel("Drag the sources and the listener on the screen; shift-drag lifts"));
+		menu->addChild(createMenuLabel("Drag the sources and the listener on the screen; shift-drag changes height"));
 		menu->addChild(createMenuItem("Reset the positions", "", [=]() { m->resetPositions(clamp(m->wSpace.load(), 0, NSPACES - 1)); }));
 		menu->addChild(createMenuItem("Reset the view", "", [=]() { m->camYaw = Cistern::YAW0; m->camPitch = Cistern::PITCH0; }));
 		menu->addChild(createSubmenuItem("Scan credits", "", [=](Menu* sub) {

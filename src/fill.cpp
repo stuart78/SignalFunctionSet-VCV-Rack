@@ -579,7 +579,7 @@ struct Fill : Module {
 		configSwitch(SYNC_PARAM, 0.f, 1.f, 1.f, "Sync fills to phrase", {"Free (russian roulette)", "Synced"});
 		configParam(EXTRAS_PARAM, 0.f, 8.f, 4.f, "Extra triggers (max engine-added notes per bar; 0 = variation off)");
 		getParamQuantity(EXTRAS_PARAM)->snapEnabled = true;
-		configInput(CLOCK_INPUT, "Clock — steps fire on its edges (required)");
+		configInput(CLOCK_INPUT, "Clock (required; steps fire on its edges)");
 		configInput(BAR_INPUT, "Bar (downbeat; also sets how many clocks make a bar)");
 		configInput(RESET_INPUT, "Reset");
 		configInput(NEXT_INPUT, "Next queue entry (advances at the next cycle)");
@@ -602,9 +602,9 @@ struct Fill : Module {
 		}
 		configOutput(FILL_OUTPUT, "Fill gate (high during a fill)");
 		configOutput(SET_OUTPUT, "Pattern set (1V per set)");
-		configOutput(NUM_OUTPUT, "Time-signature numerator (0.5V/count — Meter's 'Time signature CV absolute')");
+		configOutput(NUM_OUTPUT, "Time-signature numerator (0.5V/count, for Meter's 'Time signature CV absolute')");
 		configOutput(DEN_OUTPUT, "Time-signature denominator (1V per denom index: 1,2,4,8,16,32)");
-		configOutput(BPM_OUTPUT, "Set tempo (0.01V/BPM — Meter's \"BPM CV absolute\")");
+		configOutput(BPM_OUTPUT, "Set tempo (0.01V/BPM, for Meter's \"BPM CV absolute\")");
 		for (int c = 0; c < FILL_NCH; c++) for (int s = 0; s < FILL_MAX_STEPS; s++) { curProb[c][s] = 1.f; curRat[c][s] = 1; }
 
 		loadAllLibraries(lib);
@@ -1818,7 +1818,7 @@ struct FillWidget : ModuleWidget {
 			std::string tmp = asset::user("SignalFunctionSet/dp-import.tmp");
 			system::createDirectories(asset::user("SignalFunctionSet"));
 			if (!network::requestDownload(url, tmp, nullptr)) {
-				osdialog_message(OSDIALOG_ERROR, OSDIALOG_OK, "Download failed — check the URL and your connection.");
+				osdialog_message(OSDIALOG_ERROR, OSDIALOG_OK, "Download failed. Check the URL and your connection.");
 				return;
 			}
 			std::string data;

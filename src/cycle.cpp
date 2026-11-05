@@ -133,7 +133,7 @@ struct Cycle : Module {
 			configOutput(UNI_OUTPUT + i, string::f("%c unipolar (0-5V)", c));
 			configOutput(BI_OUTPUT + i, string::f("%c bipolar (±5V)", c));
 		}
-		configInput(CLOCK_INPUT, "Clock (optional — sets the staircase / stepped-random step grid: one step per pulse)");
+		configInput(CLOCK_INPUT, "Clock (optional; one staircase or stepped-random step per pulse)");
 		configInput(BAR_INPUT, "Bar (downbeat sync)");
 		configInput(RESET_INPUT, "Reset (restart cycle)");
 		configOutput(EOC_OUTPUT, "End of cycle (trigger)");

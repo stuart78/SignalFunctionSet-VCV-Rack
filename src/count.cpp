@@ -381,7 +381,7 @@ struct CountWidget : ModuleWidget {
 		// period is unchanged -- Threes by 4, Odd by 2 -- and those are the
 		// first amounts anyone tries, so each entry carries the row it would
 		// give over the current cycle, and a no-op reads as one.
-		menu->addChild(createMenuLabel("Rotate each cycle by (steps): the mask walks round the bar"));
+		menu->addChild(createMenuLabel("Rotate each cycle by (steps; the mask moves round the bar)"));
 		for (int i = 0; i < CT_N; i++) {
 			int n = m->steps;
 			std::vector<std::string> names;
@@ -390,7 +390,7 @@ struct CountWidget : ModuleWidget {
 				[=]() { return std::min(m->out[i].rotStep, n - 1); },
 				[=](int v) { m->out[i].rotStep = clamp(v, 0, CT_MAXSTEPS - 1); }));
 		}
-		menu->addChild(createMenuLabel("Offset a mask (steps; the row it gives)"));
+		menu->addChild(createMenuLabel("Offset a mask (steps; each item shows the resulting row)"));
 		for (int i = 0; i < CT_N; i++) {
 			int n = m->steps;
 			int mk = clamp((int)std::round(m->params[Count::MASK_PARAM + i].getValue()), 0, CT_NMASK - 1);

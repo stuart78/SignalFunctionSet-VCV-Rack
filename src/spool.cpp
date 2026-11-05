@@ -258,7 +258,7 @@ struct Spool : Module {
 		// Measured once, the tape has one pitch, absolute mode is a fixed ratio,
 		// the performance keeps its life, and there is nothing to step or alias.
 		configSwitch(STRETCH_PARAM, 0.f, 1.f, 0.f, "V/OCT changes",
-			{"Speed (varispeed, as a Mellotron does)", "Pitch only (time-stretched)"});
+			{"Speed (varispeed, as on a Mellotron)", "Pitch only (time-stretched)"});
 		configSwitch(DETECT_PARAM, 0.f, 1.f, 0.f, "Pitch detection",
 		             {"Once, when the tape is loaded", "Continuous (tracks, and flattens vibrato)"});
 		configInput(ROOT_INPUT, sfs::rootCvName(sfs::ROOT_CV_VOCT));
@@ -1366,13 +1366,13 @@ struct SpoolWidget : ModuleWidget {
 		// Driven as a PARAM, not a plain member, so it saves with the patch for
 		// free and shows up in the right-click parameter list like everything else.
 		menu->addChild(createIndexSubmenuItem("New note starts",
-			{"Where the tape stopped", "At the beginning (as a Mellotron does)"},
+			{"Where the tape stopped", "At the beginning (as on a Mellotron)"},
 			[=]() { return (int)std::round(m->params[Spool::REWIND_PARAM].getValue()); },
 			[=](int v) { m->params[Spool::REWIND_PARAM].setValue((float)clamp(v, 0, 1)); }));
 		// The pitch-detection choice had a param and no way to reach it: no
 		// trimpot on the panel and no menu entry, so it was "once" for everyone.
 		menu->addChild(createIndexSubmenuItem("V/OCT changes",
-			{"Speed (varispeed, as a Mellotron does)", "Pitch only (time-stretched)"},
+			{"Speed (varispeed, as on a Mellotron)", "Pitch only (time-stretched)"},
 			[=]() { return (int)std::round(m->params[Spool::STRETCH_PARAM].getValue()); },
 			[=](int v) { m->params[Spool::STRETCH_PARAM].setValue((float)clamp(v, 0, 1)); }));
 		menu->addChild(createIndexSubmenuItem("Pitch detection",

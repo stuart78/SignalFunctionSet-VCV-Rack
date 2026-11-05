@@ -46,11 +46,11 @@ struct SlideX : Module {
 		for (int i = 0; i < SlideExpanderMessage::NCH; i++) {
 			configOutput(STRING_OUTPUT + i, string::f("String %d", i + 1));
 			configInput(GATE_INPUT + i, string::f("String %d gate", i + 1));
-			configInput(VELS_INPUT + i, string::f("String %d velocity (0–10V)", i + 1));
+			configInput(VELS_INPUT + i, string::f("String %d velocity (0-10V)", i + 1));
 			configParam(VELATT_PARAM + i, 0.f, 1.f, 1.f,
 			            string::f("String %d velocity / attenuator", i + 1), "%", 0.f, 100.f);
 		}
-		configInput(VEL_INPUT, "(retired — each string has its own velocity jack)");
+		configInput(VEL_INPUT, "(retired: each string has its own velocity jack)");
 	}
 
 	~SlideX() {
