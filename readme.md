@@ -30,6 +30,7 @@ Modules grouped by function:
 - [Wheel](#wheel): Hurdy-gurdy drone instrument, one wheel bowing six strings
 - [Carillon](#carillon): Twenty-five bells joined by rods you draw
 - [Strata](#strata): A wavetable voice you travel through in three dimensions
+- [Canopy](#canopy): Steel tongue drum played by drops falling through leaves
 
 **Filters & Resonators**
 - [Band](#band): Harmonic bandpass bank (isolate individual harmonics)
@@ -555,6 +556,30 @@ Strata plays what WaveStack builds. WaveStack writes the table's shape into the 
 **Context menu:** Load a table or a folder of tables as layers, factory tables, add or remove a layer, conform at load (normalize, remove DC, align zero crossings), waypoints, glide (rate or time), path (straight or along the grid), edges (clamp or wrap per axis), new shuffle order, reset the listeners.
 
 Full detail in the [Strata manual](docs/strata-manual.md).
+
+#### Canopy
+
+<img src="screenshots/Canopy.png" alt="Canopy panel" height="320"> 
+
+A steel tongue drum played by drops falling past leaves you place. Drops appear above the drum and fall under gravity, bounce off the leaves, and sound the drum where they land. A leaf hit is silent: it only changes where the drop goes next. The screen is drawn from the same model, so the drop you see landing is the note you hear. You can also strike the tongues directly from GATE.
+
+**Features:**
+- **Every landing sounds.** On a tongue, that tongue rings and its neighbours ring faintly. Between tongues, the nearest ones ring quietly and the shell is louder, so the note sounds muted.
+- **The tongues follow the scale.** A scale of up to eight notes gets two octaves and a longer one gets one octave, at most 16 tongues, so a pentatonic scale gives the common ten. The lowest note is the big tongue in the middle.
+- **Five drop materials, plus Mix.** Water, rubber, wood, glass and steel differ in weight, contact time and bounce. Water does not bounce: it strikes and breaks into pieces that strike again.
+- **Leaves you can move.** Drag a leaf to place it, shift-drag for height, drag an end to steer it. DENSITY sets how many are in play. Leaves bend under a hit and spring back, and a drop on a leaf coming back up is thrown.
+- **Six leaf forms in real proportion.** Monstera, oak, maple, beech, willow and ginkgo are sized against a 45 cm drum, and the physics reads the same outlines the screen draws, so a small drop falls through a monstera's cut. Forms are in the menu.
+- **Leaf materials.** Leaf, felt, rubber, wood, glass, steel, or a different one per leaf. A glass marble rebounds at 0.08 of its speed off felt and 1.03 off rubber.
+- **Controlled movement.** DRIFT, TILT and SPEED move each leaf around where you placed it, within hard limits. At zero a leaf stays exactly where it was put.
+- **X and Z** move the column of drops, narrowing it to stay over the drum. **CLOCK** releases one drop per pulse.
+
+**Controls:** Rate, Material, Size, Scatter, Density, Leaf, Drift, Speed, Tilt, Decay, Tone, Root, Scale.
+**Inputs:** V/OCT, Gate, Vel (all poly), Clock, X, Z, and a CV for every control.
+**Outputs:** Poly (one channel per tongue), Left, Right.
+
+**Context menu:** ROOT CV, lowest tongue, leaf form, evenly spaced drops, reset leaf positions, reset view.
+
+Full detail in the [Canopy manual](docs/canopy-manual.md).
 
 ### Filters & Resonators
 

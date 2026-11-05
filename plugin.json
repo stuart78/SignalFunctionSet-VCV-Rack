@@ -626,6 +626,17 @@
         "Expander"
       ],
       "hidden": true
+    },
+    {
+      "slug": "Canopy",
+      "name": "Canopy",
+      "description": "Steel tongue drum played by drops falling through leaves you place.",
+      "tags": [
+        "Drum",
+        "Physical modeling",
+        "Polyphonic",
+        "Random"
+      ]
     }
   ]
 }
