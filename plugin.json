@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.24.2",
+  "version": "2.24.3",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -603,8 +603,7 @@
         "Switch",
         "Sequencer",
         "Random"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Concrete",
@@ -614,8 +613,7 @@
         "Sampler",
         "Sequencer",
         "Mixer"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "ConcreteIn",
@@ -624,8 +622,7 @@
       "tags": [
         "Sampler",
         "Expander"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Canopy",

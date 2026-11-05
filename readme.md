@@ -20,6 +20,8 @@ Modules grouped by function:
 - [Phase](#phase): Dual sample looper with sleep/rotate phase drift
 - [Play](#play): Polyphonic multisample player (SFZ / DecentSampler)
 - [Spool](#spool): Four short tapes played by gates, and the tape never rewinds
+- [Concrète](#concrète): Four lanes of clips on one tape loop, with drawn curves
+  - [Concrète In (Expander)](#concrète-in-expander): records into the lanes
 - [Loom](#loom): Eight-string waveguide resonator you strum with the mouse
 - [Slide](#slide): Electric lap steel, a steel bar across eight strings
   - [SLIDE XP (Expander)](#slide-xp-expander): the eight strings on eight jacks
@@ -73,6 +75,7 @@ Modules grouped by function:
 **Utilities**
 - [Key](#key): Quantizer that takes its key from the patch, and hands it out
 - [Shift](#shift): 4-output CV shift register with cascade chain
+- [Hocket](#hocket): Sends one line of notes or audio to eight channels in turn
 - [Record](#record): Auto-sampler that captures any voice to a multisampled SFZ instrument
 
 - [Other Platforms](#other-platforms)
@@ -335,6 +338,35 @@ Four short tapes, one transport, and no rewind. After the Mellotron, and departi
 **Context menu:** Load tape 1 to 4, Rewind all tapes, Motor sag, New note starts (where the tape stopped, or at the beginning), V/OCT changes (speed, or pitch only), Pitch detection (once or continuous).
 
 See [docs/spool-manual.md](docs/spool-manual.md) for the full manual.
+
+#### Concrète
+
+<img src="screenshots/Concrete.png" alt="Concrète panel" height="320"> 
+
+Four lanes of samples on one tape loop of 1 to 8 bars, with one playhead over all four. A clip is a window into a sample, placed at a bar position and played at its own speed. A lane plays the clip that started most recently at or before the playhead, so a clip runs until its audio ends, the next clip starts, or the loop ends. The loop end cuts a clip off, as on a real tape loop.
+
+**Features:**
+- **Putting a clip down is a splice.** Dropping a file, moving a clip or finishing a recording replaces what the new clip covers, and a clip it landed in the middle of carries on after it from where that audio had reached.
+- **Varispeed.** Pitch and length change together, from x1/8 to x8, and a clip can be reversed. A clip can instead follow the tempo, which keeps it the same number of bars long.
+- **Editing on the screen.** Drag a clip to move it, Ctrl or Cmd-drag to copy it, and drag an edge to trim it, with Rack's Ctrl and Ctrl+Shift fine adjustment and a magnified view of the audio around the edge. Drop WAV or FLAC files on a lane.
+- **Four curves per lane.** VOL, FILTER (lowpass below the centre, highpass above), PAN and PITCH are drawn as points joined by straight lines across the loop. PITCH is varispeed on the whole lane, an octave up or down.
+- **A clock drives the playhead.** Each CLOCK edge puts the playhead on its grid position, BAR moves it to the nearest bar line, and a clock that stops stops the tape. With neither patched, the BPM knob sets the tempo.
+- **Every edge is faded over 3 ms**, including a clip starting, being cut or ending, the loop end and a reset.
+
+**Controls:** BPM, Bars, Play, Reset.
+**Inputs:** Clock, Bar, Play, Reset.
+**Outputs:** L and R for each of the four lanes, and the L and R mix.
+
+**Context menu:** Snap to the clock grid, clocks per bar with BAR unpatched, reset when PLAY starts, zoomed view follows the playhead, keep copies of loaded samples in the patch, clear every lane, reset every curve.
+
+#### Concrète In (Expander)
+
+<img src="screenshots/ConcreteIn.png" alt="Concrète In panel" height="320"> 
+
+Records into Concrète's lanes. Place it directly to Concrète's left, and its four rows sit level with the lanes on the screen. The REC button and the GATE input both arm a lane, and an armed lane with a cable in IN L or IN R records while the tape is moving, playing its input through its curves. When recording stops, the take becomes a clip where it was made and is spliced in. Recording held across the loop end splits into two takes. Takes are saved inside the patch as 16-bit stereo WAV files.
+
+**Controls:** Per lane, Rec.
+**Inputs:** Per lane, Gate, In L, In R (normalled from L).
 
 #### Loom
 
@@ -1392,6 +1424,26 @@ A 4-output CV shift register with per-lane controls. Sample input CV at the cloc
 - "Clear all" wipes all buffer contents, held values, jumble S&H, and all read/write/divider indices (same as a Reset trigger)
 
 See [docs/shift-manual.md](docs/shift-manual.md) for the full manual.
+#### Hocket
+
+<img src="screenshots/Hocket.png" alt="Hocket panel" height="320"> 
+
+Sends one line of notes or audio to eight channels in turn, after the hocket, a technique in medieval European polyphony where a melody is split between voices. One selection drives everything: the pitch, the gate and a stereo audio signal all go to the selected channel, so one module can spread a melody across eight voices and move the same line's audio through eight effects.
+
+**Features:**
+- **Eleven patterns.** Up, Down, Pendulum, Random, Random no repeat, Shuffle, Stride 3, Stride 5, Converge, Register (low notes to low channels) and Drunk.
+- **Channels in play.** Eight ON buttons, and COUNT keeps the first N of those that are on.
+- **GROUP and STAY.** GROUP sets how many notes a channel plays before the selection moves, and STAY sets the chance that a note stays where it is.
+- **Pitch is held after a note.** A voice still releasing when the next channel plays stays at its own pitch.
+- **Audio is a switch.** FADE sets the crossfade between channels from 0.5 ms to 1 s. One source has one tail, so eight voices fed from the CV and GATE outputs ring independently and eight effects fed from the audio outputs do not.
+- **TRIG moves the selection on a clock** whatever the notes are doing, and GATE is normalled from it.
+
+**Controls:** Pattern, Count, Group, Stay, Fade, and an On button per channel.
+**Inputs:** CV, Gate, In L, In R (normalled from L), Trig, Reset, and a CV for Pattern, Count, Group, Stay and Fade.
+**Outputs:** CV, Gate, L and R for each of the eight channels.
+
+**Context menu:** CV follows the input while the gate is held, a new pitch under a held gate is a new note.
+
 #### Record
 
 <img src="screenshots/Record.png" alt="Record panel" height="320"> 
