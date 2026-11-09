@@ -257,6 +257,35 @@ struct Slice : Module {
 	int   spliceMode = 0;             // 0 = clean, 1 = dirty
 	static constexpr float SPLICE_MS = 1.5f;
 	bool  freeze = false;
+	long  frzPos = 0;                 // buffer position of the frozen loop
+
+	// The edge fades only cover the ends of a slice. FREEZE changing, or a RESET,
+	// moves the read to different audio (or the envelope to zero) at any point
+	// inside one, where the envelope may be at full level, so the output steps
+	// there. On that sample the difference between the last output and the new one
+	// is added back and faded to nothing over a few milliseconds, which joins the
+	// two with no step and needs no second read head.
+	static constexpr float JUMP_MS = 5.f;
+	bool  freezeWas = false;
+	float lastWetL = 0.f, lastWetR = 0.f;
+	float jumpL = 0.f, jumpR = 0.f;
+	float jumpLeft = 0.f;
+	float recJumpL = 0.f, recJumpR = 0.f;
+	float recLeft = 0.f;
+
+	// While frozen the write head stands still, so the newest and the oldest audio
+	// sit next to each other there and a read that runs across that point jumps
+	// from one to the other. Checked on the position actually being read.
+	// A read that overtook the stopped write head is still ahead of it after a
+	// resume, so this stays on until the slice ends.
+	long  seamAt = 0;
+	bool  frozeThisSlice = false;
+	void checkSeam(bool& jumped) {
+		if (!frozeThisSlice) return;
+		long at = (((long)std::floor(rdPos) - wr) % bufN + bufN) % bufN;
+		if (std::labs(at - seamAt) > bufN / 2) jumped = true;
+		seamAt = at;
+	}
 
 	// ── seeded choice ────────────────────────────────────────────────────────
 	uint32_t seed = 0x5c1ce;
@@ -494,11 +523,21 @@ struct Slice : Module {
 				int d = DIVS[(int)(rollAt(idx, 3) * 4.f) & 3];
 				repLen = std::max(64L, (long)(sliceLen / (float)d));
 				repStart = wr;
+				if (freeze) {
+					// Nothing is arriving to capture, so the fragment is cut from
+					// the frozen loop, far enough back to end before the write head.
+					long back = ((wr - frzPos) % bufN + bufN) % bufN;
+					repStart = (back >= repLen) ? frzPos : ((wr - repLen) % bufN + bufN) % bufN;
+				}
 				rdPos = now; break;                    // live until the fragment fills
 			}
 			case XF_PITCH: {
 				rdRate = (rollAt(idx, 4) < 0.5f) ? 0.5 : 2.0;
-				rdPos = now - (double)sliceLen; break;
+				rdPos = now - (double)sliceLen;
+				// At double speed the read covers two slices of audio. Normally the
+				// write head moves ahead of it; frozen it does not, so start further back.
+				if (freeze && rdRate > 1.0) rdPos = now - 2.0 * (double)sliceLen;
+				break;
 			}
 		}
 	}
@@ -542,6 +581,11 @@ struct Slice : Module {
 		if (inputs[FREEZE_INPUT].isConnected())
 			freeze = inputs[FREEZE_INPUT].getVoltage() >= 1.f;
 		lights[FREEZE_LIGHT].setBrightness(freeze ? 1.f : 0.f);
+		bool jumped = rst || (freeze != freezeWas);
+		bool resumed = freezeWas && !freeze;
+		bool froze = freeze && !freezeWas;
+		freezeWas = freeze;
+		if (freeze) frozeThisSlice = true;
 
 		if (reseedBtn.process(params[RESEED_PARAM].getValue() > 0.5f)
 		    || reseedTrig.process(inputs[RESEED_INPUT].getVoltage(), 0.1f, 1.f))
@@ -566,15 +610,51 @@ struct Slice : Module {
 		float inL = inputs[L_INPUT].getVoltage();
 		float inR = inputs[R_INPUT].isConnected() ? inputs[R_INPUT].getVoltage() : inL;
 		if (!freeze) {
-			bufL[(size_t)wr] = inL;
-			bufR[(size_t)wr] = inR;
+			float recL = inL, recR = inR;
+			// The input carried on while the write head stood still, so what
+			// arrives now does not follow what was last written. Joined the same
+			// way as the output, or DELAY, SHUFFLE, REVERSE and PITCH would meet a
+			// step at this point in the buffer every time they read across it.
+			if (resumed) {
+				long back = ((wr - 1) % bufN + bufN) % bufN;
+				recJumpL = bufL[(size_t)back] - inL;
+				recJumpR = bufR[(size_t)back] - inR;
+				recLeft = std::max(1.f, JUMP_MS * 0.001f * sr);
+			}
+			if (recLeft > 0.f) {
+				float len = std::max(1.f, JUMP_MS * 0.001f * sr);
+				float g = 0.5f * (1.f - std::cos((float)M_PI * recLeft / len));
+				recL += recJumpL * g;
+				recR += recJumpR * g;
+				recLeft -= 1.f;
+			}
+			bufL[(size_t)wr] = recL;
+			bufR[(size_t)wr] = recR;
 			wr = (wr + 1) % bufN;
 			if (written < bufN) written++;
 			else primed = true;
 		}
 
+		// While frozen, the straight signal is the last REACH of audio on a loop.
+		// It runs under every slice, as the input runs under a CUT when not
+		// frozen, so straight slices stay continuous from one to the next and the
+		// only join is where the loop goes round. The position is absolute, so
+		// turning REACH moves the point it goes round at and nothing else.
+		bool frzWrapped = false;
+		if (freeze) {
+			long loop = std::min((long)reachSamples(), std::min((long)written, bufN - 1));
+			loop = std::max(loop, 1L);
+			if (!froze) frzPos = (frzPos + 1) % bufN;
+			long back = ((wr - frzPos) % bufN + bufN) % bufN;
+			if (froze || back == 0 || back > loop) {
+				frzPos = ((wr - loop) % bufN + bufN) % bufN;
+				frzWrapped = !froze;
+			}
+		}
+
 		// ── slice boundary ───────────────────────────────────────────────────
 		if (slicePos <= 0.0) {
+			frozeThisSlice = freeze;
 			beginSlice(sliceIdx);
 			slicePulse.trigger(0.001f);
 		}
@@ -583,9 +663,9 @@ struct Slice : Module {
 		float outL, outR;
 		bool live = (xf < 0 || xf == XF_SWAP);
 		if (freeze && live) {
-			// Frozen, a passthrough slice has nothing live to pass: loop the
-			// buffer instead, so freeze turns the module into a player.
-			rdPos += 1.0;
+			// Frozen, a straight slice has no input to pass, so it plays the loop.
+			rdPos = (double)frzPos;
+			if (frzWrapped) jumped = true;
 			outL = readL(rdPos); outR = readR(rdPos);
 		} else if (live) {
 			long back = ((wr - 1) % bufN + bufN) % bufN;
@@ -598,6 +678,7 @@ struct Slice : Module {
 			long into = (long)slicePos;
 			long p = (into < repLen) ? into : (into % repLen);
 			rdPos = (double)((repStart + p) % bufN);
+			checkSeam(jumped);
 			outL = readL(rdPos); outR = readR(rdPos);
 			if (spliceMode == 0 && repLen > 8) {
 				// A raised cosine, NOT the SHAPE curve: the repeat splice is
@@ -611,6 +692,7 @@ struct Slice : Module {
 				outL *= g; outR *= g;
 			}
 		} else {
+			checkSeam(jumped);
 			outL = readL(rdPos); outR = readR(rdPos);
 			rdPos += rdRate;
 		}
@@ -686,6 +768,20 @@ struct Slice : Module {
 			double alt = rdPos - (double)(std::floor(rollAt(sliceIdx, 5) * 4.f) * sliceLen);
 			wetR = readR(alt) * env;
 		}
+		if (jumped) {
+			jumpL = lastWetL - wetL;
+			jumpR = lastWetR - wetR;
+			jumpLeft = std::max(1.f, JUMP_MS * 0.001f * sr);
+		}
+		if (jumpLeft > 0.f) {
+			float len = std::max(1.f, JUMP_MS * 0.001f * sr);
+			float g = 0.5f * (1.f - std::cos((float)M_PI * jumpLeft / len));
+			wetL += jumpL * g;
+			wetR += jumpR * g;
+			jumpLeft -= 1.f;
+		}
+		lastWetL = wetL;
+		lastWetR = wetR;
 		float finalL = inL * (1.f - mix) + wetL * mix;
 		float finalR = inR * (1.f - mix) + wetR * mix;
 		outputs[L_OUTPUT].setVoltage(finalL);
