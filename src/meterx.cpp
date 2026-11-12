@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "meter-messages.hpp"
 #include "pulse-width.hpp"
 #include <cmath>
@@ -111,9 +112,12 @@ struct MXPies : Widget {
 			float frac = module ? (period > 0.f ? std::fmod(module->barPos, period) / period : 0.f)
 			                    : (0.12f + 0.10f * (i - 2));   // browser preview: staggered demo
 			if (frac < 0.f) frac += 1.f;
-			// light disc (the empty remainder of the cycle) — no border
+			// light disc (the empty remainder of the cycle) — no border. On a dark
+			// faceplate it is a well a little lighter than the panel, as
+			// tools/panel_dark.py draws the light grey under a slider.
 			nvgBeginPath(vg); nvgCircle(vg, c.x, c.y, R);
-			nvgFillColor(vg, nvgRGB(0xd8, 0xd8, 0xd0)); nvgFill(vg);
+			nvgFillColor(vg, sfs::dark() ? nvgRGB(0x4a, 0x4a, 0x50) : nvgRGB(0xd8, 0xd8, 0xd0));
+			nvgFill(vg);
 			// elapsed wedge, clockwise from 12 o'clock
 			if (frac > 0.001f) {
 				float a0 = -M_PI / 2.f, a1 = a0 + frac * 2.f * M_PI;
@@ -131,19 +135,32 @@ struct MXPies : Widget {
 struct MeterXWidget : ModuleWidget {
 	MeterXWidget(MeterX* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/meterx.svg")));
-		// No virtual screws — see CLAUDE.md. Labels come from the SVG art (not code).
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		// No virtual screws — see CLAUDE.md.
+		setPanel(sfs::themedPanel("meterx"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("METER X");
 		MXPies* pies = new MXPies(); pies->module = module; pies->box.size = box.size; addChild(pies);
 
+		// Each output is named at the left of its row, the name's baseline half
+		// a cap height below the row so it sits centred on the jack.
+		static const char* const NAMES[10] = {"24PPQN", "RUN", "BAR", "2 BAR", "4 BAR",
+		                                      "8 BAR", "16 BAR", "32 BAR", "64 BAR", "128 BAR"};
+		for (int i = 0; i < 10; i++)
+			lbl->add(2.54f, MX_YS[i] + 0.83f, NAMES[i], sfs::PanelLabels::LABEL, NVG_ALIGN_LEFT);
+
 		const float* ys = MX_YS;
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(MX_X_JACK, ys[0])), module, MeterX::PPQN24_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(MX_X_JACK, ys[0])), module, MeterX::PPQN24_OUTPUT));
 		addChild(createLightCentered<SmallLight<YellowLight>>(mm2px(Vec(MX_X_LED, ys[0])), module, MeterX::PPQN24_LIGHT));
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(MX_X_JACK, ys[1])), module, MeterX::RUN_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(MX_X_JACK, ys[1])), module, MeterX::RUN_OUTPUT));
 		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(MX_X_LED, ys[1])), module, MeterX::RUN_LIGHT));
 
 		for (int k = 0; k < 8; k++) {
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(MX_X_JACK, ys[2 + k])), module, MeterX::BAR_OUTPUT + k));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(MX_X_JACK, ys[2 + k])), module, MeterX::BAR_OUTPUT + k));
 			addChild(createLightCentered<SmallLight<YellowLight>>(mm2px(Vec(MX_X_LED, ys[2 + k])), module, MeterX::BAR_LIGHT + k));
 		}
 	}

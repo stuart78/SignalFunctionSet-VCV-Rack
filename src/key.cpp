@@ -1215,7 +1215,7 @@ static const float kRootOut = 48.21f, kScaleOut = 60.06f;
 struct KeyWidget : ModuleWidget {
 	KeyWidget(Key* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/key.svg")));
+		setPanel(sfs::themedPanel("key"));
 		using sfs::hp;
 
 		// NO sfs::PanelLabels. res/key.svg is the designer's own file, published
@@ -1235,19 +1235,19 @@ struct KeyWidget : ModuleWidget {
 		addChild(disp);
 
 		for (int c = 0; c < KEY_NCH; c++) {
-			addInput (createInputCentered <PJ301MPort>(mm2px(Vec(col[c], yIn)),   module, Key::IN_INPUT + c));
-			addInput (createInputCentered <PJ301MPort>(mm2px(Vec(col[c], yTrig)), module, Key::TRIG_CH_INPUT + c));
+			addInput (createInputCentered <sfs::Jack>(mm2px(Vec(col[c], yIn)),   module, Key::IN_INPUT + c));
+			addInput (createInputCentered <sfs::Jack>(mm2px(Vec(col[c], yTrig)), module, Key::TRIG_CH_INPUT + c));
 			addParam (createParamCentered <Trimpot>   (mm2px(Vec(col[c], yOff)), module, Key::OFFSET_PARAM + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(col[c], yOut)), module, Key::OUT_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(col[c], yOut)), module, Key::OUT_OUTPUT + c));
 		}
 
 		// ── the key, in and out ────────────────────────────────────────────────
 		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kRoot,    yKey)), module, Key::ROOT_PARAM));
-		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kRootIn,  yKey)), module, Key::ROOT_INPUT));
+		addInput (createInputCentered <sfs::Jack>(mm2px(Vec(kRootIn,  yKey)), module, Key::ROOT_INPUT));
 		addParam (createParamCentered <Trimpot>   (mm2px(Vec(kScale,   yKey)), module, Key::SCALE_PARAM));
-		addInput (createInputCentered <PJ301MPort>(mm2px(Vec(kScaleIn, yKey)), module, Key::SCALE_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kRootOut,  yKey)), module, Key::ROOT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(kScaleOut, yKey)), module, Key::SCALE_OUTPUT));
+		addInput (createInputCentered <sfs::Jack>(mm2px(Vec(kScaleIn, yKey)), module, Key::SCALE_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(kRootOut,  yKey)), module, Key::ROOT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(kScaleOut, yKey)), module, Key::SCALE_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

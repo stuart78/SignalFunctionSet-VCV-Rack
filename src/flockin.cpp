@@ -78,20 +78,20 @@ static const float FI_Y_IN = 120.67f;
 struct FlockInWidget : ModuleWidget {
 	FlockInWidget(FlockIn* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/flockin.svg")));
+		setPanel(sfs::themedPanel("flockin"));
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_X, FI_Y_ENV)), module, FlockIn::ENV_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_ENV_CV)), module, FlockIn::ENV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FI_X, FI_Y_ENV_CV)), module, FlockIn::ENV_INPUT));
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(FI_X, FI_Y_REACH)), module, FlockIn::REACH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_REACH_CV)), module, FlockIn::REACH_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FI_X, FI_Y_REACH_CV)), module, FlockIn::REACH_INPUT));
 
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(FI_X, FI_Y_FREEZE)), module, FlockIn::FREEZE_PARAM, FlockIn::FREEZE_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_X, FI_Y_FREEZE_CV)), module, FlockIn::FREEZE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FI_X, FI_Y_FREEZE_CV)), module, FlockIn::FREEZE_INPUT));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XL, FI_Y_IN)), module, FlockIn::L_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FI_XR, FI_Y_IN)), module, FlockIn::R_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FI_XL, FI_Y_IN)), module, FlockIn::L_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FI_XR, FI_Y_IN)), module, FlockIn::R_INPUT));
 	}
 };
 

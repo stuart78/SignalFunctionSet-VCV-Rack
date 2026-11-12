@@ -346,7 +346,7 @@ static const float CT_Y_OUT[CT_N] = {63.5f, 75.0f, 86.4f, 97.8f, 109.2f, 120.7f}
 struct CountWidget : ModuleWidget {
 	CountWidget(Count* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/count.svg")));
+		setPanel(sfs::themedPanel("count"));
 
 		CountDisplay* disp = new CountDisplay();
 		disp->module = module;
@@ -354,12 +354,12 @@ struct CountWidget : ModuleWidget {
 		disp->box.size = mm2px(Vec(35.47f, 15.24f));
 		addChild(disp);
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_CLOCK)), module, Count::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CT_X_IN, CT_Y_CLOCK)), module, Count::CLOCK_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_BPM, CT_Y_KNOB)), module, Count::BPM_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_STEPS, CT_Y_KNOB)), module, Count::STEPS_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_IN, CT_Y_CV)), module, Count::RESET_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_BPM, CT_Y_CV)), module, Count::BPM_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CT_X_STEPS, CT_Y_CV)), module, Count::STEPS_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CT_X_IN, CT_Y_CV)), module, Count::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CT_X_BPM, CT_Y_CV)), module, Count::BPM_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CT_X_STEPS, CT_Y_CV)), module, Count::STEPS_INPUT));
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(CT_X_BTN, CT_Y_RUN)), module, Count::RUN_PARAM, Count::RUN_LIGHT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CT_X_BTN, CT_Y_RST)), module, Count::RESET_PARAM));
@@ -367,7 +367,7 @@ struct CountWidget : ModuleWidget {
 		for (int i = 0; i < CT_N; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_DIV, CT_Y_OUT[i])), module, Count::DIV_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_MASK, CT_Y_OUT[i])), module, Count::MASK_PARAM + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CT_X_OUT, CT_Y_OUT[i])), module, Count::GATE_OUTPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CT_X_OUT, CT_Y_OUT[i])), module, Count::GATE_OUTPUT + i));
 		}
 	}
 

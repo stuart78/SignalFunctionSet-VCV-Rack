@@ -311,7 +311,7 @@ struct TouchMenuSlider : ui::Slider {
 struct TouchWidget : ModuleWidget {
 	TouchWidget(Touch* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/touch.svg")));
+		setPanel(sfs::themedPanel("touch"));
 
 		auto* lab = new sfs::PanelLabels();
 		lab->box.size = box.size;
@@ -328,14 +328,14 @@ struct TouchWidget : ModuleWidget {
 		// pot and its CV two cells apart on the same row, joined by a hairline
 		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(X_KNOB_L - 5.08f, Y_MB)), module, Touch::MORPH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(X_KNOB_L + 5.08f, Y_MB)), module, Touch::MORPH_CV_INPUT));
 		lab->rogan(X_KNOB_L - 5.08f, Y_MB, "MORPH");
 		lab->link(X_KNOB_L - 5.08f, Y_MB, X_KNOB_L + 5.08f, Y_MB);
 
 		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(X_KNOB_R - 5.08f, Y_MB)), module, Touch::BIAS_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(X_KNOB_R + 5.08f, Y_MB)), module, Touch::BIAS_CV_INPUT));
 		lab->rogan(X_KNOB_R - 5.08f, Y_MB, "BIAS");
 		lab->link(X_KNOB_R - 5.08f, Y_MB, X_KNOB_R + 5.08f, Y_MB);
@@ -347,8 +347,8 @@ struct TouchWidget : ModuleWidget {
 		const int   inId2[4]  = {Touch::CLOCK_INPUT, Touch::BAR_INPUT,
 		                         Touch::RESET_INPUT, Touch::ROOT_INPUT};
 		for (int i = 0; i < 4; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(X_IN[i], Y_IN1)), module, inId1[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(X_IN[i], Y_IN2)), module, inId2[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(X_IN[i], Y_IN1)), module, inId1[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(X_IN[i], Y_IN2)), module, inId2[i]));
 			lab->jackOnPlate(X_IN[i], Y_IN1, inLab1[i]);
 			lab->jackOnPlate(X_IN[i], Y_IN2, inLab2[i]);
 		}
@@ -366,7 +366,7 @@ struct TouchWidget : ModuleWidget {
 		const int   outId[6]  = {Touch::VOCT_OUTPUT, Touch::TRIG_OUTPUT, Touch::GATE_OUTPUT,
 		                         Touch::VEL_OUTPUT, Touch::SLIDE_OUTPUT, Touch::PEDAL_OUTPUT};
 		for (int i = 0; i < 6; i++) {
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(X_OUT[i], Y_OUT)), module, outId[i]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(X_OUT[i], Y_OUT)), module, outId[i]));
 			lab->jackOnPlate(X_OUT[i], Y_OUT, outLab[i]);
 		}
 	}

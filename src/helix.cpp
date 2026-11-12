@@ -439,7 +439,7 @@ static const float HX_TY = 110.0f;   // the transport row
 struct HelixWidget : ModuleWidget {
 	HelixWidget(Helix* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/helix.svg")));
+		setPanel(sfs::themedPanel("helix"));
 
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
@@ -464,7 +464,7 @@ struct HelixWidget : ModuleWidget {
 		for (int i = 0; i < 6; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(HX_X[i], HX_KY)), module, row[i].p));
 			if (row[i].in >= 0) {
-				addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HX_X[i], HX_JY)), module, row[i].in));
+				addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HX_X[i], HX_JY)), module, row[i].in));
 				lbl->pairDown(HX_X[i], HX_KY, HX_JY, row[i].t);
 			} else {
 				lbl->trim(HX_X[i], HX_KY, row[i].t);
@@ -477,17 +477,17 @@ struct HelixWidget : ModuleWidget {
 		lbl->trim(HX_X[5], HX_JY, "SNAP");
 
 		// The transport row: what is played in and out, and nothing else.
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HX_X[0], HX_TY)), module, Helix::INL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HX_X[0], HX_TY)), module, Helix::INL_INPUT));
 		lbl->jack(HX_X[0], HX_TY, "IN L");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HX_X[1], HX_TY)), module, Helix::INR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HX_X[1], HX_TY)), module, Helix::INR_INPUT));
 		lbl->jack(HX_X[1], HX_TY, "IN R");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HX_X[2], HX_TY)), module, Helix::SYNC_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HX_X[2], HX_TY)), module, Helix::SYNC_INPUT));
 		lbl->jack(HX_X[2], HX_TY, "SYNC");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HX_X[3], HX_TY)), module, Helix::PHASE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HX_X[3], HX_TY)), module, Helix::PHASE_OUTPUT));
 		lbl->jackOnPlate(HX_X[3], HX_TY, "PHASE");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HX_X[4], HX_TY)), module, Helix::OUTL_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HX_X[4], HX_TY)), module, Helix::OUTL_OUTPUT));
 		lbl->jackOnPlate(HX_X[4], HX_TY, "OUT L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HX_X[5], HX_TY)), module, Helix::OUTR_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HX_X[5], HX_TY)), module, Helix::OUTR_OUTPUT));
 		lbl->jackOnPlate(HX_X[5], HX_TY, "OUT R");
 	}
 

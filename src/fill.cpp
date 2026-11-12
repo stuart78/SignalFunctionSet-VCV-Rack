@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "pulse-width.hpp"
 #include "drum-taste.hpp"
 #include <osdialog.h>
@@ -1134,12 +1135,12 @@ static const NVGcolor FILL_CHCOL[FILL_NCH] = {
 static const char* FILL_ROWLBL[FILL_NCH] = {"KIK", "SNR", "CHH", "OHH", "LO", "HI", "CLP", "BEL"};
 
 // Shared SFS display palette (matches Note/Beat).
-static const NVGcolor FBG         = nvgRGB(0x1A, 0x1A, 0x32);
+#define FBG (sfs::SCREEN_BG)
 static const NVGcolor FBLUE       = nvgRGB(0x00, 0x97, 0xDE);
 static const NVGcolor FBLUE_DARK  = nvgRGB(0x0D, 0x59, 0x86);
 static const NVGcolor FBLUE_LINE  = nvgRGB(0x0D, 0x59, 0x88);
-static const NVGcolor FPURPLE     = nvgRGB(0x35, 0x35, 0x4D);
-static const NVGcolor FPURPLE_MID = nvgRGB(0x4A, 0x4A, 0x66);
+#define FPURPLE (sfs::SCREEN_PURP)
+#define FPURPLE_MID (sfs::SCREEN_PMID)
 static const NVGcolor FORANGE     = nvgRGB(0xEC, 0x65, 0x2E);
 static const NVGcolor FTEXT       = nvgRGB(0xFF, 0xFF, 0xFF);
 static const NVGcolor FTEXT_DIM   = nvgRGB(0x80, 0x80, 0x80);
@@ -1692,7 +1693,7 @@ struct FillDisplay : Widget {
 struct FillWidget : ModuleWidget {
 	FillWidget(Fill* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/fill.svg")));
+		setPanel(sfs::themedPanel("fill"));
 
 		// NO sfs::PanelLabels. res/fill.svg is the designer's own file, published
 		// by `figma_panel_template.py --publish fill`, and it carries every label,
@@ -1713,43 +1714,43 @@ struct FillWidget : ModuleWidget {
 		for (int c = 0; c < FILL_NCH; c++) {
 			float y = cy0 + cdy * c;
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(xSw, y)), module, Fill::SWING_PARAM + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xG, y)), module, Fill::GATE_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xV, y)), module, Fill::VEL_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xA, y)), module, Fill::ACC_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xG, y)), module, Fill::GATE_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xV, y)), module, Fill::VEL_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xA, y)), module, Fill::ACC_OUTPUT + c));
 		}
 
 		// ── row A: reset, and the three pressure controls ──────────────────────
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(10.20f, 76.20f)), module, Fill::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.14f, 76.20f)), module, Fill::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(22.14f, 76.20f)), module, Fill::RESET_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(42.71f, 76.20f)), module, Fill::ACCUM_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(53.04f, 76.20f)), module, Fill::ACCUM_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(53.04f, 76.20f)), module, Fill::ACCUM_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(65.91f, 76.20f)), module, Fill::PHRASE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(76.24f, 76.20f)), module, Fill::PHRASE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(76.24f, 76.20f)), module, Fill::PHRASE_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(91.40f, 76.20f)), module, Fill::SET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(101.73f, 76.20f)), module, Fill::SET_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(101.73f, 76.20f)), module, Fill::SET_CV_INPUT));
 
 		// ── row B: the clock in, and the rest of the engine ────────────────────
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.24f, 91.49f)), module, Fill::BAR_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(22.01f, 91.49f)), module, Fill::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.24f, 91.49f)), module, Fill::BAR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(22.01f, 91.49f)), module, Fill::CLOCK_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(42.21f, 91.49f)), module, Fill::DISCHARGE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(52.54f, 91.49f)), module, Fill::DISCHARGE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(52.54f, 91.49f)), module, Fill::DISCHARGE_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(65.91f, 91.49f)), module, Fill::EXTRAS_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(76.24f, 91.49f)), module, Fill::EXTRAS_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(76.24f, 91.49f)), module, Fill::EXTRAS_CV_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(91.40f, 91.49f)), module, Fill::NEXT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(101.73f, 91.49f)), module, Fill::NEXT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(101.73f, 91.49f)), module, Fill::NEXT_INPUT));
 
 		// ── row C ──────────────────────────────────────────────────────────────
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(10.20f, 106.69f)), module, Fill::BPM_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(21.97f, 106.69f)), module, Fill::NUM_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(10.20f, 106.69f)), module, Fill::BPM_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(21.97f, 106.69f)), module, Fill::NUM_OUTPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(42.71f, 106.69f)), module, Fill::TIER_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(53.04f, 106.69f)), module, Fill::TIER_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(53.04f, 106.69f)), module, Fill::TIER_CV_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(65.91f, 106.69f)), module, Fill::RESEED_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(76.24f, 106.69f)), module, Fill::RESEED_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(76.24f, 106.69f)), module, Fill::RESEED_INPUT));
 
 		// ── row D: the tempo/time-signature plate, and the fill gate ───────────
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(10.12f, 121.88f)), module, Fill::SET_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(21.97f, 121.88f)), module, Fill::DEN_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(143.98f, 121.88f)), module, Fill::FILL_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(10.12f, 121.88f)), module, Fill::SET_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(21.97f, 121.88f)), module, Fill::DEN_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(143.98f, 121.88f)), module, Fill::FILL_OUTPUT));
 		addChild(createLightCentered<MediumLight<GreenLight>>(
 			mm2px(Vec(152.19f, 121.88f)), module, Fill::FILL_LIGHT));
 	}

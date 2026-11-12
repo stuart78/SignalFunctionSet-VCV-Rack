@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "fastmath.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -563,7 +564,46 @@ void IntoneDisplay::drawLayer(const DrawArgs& args, int layer) {
 struct IntoneWidget : ModuleWidget {
 	IntoneWidget(Intone* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/intone.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps only
+		// the Greek row names, which Figtree cannot set.
+		setPanel(sfs::themedPanel("intone"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("INTONE");
+		{
+			const float cx[5] = {13.55f, 27.10f, 40.64f, 54.18f, 67.73f};
+			const char* names[5] = {"F1", "F2", "F3", "F4", "F5"};
+			for (int i = 0; i < 5; i++) {
+				lbl->trim(cx[i], 48.f, names[i]);
+				lbl->link(cx[i], 43.4f, cx[i], 48.f);           // from the name to the freq trimpot
+				// freq trimpot to its CV jack, round the right of the column
+				const float xr = cx[i] + 5.33f;
+				lbl->link(cx[i], 48.f, xr, 48.f);
+				lbl->link(xr, 48.f, xr, 84.f);
+				lbl->link(xr, 84.f, cx[i], 84.f);
+				// bandwidth trimpot to its CV jack, round the left
+				const float xl = cx[i] - 5.33f;
+				lbl->link(cx[i], 60.f, xl, 60.f);
+				lbl->link(xl, 60.f, xl, 94.f);
+				lbl->link(xl, 94.f, cx[i], 94.f);
+			}
+		}
+		lbl->add(4.49f, 73.23f, "A");                          // the amplitude row
+		// the vowels along the morph slider
+		lbl->add(25.07f, 101.95f, "A");
+		lbl->add(32.85f, 101.95f, "E");
+		lbl->add(40.11f, 101.95f, "I");
+		lbl->add(47.60f, 101.95f, "O");
+		lbl->add(55.62f, 101.95f, "U");
+		lbl->jack(7.62f, 118.f, "VOWEL");
+		lbl->pair(17.78f, 118.f, "SKIRT");
+		lbl->add(38.10f, 112.2f, "TRIG");
+		lbl->add(38.10f, 124.61f, "AUDIO");
+		lbl->jack(48.26f, 118.f, "V/OCT");
+		lbl->jack(58.42f, 118.f, "EXCITE");
+		lbl->jackOnPlate(73.66f, 118.f, "OUT");
 
 
 		// Spectrum display
@@ -593,12 +633,12 @@ struct IntoneWidget : ModuleWidget {
 		}
 		// Freq CV jacks Y=84
 		for (int i = 0; i < NUM_FORMANTS; i++) {
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(colX[i], 84.f)), module, Intone::F1_FREQ_CV + i));
 		}
 		// BW CV jacks Y=94
 		for (int i = 0; i < NUM_FORMANTS; i++) {
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(colX[i], 94.f)), module, Intone::F1_BW_CV + i));
 		}
 
@@ -607,13 +647,13 @@ struct IntoneWidget : ModuleWidget {
 			mm2px(Vec(40.64f, 106.f)), module, Intone::VOWEL_PARAM));
 
 		// Bottom row Y=118
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 118.f)), module, Intone::VOWEL_CV));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 118.f)), module, Intone::VOWEL_CV));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(17.78f, 118.f)), module, Intone::SKIRT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(27.94f, 118.f)), module, Intone::SKIRT_CV));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(27.94f, 118.f)), module, Intone::SKIRT_CV));
 		addParam(createParamCentered<CKSS>(mm2px(Vec(38.10f, 118.f)), module, Intone::MODE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(48.26f, 118.f)), module, Intone::VOCT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(58.42f, 118.f)), module, Intone::EXC_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(73.66f, 118.f)), module, Intone::AUDIO_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(48.26f, 118.f)), module, Intone::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(58.42f, 118.f)), module, Intone::EXC_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(73.66f, 118.f)), module, Intone::AUDIO_OUTPUT));
 	}
 };
 

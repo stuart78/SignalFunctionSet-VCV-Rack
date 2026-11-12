@@ -1543,7 +1543,7 @@ struct LoomDisplay : OpaqueWidget {
 struct LoomWidget : ModuleWidget {
 	LoomWidget(Loom* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/loom.svg")));
+		setPanel(sfs::themedPanel("loom"));
 		using sfs::hp;
 
 		// NO sfs::PanelLabels HERE, DELIBERATELY. res/loom.svg is the designer's
@@ -1567,56 +1567,56 @@ struct LoomWidget : ModuleWidget {
 		// ── left: four rows of two pot-over-jack pairs ─────────────────────────
 		const float rowA = hp(4), rowAj = hp(6);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowA)), module, Loom::BODY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowAj)), module, Loom::BODY_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowAj)), module, Loom::BODY_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowA)), module, Loom::COUPLE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowAj)), module, Loom::COUPLE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowAj)), module, Loom::COUPLE_CV_INPUT));
 
 		const float rowB = hp(9), rowBj = hp(11);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowB)), module, Loom::DECAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowBj)), module, Loom::DECAY_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowBj)), module, Loom::DECAY_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowB)), module, Loom::DAMP_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowBj)), module, Loom::DAMP_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowBj)), module, Loom::DAMP_CV_INPUT));
 
 		const float rowC = hp(14), rowCj = hp(16);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowC)), module, Loom::PICK_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowCj)), module, Loom::PICK_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowCj)), module, Loom::PICK_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowC)), module, Loom::SPREAD_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowCj)), module, Loom::SPREAD_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowCj)), module, Loom::SPREAD_CV_INPUT));
 
 		const float rowD = hp(19), rowDj = hp(21);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowD)), module, Loom::ROOT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowDj)), module, Loom::ROOT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowDj)), module, Loom::ROOT_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowD)), module, Loom::SCALE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowDj)), module, Loom::SCALE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowDj)), module, Loom::SCALE_CV_INPUT));
 
 		// ── the eight strings: a gate in and an audio out each ─────────────────
 		for (int i = 0; i < LOOM_N; i++) {
 			float x = str0 + strStep * i;
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(x, gateY)), module, Loom::STRING_GATE_INPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, outY)), module, Loom::STRING_OUTPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(x, gateY)), module, Loom::STRING_GATE_INPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, outY)), module, Loom::STRING_OUTPUT + i));
 		}
 
 		// ── the auto-player, two rows of pot + jack, each ending in a button ────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(9.5f), knobY)), module, Loom::PATTERN_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(11.75f), knobY)), module, Loom::PATTERN_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(11.75f), knobY)), module, Loom::PATTERN_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(14.5f), knobY)), module, Loom::DENSITY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(16.75f), knobY)), module, Loom::DENSITY_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(16.75f), knobY)), module, Loom::DENSITY_CV_INPUT));
 
 		// ── bottom row ─────────────────────────────────────────────────────────
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, botY)), module, Loom::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, botY)), module, Loom::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, botY)), module, Loom::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, botY)), module, Loom::GATE_INPUT));
 		// VEL stands above V/OCT with no pot of its own, so no pipe joins them --
 		// it is the poly velocity that goes with the poly gate, not a modulator.
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colC, hp(21))), module, Loom::VEL_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colC, botY)), module, Loom::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colC, hp(21))), module, Loom::VEL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colC, botY)), module, Loom::VOCT_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(9.5f), botY)), module, Loom::OCT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(11.75f), botY)), module, Loom::OCT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(11.75f), botY)), module, Loom::OCT_CV_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(hp(14.5f), botY)), module, Loom::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(16.75f), botY)), module, Loom::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(16.75f), botY)), module, Loom::RESET_INPUT));
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(hp(20), botY)), module, Loom::AUTO_PARAM, Loom::AUTO_LIGHT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(23.5f), botY)), module, Loom::MIX_L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(26), botY)), module, Loom::MIX_R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(23.5f), botY)), module, Loom::MIX_L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(26), botY)), module, Loom::MIX_R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

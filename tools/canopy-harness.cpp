@@ -3,7 +3,10 @@
 // the scale, material sets weight, brightness and bounce, every landing sounds, a
 // paddle deflects a drop in silence and its material changes how, drift stays where
 // its knobs say, GATE plays directly, drops reach the drum, and the mouse maths
-// inverts the camera. `render DIR` writes listening WAVs.
+// inverts the camera; and the zither: every string in tune, a hit at a string's
+// middle has no even harmonics, a big drop rests on two strings and rolls down
+// them rubbing them, and a resting drop damps what moves where it sits.
+// `render DIR` writes listening WAVs.
 //
 //   clang++ -std=c++11 -O2 -w -DARCH_MAC -I src -I ../Rack-SDK/include -I ../Rack-SDK/dep/include \
 //     tools/canopy-harness.cpp -o /tmp/canopy-harness \
@@ -104,6 +107,33 @@ static int render(const std::string& dir) {
 		{"mix-felt-leaves", TM_MIX, TP_FELT, 0.5f, 0.46f, 0.2f},
 		{"mix-steel-leaves", TM_MIX, TP_STEEL, 0.5f, 0.46f, 0.2f},
 		{"glass-drifting", TM_GLASS, TP_WOOD, 0.5f, 0.46f, 0.9f},
+		// the zither: "rolling" is big, slow, few drops, so they settle on the strings
+		{"zither-glass", TM_GLASS, TP_WOOD, 0.45f, 0.46f, 0.2f},
+		{"zither-mix", TM_MIX, TP_WOOD, 0.5f, 0.46f, 0.2f},
+		{"zither-water-rain", TM_WATER, TP_WOOD, 0.70f, 0.3f, 0.2f},
+		{"zither-steel", TM_STEEL, TP_WOOD, 0.40f, 0.46f, 0.2f},
+		{"zither-rolling", TM_GLASS, TP_FELT, 0.25f, 1.0f, 0.1f},
+		// the steel pan: rubber is what its sticks are tipped with
+		{"pan-rubber", TM_RUBBER, TP_WOOD, 0.5f, 0.46f, 0.2f},
+		{"pan-glass", TM_GLASS, TP_WOOD, 0.45f, 0.46f, 0.2f},
+		{"pan-mix", TM_MIX, TP_WOOD, 0.5f, 0.46f, 0.2f},
+		{"pan-water-rain", TM_WATER, TP_WOOD, 0.70f, 0.3f, 0.2f},
+		{"bowls-wood", TM_WOOD, TP_WOOD, 0.35f, 0.5f, 0.2f},
+		{"bowls-glass", TM_GLASS, TP_WOOD, 0.35f, 0.46f, 0.2f},
+		{"bowls-mix", TM_MIX, TP_WOOD, 0.45f, 0.46f, 0.2f},
+		{"bowls-water-rain", TM_WATER, TP_WOOD, 0.70f, 0.3f, 0.2f},
+		{"chimes-glass", TM_GLASS, TP_LEAF, 0.40f, 0.5f, 0.2f},
+		{"chimes-wood", TM_WOOD, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"chimes-water-rain", TM_WATER, TP_LEAF, 0.70f, 0.3f, 0.2f},
+		{"handpan-rubber", TM_RUBBER, TP_LEAF, 0.40f, 0.5f, 0.2f},
+		{"handpan-glass", TM_GLASS, TP_LEAF, 0.40f, 0.5f, 0.2f},
+		{"handpan-water-rain", TM_WATER, TP_LEAF, 0.70f, 0.3f, 0.2f},
+		{"bonang-wood", TM_WOOD, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"bonang-rubber", TM_RUBBER, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"marimba-rubber", TM_RUBBER, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"marimba-wood", TM_WOOD, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"balafon-wood", TM_WOOD, TP_LEAF, 0.45f, 0.5f, 0.2f},
+		{"balafon-rubber", TM_RUBBER, TP_LEAF, 0.55f, 0.5f, 0.2f},
 	};
 	for (auto& s : S) {
 		Run r(false);
@@ -113,6 +143,14 @@ static int render(const std::string& dir) {
 		r.m->params[Canopy::SIZE_PARAM].setValue(s.size);
 		r.m->params[Canopy::DRIFT_PARAM].setValue(s.drift);
 		r.m->params[Canopy::TILT_PARAM].setValue(s.drift);
+		if (std::string(s.name).compare(0, 6, "zither") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f);
+		if (std::string(s.name).compare(0, 4, "pan-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f);
+		if (std::string(s.name).compare(0, 6, "bowls-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f);
+		if (std::string(s.name).compare(0, 7, "chimes-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f);
+		if (std::string(s.name).compare(0, 8, "handpan-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(5.f);
+		if (std::string(s.name).compare(0, 8, "marimba-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(7.f);
+		if (std::string(s.name).compare(0, 8, "balafon-") == 0) r.m->params[Canopy::INSTRUMENT_PARAM].setValue(8.f);
+		if (std::string(s.name).compare(0, 7, "bonang-") == 0) { r.m->params[Canopy::INSTRUMENT_PARAM].setValue(6.f); r.m->params[Canopy::SCALE_PARAM].setValue(15.f); }
 		std::vector<float> L, R; int n = (int)(25.f * SR);
 		for (int i = 0; i < n; i++) { r.tick(); L.push_back(r.m->outputs[Canopy::L_OUTPUT].getVoltage()); R.push_back(r.m->outputs[Canopy::R_OUTPUT].getVoltage()); }
 		writeWav(dir + "/" + s.name + ".wav", L, R);
@@ -875,6 +913,700 @@ int main(int argc, char** argv) {
 		check(finite && pk <= 10.f, string::f("12 large steel drops a second, ring time x4: peak %.2f V", pk));
 		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
 		check(sec / 20.0 < 0.05, "under 5% of a core");
+	}
+
+	printf("== the zither ==\n");
+	{
+		// in tune: each string plucked from GATE, read on its own POLY channel
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f); r.run(0.01f);
+		check(r.m->instNow == 1 && r.m->nT == 10, string::f("switched to the zither: %d strings on Pentatonic Minor", r.m->nT));
+		float worst = 0.f;
+		for (int t = 0; t < r.m->nT; t++) {
+			r.m->inputs[Canopy::GATE_INPUT].channels = t + 1;
+			for (int c = 0; c <= t; c++) r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, c);
+			r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, t);
+			std::vector<float> v = r.record(0.5f, t);
+			float f = r.m->tv[t].freq, got = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(got / f)));
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, t);
+		}
+		check(worst < 3.f, string::f("every string in tune: worst %.1f cents", worst));
+	}
+	{
+		// a hit at the middle of a string gives its odd harmonics, not its even ones
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f); r.run(0.01f);
+		const Canopy::TongueVoice& T = r.m->tv[2];
+		r.m->spawn(T.tx, T.tz + 0.5f * T.len);
+		std::vector<float> v = r.record(1.5f, 2);
+		float h2 = goertzel(v, 2.f * T.freq), h3 = goertzel(v, 3.f * T.freq);
+		check(h2 < 0.25f * h3, string::f("struck at its middle: 2nd harmonic %.1f dB under the 3rd", 20.f * std::log10(h3 / std::max(h2, 1e-9f))));
+	}
+	{
+		// a large drop set down between two strings rests on both and rolls toward the front
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f); r.run(0.01f);
+		float x = 0.5f * (r.m->tv[4].tx + r.m->tv[5].tx), z = CP_Z_BACK + 0.15f;
+		r.m->spawn(x, z);
+		CanopyDrop* d = nullptr;
+		for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+		float reach = d->r + CP_Z_R, h = std::sqrt(std::max(reach * reach - 0.25f * CP_Z_SP * CP_Z_SP, 0.f));
+		d->y = cpBoardY(z) + CP_Z_H + h + 0.001f; d->vx = d->vy = d->vz = 0.f;
+		int touching = 0; float z0 = d->z, zMax = d->z; double e = 0.0; int n = (int)(3.f * SR);
+		for (int i = 0; i < n && d->alive; i++) {
+			r.tick();
+			if (r.m->tv[4].zTouch && r.m->tv[5].zTouch) touching++;
+			if (d->y > cpBoardY(d->z)) zMax = std::max(zMax, d->z);
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l;
+		}
+		float secs = touching / SR;
+		check(secs > 0.4f, string::f("a large glass drop rests on two strings for %.2f s", secs));
+		check(zMax - z0 > 0.6f, string::f("and rolls %.2f toward the front", zMax - z0));
+		float rms = std::sqrt(e / n);
+		check(rms > 0.01f && rms < 1.f, string::f("rolling rubs the strings: %.3f V rms with no hit", rms));
+	}
+	{
+		// a drop resting on a string damps the harmonics that move most where it sits
+		auto ring = [&](bool rest) {
+			Run r; r.noPaddles(); r.mat(TM_GLASS);
+			r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+			r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f); r.run(0.01f);
+			r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			r.run(0.05f);
+			for (int i = 0; i < (int)(0.5f * SR); i++) {
+				if (rest) for (int k = 0; k < 24; k++) { r.m->tv[0].zTouch = false; }
+				if (rest && (i % 24) == 0) {
+					r.m->tv[0].zTouch = false;
+					r.m->touchString(r.m->tv[0], 0.5f, 1.f, 0.f);
+				}
+				r.tick();
+			}
+			std::vector<float> v = r.record(0.3f, 0);
+			return goertzel(v, r.m->tv[0].freq);
+		};
+		float free = ring(false), held = ring(true);
+		check(held < 0.3f * free, string::f("a drop resting at its middle takes the fundamental down %.1f dB in half a second",
+		                                    20.f * std::log10(free / std::max(held, 1e-9f))));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f); q.run(0.01f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a string\n",
+		       std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(1.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("zither in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the steel pan ==\n");
+	{
+		Run r; r.noPaddles(); r.mat(TM_RUBBER);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); r.run(0.02f);
+		check(r.m->instNow == 2 && r.m->nT == 29, string::f("a low-C tenor pan: %d pads, C4 to E6", r.m->nT));
+		// round the outer ring the notes go in fifths, and a note's octave lies straight inward
+		int fifths = 0, inline_ = 0;
+		for (int i = 0; i < 12; i++) {
+			const Canopy::TongueVoice& A = r.m->tv[i];
+			for (int j = 0; j < 12; j++) {
+				const Canopy::TongueVoice& B = r.m->tv[j];
+				float d = B.pth - A.pth; if (d < 0) d += 2.f * (float)M_PI;
+				if (std::fabs(d - (float)M_PI / 6.f) < 0.01f && ((int)std::round(B.semis - A.semis) % 12 + 12) % 12 == 7) fifths++;
+			}
+			if (std::fabs(r.m->tv[i + 12].pth - A.pth) < 1e-4f && r.m->tv[i + 12].ring == 1) inline_++;
+		}
+		check(fifths == 12, string::f("every outer neighbour is a fifth on: %d of 12", fifths));
+		check(inline_ == 12, string::f("every octave lies straight inward: %d of 12", inline_));
+		int damped = 0; for (int t = 0; t < r.m->nT; t++) damped += r.m->tv[t].damped;
+		check(29 - damped == 12, string::f("Pentatonic Minor on C damps the rest: %d pads sound", 29 - damped));
+		// in tune: each pad struck from GATE with its V/OCT
+		r.m->inputs[Canopy::VOCT_INPUT].channels = 1; r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		float worst = 0.f;
+		for (int t = 0; t < r.m->nT; t += 1) {
+			if (r.m->tv[t].damped) continue;
+			r.m->inputs[Canopy::VOCT_INPUT].setVoltage(r.m->tv[t].semis / 12.f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f); r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			std::vector<float> v = r.record(1.2f);
+			float f = r.m->tv[t].freq, got = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(got / f)));
+			r.run(1.5f);
+		}
+		check(worst < 3.f, string::f("every sounding pad in tune: worst %.1f cents", worst));
+		check(r.m->outputs[Canopy::POLY_OUTPUT].getChannels() == 16, "POLY carries the 16 loudest");
+	}
+	{
+		// a hit near a pad's edge brings the octave out more than one at its middle
+		auto ratio = [&](float rho) {
+			Run r; r.noPaddles(); r.mat(TM_RUBBER);
+			r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); r.run(0.02f);
+			r.m->hitPanAt(3, rho, CP_V0 * 0.6f, TM_RUBBER, CP_R0, 1.f);
+			std::vector<float> v = r.record(0.3f, -1);
+			float f = r.m->tv[3].freq;
+			return goertzel(v, 2.f * f) / std::max(goertzel(v, f), 1e-9f);
+		};
+		float mid = ratio(0.f), edge = ratio(0.9f);
+		check(edge > 1.5f * mid, string::f("the octave against the fundamental: %.2f struck at the middle, %.2f near the edge", mid, edge));
+	}
+	{
+		Run r; r.noPaddles();
+		r.m->panTuning = Canopy::PAN_SCALE;
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); r.run(0.02f);
+		check(r.m->nT == 12, string::f("tuned to Pentatonic Minor: %d pads over the same range", r.m->nT));
+		r.m->panTuning = Canopy::PAN_CHROMATIC; r.run(0.01f);
+		int damped = 0; for (int t = 0; t < r.m->nT; t++) damped += r.m->tv[t].damped;
+		check(r.m->nT == 29 && damped == 0, "chromatic: all 29, none damped");
+	}
+	{
+		// drops roll down the bowl to its low point, and fade there rather than piling up
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); r.run(0.02f);
+		r.m->spawn(0.7f, -0.3f);
+		CanopyDrop* d = nullptr; for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+		float lowZ = CP_PAN_T / (2.f * CP_PAN_D), nearest = 9.f; int n = (int)(20.f * SR), i = 0;
+		for (; i < n && d->alive; i++) {
+			r.tick();
+			nearest = std::min(nearest, std::sqrt(d->x * d->x + (d->z - lowZ) * (d->z - lowZ)));
+		}
+		check(nearest < 0.15f, string::f("a glass drop rolls to within %.2f of the bowl's low point", nearest));
+		check(!d->alive, string::f("and is gone after %.1f s", i / SR));
+	}
+	{
+		// a drop set down gently on the outer ring rolls down across the pads: it barely
+		// strikes (one bounce at most), yet every groove it crosses and every bump sounds
+		auto roll = [&](bool silent, int& pads, long& strikes) {
+			Run r; r.noPaddles(); r.mat(TM_GLASS);
+			r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); r.run(0.02f);
+			r.m->spawn(0.f, -0.85f);
+			CanopyDrop* d = nullptr; for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+			d->y = cpPanY(d->x, d->z) + d->r; d->vx = 0.35f; d->vy = 0.f; d->vz = 0.f;
+			long s0 = r.m->strikes;
+			bool seen[CP_MAXN] = {};
+			double e = 0.0; int n = (int)(1.5f * SR);
+			for (int i = 0; i < n; i++) {
+				if (silent) d->pad = -2;                // as if rolling made no sound
+				r.tick();
+				float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l;
+				for (int t = 0; t < r.m->nT; t++) if (r.m->tv[t].env > 0.002f) seen[t] = true;
+			}
+			pads = 0; for (int t = 0; t < CP_MAXN; t++) pads += seen[t];
+			strikes = r.m->strikes - s0;
+			return (float)std::sqrt(e / n);
+		};
+		int pads, padsQ; long st, stQ;
+		float rolled = roll(false, pads, st), quiet = roll(true, padsQ, stQ);
+		check(st <= 1 && pads >= 3 && rolled > 2.f * quiet + 0.005f && rolled < 0.35f,
+		      string::f("a glass drop rolling down the pan sounds %d pads at %.3f V rms, %ld strikes (%.3f V without the rolling)", pads, rolled, st, quiet));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a pad\n",
+		       std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(2.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("pan in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the singing bowls ==\n");
+	{
+		Run r; r.noPaddles(); r.mat(TM_WOOD);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+		bool sized = true;
+		for (int t = 1; t < r.m->nT; t++) sized = sized && r.m->tv[t].bR < r.m->tv[t - 1].bR;
+		check(r.m->instNow == 3 && r.m->nT == 5 && sized && r.m->tv[0].tx == 0.f,
+		      string::f("%d bowls for Pentatonic Minor, smaller as they rise, the largest in the middle", r.m->nT));
+		r.m->inputs[Canopy::VOCT_INPUT].channels = 1; r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		float worst = 0.f;
+		for (int t = 0; t < r.m->nT; t++) {
+			r.m->inputs[Canopy::VOCT_INPUT].setVoltage(r.m->tv[t].semis / 12.f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f); r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			std::vector<float> v = r.record(1.5f);
+			float f = r.m->tv[t].freq, got = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(got / f)));
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f);
+			r.m->params[Canopy::DECAY_PARAM].setValue(0.f); r.run(3.f); r.m->params[Canopy::DECAY_PARAM].setValue(0.5f);
+		}
+		check(worst < 3.f, string::f("every bowl in tune: worst %.1f cents", worst));
+	}
+	{
+		// struck between the lines its pairs split along, a bowl beats; on one, it does not
+		auto depth = [&](float off) {
+			Run r; r.noPaddles();
+			r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+			const Canopy::TongueVoice& T = r.m->tv[0];
+			r.m->hitBowlAt(0, 1.f, T.bAx + off, CP_V0 * 0.6f, TM_WOOD, CP_R0, 1.f);
+			float lo = 1e9f, hi = 0.f, f = T.freq;
+			// undo the decay with the bowl's own: the fundamental's per-sample factor
+			float dec1 = std::sqrt(T.c[0] * T.c[0] + T.s[0] * T.s[0]);
+			for (int w = 0; w < 24; w++) {
+				std::vector<float> v = r.record(0.5f, -1);
+				float g = goertzel(v, f) * std::pow(dec1, -(float)(w + 0.5f) * 0.5f * SR);
+				if (w > 1) { lo = std::min(lo, g); hi = std::max(hi, g); }
+			}
+			return lo / std::max(hi, 1e-9f);
+		};
+		float between = depth((float)M_PI / 8.f), on = depth(0.f);
+		check(between < 0.6f && on > 0.8f, string::f("the fundamental's low against its high over 12 s: %.2f struck between, %.2f struck on the line", between, on));
+	}
+	{
+		// every bowl under the column is as likely as any other, whatever its size
+		Run r; r.noPaddles();
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+		int hits[CP_MAXN] = {}, misses = 0;
+		for (int i = 0; i < 2000; i++) {
+			r.m->spawnNow();
+			for (CanopyDrop& d : r.m->drop) if (d.alive) {
+				int t = r.m->bowlUnder(d.x, d.z);
+				if (t >= 0) hits[t]++; else misses++;
+				d.alive = false;
+			}
+		}
+		int lo = 1 << 30, hi = 0;
+		for (int t = 0; t < r.m->nT; t++) { lo = std::min(lo, hits[t]); hi = std::max(hi, hits[t]); }
+		check(hi < 1.4f * lo, string::f("drops over each bowl: %d to %d of 2000 (the largest has %d), %d over the rims or between", lo, hi, hits[0], misses));
+	}
+	{
+		// nothing holds a drop on the lip: set down on top of it, it rolls off
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+		const Canopy::TongueVoice& T = r.m->tv[0];
+		r.m->spawn(T.tx, T.tz);
+		CanopyDrop* d = nullptr; for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+		float lr = (1.f - 0.5f * CP_BOWL_WALL) * T.bR;
+		d->x = T.tx + lr; d->z = T.tz; d->y = T.bY + 0.5f * CP_BOWL_WALL * T.bR + d->r;
+		d->vx = d->vy = d->vz = 0.f;
+		float t = 0.f;
+		for (int i = 0; i < (int)(3.f * SR) && d->alive; i++) {
+			r.tick();
+			if (d->y < T.bY - d->r) { t = i / SR; break; }
+		}
+		check(t > 0.f && t < 1.f, string::f("a glass drop set on top of the lip has left it after %.2f s", t));
+		// and one dropped on the outside of the belly strikes the bowl and falls off
+		Run q; q.noPaddles(); q.mat(TM_GLASS);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); q.run(0.02f);
+		const Canopy::TongueVoice& U = q.m->tv[0];
+		q.m->spawn(U.tx + 1.06f * U.bR, U.tz);
+		long s0 = q.m->strikes;
+		CanopyDrop* e = nullptr; for (CanopyDrop& w : q.m->drop) if (w.alive) e = &w;
+		float lowest = 9.f;
+		for (int i = 0; i < (int)(3.f * SR) && e->alive; i++) { q.tick(); lowest = std::min(lowest, e->y); }
+		check(q.m->strikes > s0 && lowest < U.bY - U.bD, string::f("one dropped on the belly strikes it %ld times and falls to the table", q.m->strikes - s0));
+	}
+	{
+		// water lowers a bowl's note, and water rain fills them
+		Run r; r.noPaddles();
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+		float dry = r.m->tv[0].freq;
+		r.m->tv[0].water = 0.9f; r.run(0.002f);
+		float wet = r.m->tv[0].freq;
+		check(wet < 0.92f * dry, string::f("a bowl 90%% full sounds %.1f semitones lower", 12.f * std::log2(dry / wet)));
+		Run q(false); q.mat(TM_WATER);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); q.m->params[Canopy::RATE_PARAM].setValue(0.8f);
+		q.run(20.f);
+		float most = 0.f; for (int t = 0; t < q.m->nT; t++) most = std::max(most, q.m->tv[t].water);
+		check(most > 0.05f, string::f("20 s of water rain: the fullest bowl is %.0f%% full", 100.f * most));
+	}
+	{
+		// a drop rolling round inside a bowl sustains it
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); r.run(0.02f);
+		const Canopy::TongueVoice& T = r.m->tv[0];
+		r.m->spawn(T.tx, T.tz);
+		CanopyDrop* d = nullptr; for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+		float rr = 0.5f * T.bR;
+		d->x = T.tx + rr; d->z = T.tz; d->y = T.bY - T.bD + CP_BOWL_BASE * T.bR + d->r + 0.001f;
+		d->vx = 0.f; d->vy = 0.f; d->vz = 1.2f;                // across the floor and round the wall
+		double e = 0.0; int n = (int)(2.f * SR), touched = 0;
+		for (int i = 0; i < n; i++) { r.tick(); if (r.m->tv[0].zTouch) touched++; float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; }
+		check(touched > SR * 0.3f, string::f("a glass drop rolls round the big bowl for %.1f s", touched / SR));
+		printf("    and sustains it at %.3f V rms\n", std::sqrt(e / n));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a bowl\n",
+		       std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(3.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("bowls in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the wind chimes ==\n");
+	{
+		Run r; r.noPaddles(); r.mat(TM_WOOD);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f); r.run(0.02f);
+		bool shorter = true;
+		for (int t = 1; t < r.m->nT; t++) shorter = shorter && r.m->tv[t].len < r.m->tv[t - 1].len;
+		check(r.m->instNow == 4 && r.m->nT == 5 && shorter,
+		      string::f("%d tubes for Pentatonic Minor, shorter as they rise (%.2f to %.2f)", r.m->nT, r.m->tv[0].len, r.m->tv[r.m->nT - 1].len));
+		r.m->inputs[Canopy::VOCT_INPUT].channels = 1; r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		float worst = 0.f, worstP = 0.f;
+		for (int t = 0; t < r.m->nT; t++) {
+			r.m->inputs[Canopy::VOCT_INPUT].setVoltage(r.m->tv[t].semis / 12.f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f); r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			std::vector<float> v = r.record(1.5f);
+			float f = r.m->tv[t].freq, got = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(got / f)));
+			float p2 = peakFreq(v, f * 2.757f);
+			worstP = std::max(worstP, std::fabs(p2 / f - 2.757f));
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f);
+			r.m->params[Canopy::DECAY_PARAM].setValue(0.f); r.run(3.f); r.m->params[Canopy::DECAY_PARAM].setValue(0.5f);
+		}
+		check(worst < 3.f && worstP < 0.02f, string::f("every tube in tune (worst %.1f cents) with its second partial at 2.757 (off by %.3f)", worst, worstP));
+	}
+	{
+		// a tube let go from a small angle swings at its pendulum period
+		Run r; r.noPaddles();
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f); r.run(0.02f);
+		CpPend& P = r.m->tv[0].pend;
+		P.ax = 0.05f; P.wx = 0.f;
+		float L = r.m->tv[0].len, c = CP_CH_STR + 0.5f * L;
+		float want = 2.f * (float)M_PI * std::sqrt((L * L / 12.f + c * c) / (CP_G * c));
+		int cross = 0; float t0 = 0.f, t1 = 0.f, prev = P.ax;
+		for (int i = 0; i < (int)(6.f * SR); i++) {
+			r.tick();
+			if (prev > 0.f && P.ax <= 0.f) { if (cross == 0) t0 = i / SR; t1 = i / SR; cross++; }
+			prev = P.ax;
+		}
+		float got = (t1 - t0) / std::max(cross - 1, 1);
+		check(cross > 2 && std::fabs(got / want - 1.f) < 0.03f, string::f("the longest tube swings once every %.2f s (a rod on its cord: %.2f s)", got, want));
+	}
+	{
+		// a drop landing on the edge of the sail swings the clapper into the tubes
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f); r.run(0.02f);
+		r.m->spawn(0.8f * CP_CH_SR, 0.f);
+		long s0 = r.m->strikes; float most = 0.f;
+		for (int i = 0; i < (int)(4.f * SR); i++) { r.tick(); most = std::max(most, std::fabs(r.m->clap.ax)); }
+		check(most > 0.05f, string::f("a glass drop on the edge of the sail swings the clapper %.2f rad, and %ld notes sound", most, r.m->strikes - s0));
+		// pushed hard, the clapper sets off a run of notes on several tubes
+		Run q; q.noPaddles();
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f); q.run(0.02f);
+		q.m->clap.wx = 1.4f; q.m->clap.wz = 0.6f;
+		long t0 = q.m->strikes;
+		bool rang[CP_MAXN] = {};
+		for (int i = 0; i < (int)(6.f * SR); i++) { q.tick(); for (int t = 0; t < q.m->nT; t++) if (q.m->tv[t].awake) rang[t] = true; }
+		int n = 0; for (int t = 0; t < q.m->nT; t++) n += rang[t];
+		check(q.m->strikes - t0 >= 3 && n >= 2, string::f("a clapper given one push strikes %ld times over 6 s, on %d tubes", q.m->strikes - t0, n));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		long s0 = q.m->strikes;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld notes from %ld drops (%ld struck a tube)\n",
+		       std::sqrt(e / n), pk, q.m->strikes - s0, q.m->spawned, q.m->onTongue);
+		check(pk <= 7.5f && std::sqrt(e / n) > 0.2f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(4.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("chimes in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the handpan ==\n");
+	{
+		// D Minor gives a D Kurd: D3 | A3 Bb3 C4 D4 E4 F4 G4 A4
+		Run r; r.noPaddles(); r.mat(TM_RUBBER);
+		r.m->params[Canopy::ROOT_PARAM].setValue(2.f);
+		r.m->params[Canopy::SCALE_PARAM].setValue(2.f);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(5.f); r.run(0.02f);
+		static const char* NN[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+		std::string got;
+		const int want[9] = {-10, -3, -2, 0, 2, 4, 5, 7, 9};
+		bool kurd = r.m->nT == 9;
+		for (int t = 0; t < r.m->nT; t++) {
+			int s = (int)std::round(r.m->tv[t].semis);
+			got += string::f("%s%d ", NN[((s % 12) + 12) % 12], 4 + (int)std::floor(s / 12.f));
+			if (t < 9) kurd = kurd && s == want[t];
+		}
+		check(kurd, "D Minor lays out a D Kurd: " + got);
+		// the fields zigzag: the first nearest the player, then alternating sides, rising
+		bool zig = r.m->tv[1].tz > 0.5f && r.m->tv[2].tz > 0.5f;
+		for (int t = 1; t < r.m->nT; t++) zig = zig && ((t % 2 == 1) == (r.m->tv[t].tx < 0.f));
+		for (int t = 3; t < r.m->nT; t++) zig = zig && r.m->tv[t].tz < r.m->tv[t - 2].tz;
+		check(zig, "the fields rise in a zigzag from the player, alternating sides");
+		r.m->inputs[Canopy::VOCT_INPUT].channels = 1; r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		float worst = 0.f, oct = 0.f;
+		for (int t = 0; t < r.m->nT; t++) {
+			r.m->inputs[Canopy::VOCT_INPUT].setVoltage(r.m->tv[t].semis / 12.f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f); r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			std::vector<float> v = r.record(1.5f);
+			float f = r.m->tv[t].freq, g = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(g / f)));
+			oct = std::max(oct, std::fabs(1200.f * std::log2(peakFreq(v, 2.f * f) / (2.f * f))));
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f);
+			r.m->params[Canopy::DECAY_PARAM].setValue(0.f); r.run(3.f); r.m->params[Canopy::DECAY_PARAM].setValue(0.5f);
+		}
+		check(worst < 3.f && oct < 3.f, string::f("every note in tune (worst %.1f cents) with its octave in tune (%.1f cents)", worst, oct));
+	}
+	{
+		// the shell is convex: a drop set down near the ding rolls across the fields and off
+		Run r; r.noPaddles(); r.mat(TM_GLASS);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(5.f); r.run(0.02f);
+		r.m->spawn(0.25f, 0.1f);
+		CanopyDrop* d = nullptr; for (CanopyDrop& q : r.m->drop) if (q.alive) d = &q;
+		d->y = r.m->handY(d->x, d->z) + d->r; d->vx = d->vy = d->vz = 0.f;
+		long s0 = r.m->strikes; float t = 0.f;
+		bool seen[CP_MAXN] = {};
+		for (int i = 0; i < (int)(4.f * SR) && d->alive; i++) {
+			r.tick();
+			for (int k = 0; k < r.m->nT; k++) if (r.m->tv[k].env > 0.002f) seen[k] = true;
+			if (t == 0.f && d->x * d->x + d->z * d->z > 1.f) t = i / SR;
+		}
+		int pads = 0; for (bool b : seen) pads += b;
+		check(t > 0.f && t < 3.f, string::f("a glass drop set down by the ding rolls off the edge after %.2f s, sounding %d notes, %ld strikes", t, pads, r.m->strikes - s0));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(5.f); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a note\n",
+		       std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f && std::sqrt(e / n) > 0.2f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(5.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("handpan in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the bonang ==\n");
+	{
+		Run r; r.noPaddles(); r.mat(TM_WOOD);
+		r.m->params[Canopy::SCALE_PARAM].setValue(16.f);           // Slendro
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(6.f); r.run(0.02f);
+		int slendro = r.m->nT;
+		bool octave = true;
+		for (int t = 0; t < 5; t++) octave = octave && std::fabs(r.m->tv[t + 5].semis - r.m->tv[t].semis - 12.f) < 0.01f && r.m->tv[t].tz > 0.f && r.m->tv[t + 5].tz < 0.f;
+		r.m->params[Canopy::SCALE_PARAM].setValue(15.f); r.run(0.02f); // Pelog
+		check(slendro == 10 && r.m->nT == 14 && octave,
+		      string::f("Slendro gives %d kettles and Pelog %d, the far row an octave over the near one", slendro, r.m->nT));
+		r.m->inputs[Canopy::VOCT_INPUT].channels = 1; r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		float worst = 0.f;
+		for (int t = 0; t < r.m->nT; t++) {
+			r.m->inputs[Canopy::VOCT_INPUT].setVoltage(r.m->tv[t].semis / 12.f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f); r.run(0.002f);
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+			std::vector<float> v = r.record(1.f);
+			float f = r.m->tv[t].freq, g = peakFreq(v, f);
+			worst = std::max(worst, std::fabs(1200.f * std::log2(g / f)));
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f);
+			r.m->params[Canopy::DECAY_PARAM].setValue(0.f); r.run(2.f); r.m->params[Canopy::DECAY_PARAM].setValue(0.5f);
+		}
+		check(worst < 6.f, string::f("every kettle on its Pelog note: worst %.1f cents", worst));
+	}
+	{
+		// the boss gives the note; the flat top round it gives less of the fundamental
+		auto share = [&](float u) {
+			Run r; r.noPaddles();
+			r.m->params[Canopy::INSTRUMENT_PARAM].setValue(6.f); r.run(0.02f);
+			r.m->hitKettle(0, u, CP_V0 * 0.5f, TM_WOOD, CP_R0, 1.f);
+			std::vector<float> v = r.record(0.5f, 0);
+			float f = r.m->tv[0].freq, fund = goertzel(v, f), up = goertzel(v, f * 2.02f) + goertzel(v, f * 2.94f);
+			return fund / std::max(fund + up, 1e-9f);
+		};
+		float boss = share(0.1f), top = share(0.7f);
+		check(boss > 0.75f && top < boss - 0.15f, string::f("the fundamental's share: %.2f struck on the boss, %.2f on the flat top", boss, top));
+	}
+	{
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue(6.f); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a kettle's boss or top\n",
+		       std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f && std::sqrt(e / n) > 0.2f, "and the limiter holds it");
+	}
+	{
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(6.f);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n = (int)(20.f * SR);
+		for (int i = 0; i < n; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk = std::max(pk, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk <= 10.f, string::f("bonang in heavy steel rain: peak %.2f V", pk));
+		printf("    that costs %.2f%% of a core at 48 kHz\n", 100.0 * sec / 20.0);
+	}
+
+	printf("== the marimba and the balafon ==\n");
+	{
+		Run r; r.noPaddles(); r.mat(TM_RUBBER);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(7.f); r.run(0.02f);
+		int sharps = 0, damped = 0; bool raised = true;
+		for (int t = 0; t < r.m->nT; t++) {
+			sharps += r.m->tv[t].ring; damped += r.m->tv[t].damped;
+			// raised, and on the inner ring
+			if (r.m->tv[t].ring) raised = raised && r.m->tv[t].xy > CP_X_Y && std::hypot(r.m->tv[t].tx, r.m->tv[t].tz) < 0.55f;
+		}
+		check(r.m->nT == 25 && sharps == 10 && raised && damped == 14,
+		      string::f("a two-octave marimba in a circle: %d bars, %d sharps raised on the inner ring, %d outside Pentatonic Minor damped", r.m->nT, sharps, damped));
+		// struck near its end, a bar's overtones are two octaves up and nearly ten times up
+		auto partial = [&](int t, float u, float ratio) {
+			Run q; q.noPaddles();
+			q.m->params[Canopy::INSTRUMENT_PARAM].setValue(7.f); q.run(0.02f);
+			q.m->hitBar(t, u, CP_V0 * 0.5f, TM_STEEL, CP_R0, 1.f);     // a hard mallet, so the upper modes are there to measure
+			std::vector<float> v = q.record(0.3f, -1);
+			float f = q.m->tv[t].freq;
+			return std::make_pair(peakFreq(v, f * ratio) / f, goertzel(v, f * ratio) / std::max(goertzel(v, f), 1e-9f));
+		};
+		auto p4 = partial(0, 0.1f, 3.99f), p10 = partial(0, 0.1f, 9.9f), mid = partial(0, 0.5f, 3.99f);
+		check(std::fabs(p4.first - 3.99f) < 0.03f && std::fabs(p10.first - 9.9f) < 0.08f,
+		      string::f("a bar's overtones sit at %.2f and %.2f times its note", p4.first, p10.first));
+		check(mid.second < 0.1f * p4.second, string::f("struck in the middle it has no second mode: %.3f of the fundamental, against %.3f near the end", mid.second, p4.second));
+	}
+	{
+		Run r; r.noPaddles();
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue(8.f); r.run(0.02f);
+		check(r.m->nT == 10 && !r.m->tv[0].damped, string::f("a balafon on Pentatonic Minor: %d bars, all in the scale", r.m->nT));
+		// the gourd's membrane buzzes on a hard hit and not on a soft one
+		auto buzz = [&](float speed) {
+			Run q; q.noPaddles();
+			q.m->params[Canopy::INSTRUMENT_PARAM].setValue(8.f); q.run(0.02f);
+			q.m->hitBar(0, 0.42f, speed, TM_WOOD, CP_R0, 1.f);
+			std::vector<float> v = q.record(0.3f, -1);
+			// a balafon bar's own overtones are at 2.9 and 6.2 times its note, so what is
+			// at exactly 2 and 3 times comes from the membrane
+			float f = q.m->tv[0].freq;
+			return (goertzel(v, 2.f * f) + goertzel(v, 3.f * f)) / std::max(goertzel(v, f), 1e-9f);
+		};
+		float soft = buzz(CP_V0 * 0.08f), hard = buzz(CP_V0 * 0.9f);
+		check(hard > 0.1f && soft < 0.02f, string::f("its membrane buzzes when struck hard: harmonics %.3f of the note hard, %.4f soft", hard, soft));
+	}
+	for (int inst = 7; inst <= 8; inst++) {
+		Run q(false);
+		q.m->params[Canopy::INSTRUMENT_PARAM].setValue((float)inst); q.run(0.02f);
+		double e = 0.0; int n = (int)(30.f * SR); float pk = 0.f;
+		for (int i = 0; i < n; i++) { q.tick(); float l = q.m->outputs[Canopy::L_OUTPUT].getVoltage(); e += l * l; pk = std::max(pk, std::fabs(l)); }
+		printf("    %s, default settings for 30 s: rms %.2f V, peak %.2f V, %ld of %ld drops struck a sounding bar\n",
+		       inst == 7 ? "marimba" : "balafon", std::sqrt(e / n), pk, q.m->onTongue, q.m->spawned);
+		check(pk <= 7.5f && std::sqrt(e / n) > 0.2f, "and the limiter holds it");
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue((float)inst);
+		r.m->params[Canopy::RATE_PARAM].setValue(1.f);
+		r.m->params[Canopy::MATERIAL_PARAM].setValue((float)TM_STEEL);
+		r.m->params[Canopy::SIZE_PARAM].setValue(1.f);
+		r.m->params[Canopy::DECAY_PARAM].setValue(1.f);
+		float pk2 = 0.f; bool finite = true;
+		auto t0 = std::chrono::steady_clock::now();
+		int n2 = (int)(20.f * SR);
+		for (int i = 0; i < n2; i++) {
+			r.tick();
+			float l = r.m->outputs[Canopy::L_OUTPUT].getVoltage();
+			pk2 = std::max(pk2, std::fabs(l));
+			if (!std::isfinite(l)) finite = false;
+		}
+		double sec = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+		check(finite && pk2 <= 10.f, string::f("in heavy steel rain: peak %.2f V, %.2f%% of a core", pk2, 100.0 * sec / 20.0));
 	}
 
 	printf("%d failure(s)\n", fails);

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
@@ -623,7 +624,7 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 	NVGcontext* vg = args.vg;
 	const float w = box.size.x, h = box.size.y;
 	nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 3.f);
-	nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
+	nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 	if (maxPos < 1 || seqLen < 1) return;
 
 	const float top = walkTop(), bot = walkBot(), pad = SH(3);
@@ -708,7 +709,7 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 		bool on = running && (ni == curNode);
 		if (rest[ni]) {   // gate off → hollow circle on the base contour
 			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(base[ni]), SW(4.5));
-			nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
+			nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 			nvgStrokeColor(vg, on ? nvgRGB(0xec, 0x65, 0x2e) : nvgRGB(0x00, 0x97, 0xde)); nvgStrokeWidth(vg, 1.6f); nvgStroke(vg);
 		} else if (on) {  // current step (gate on) → filled playhead
 			nvgBeginPath(vg); nvgCircle(vg, X(ni), Y(base[ni]), SW(5));
@@ -723,7 +724,7 @@ void ChanceDisplay::drawScene(const DrawArgs& args, const int* core, const int* 
 void ChanceDisplay::drawReseedIcon(NVGcontext* vg, rack::math::Rect r, bool on) {
 	float cx = r.pos.x + r.size.x * 0.5f, cy = r.pos.y + r.size.y * 0.5f;
 	float rad = std::min(r.size.x, r.size.y) * 0.30f;
-	NVGcolor col = on ? nvgRGB(0xec, 0x65, 0x2e) : nvgRGB(0x55, 0x55, 0x6a);
+	NVGcolor col = on ? nvgRGB(0xec, 0x65, 0x2e) : sfs::screenTone(nvgRGB(0x55, 0x55, 0x6a));
 	nvgStrokeColor(vg, col); nvgStrokeWidth(vg, std::max(1.f, rad * 0.26f)); nvgLineCap(vg, NVG_ROUND);
 	const float a0 = 0.5f, a1 = M_PI - 0.35f;   // ~130° arcs, 180° apart
 	nvgBeginPath(vg); nvgArc(vg, cx, cy, rad, a0, a1, NVG_CW); nvgStroke(vg);
@@ -824,7 +825,7 @@ void ChanceDisplay::drawBank(const DrawArgs& args) {
 		rack::math::Rect r = patCellRect(i);
 		bool play = (i == playPat) && running;
 		bool focus = (i == editPat);
-		NVGcolor bg = focus ? nvgRGB(0x00, 0x97, 0xde) : active[i] ? nvgRGB(0x35, 0x35, 0x4d) : nvgRGBA(0x35, 0x35, 0x4d, 0x33);
+		NVGcolor bg = focus ? nvgRGB(0x00, 0x97, 0xde) : active[i] ? sfs::SCREEN_PURP : nvgTransRGBA(sfs::SCREEN_PURP, 0x33);
 		nvgBeginPath(vg); nvgRoundedRect(vg, r.pos.x, r.pos.y, r.size.x, r.size.y, 2.f);
 		nvgFillColor(vg, bg); nvgFill(vg);
 		if (play) {   // orange border = currently playing
@@ -865,7 +866,7 @@ void ChanceDisplay::drawBank(const DrawArgs& args) {
 				bool on = d < reps[i], cur = play && (d < curRep);
 				NVGcolor c = cur ? nvgRGB(0xec, 0x65, 0x2e)
 				           : on  ? (active[i] ? nvgRGB(0x00, 0x97, 0xde) : nvgRGBA(0x00, 0x97, 0xde, 0x55))
-				                 : nvgRGB(0x35, 0x35, 0x4d);
+				                 : sfs::SCREEN_PURP;
 				nvgBeginPath(vg); nvgRoundedRect(vg, rr.pos.x + d * bw + 0.5f, rr.pos.y, bw - 1.f, rr.size.y, 1.f);
 				nvgFillColor(vg, c); nvgFill(vg);
 			}
@@ -899,7 +900,7 @@ void ChanceDisplay::drawControls(const DrawArgs& args) {
 	for (int i = 0; i < NUM_NODES; i++) {
 		rack::math::Rect g = gateRect(i);
 		nvgBeginPath(vg); nvgRoundedRect(vg, g.pos.x, g.pos.y, g.size.x, g.size.y, 2.f);
-		nvgFillColor(vg, gm[i] == 0 ? nvgRGB(0x35, 0x35, 0x4d) : nvgRGB(0x00, 0x97, 0xde)); nvgFill(vg);
+		nvgFillColor(vg, gm[i] == 0 ? sfs::SCREEN_PURP : nvgRGB(0x00, 0x97, 0xde)); nvgFill(vg);
 		if (font) {
 			nvgFontFaceId(vg, font->handle); nvgFontSize(vg, SH(11));
 			nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
@@ -991,7 +992,14 @@ struct ChanceParamSlider : ui::Slider {
 struct ChanceWidget : ModuleWidget {
 	ChanceWidget(Chance* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/chance.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the tick over GRAV.
+		setPanel(sfs::themedPanel("chance"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("CHANCE");
 		// No virtual screws — see CLAUDE.md (SFS panels omit them by design).
 
 		ChanceDisplay* disp = new ChanceDisplay();
@@ -1019,25 +1027,42 @@ struct ChanceWidget : ModuleWidget {
 		const int rowBcv[9] = {Chance::START_CV_INPUT, Chance::END_CV_INPUT,
 			Chance::GRAVITY_CV_INPUT, Chance::DRIFT_CV_INPUT, Chance::BRANCH_CV_INPUT,
 			Chance::RESTS_CV_INPUT, Chance::EVEN_REST_CV_INPUT, Chance::OCT_CV_INPUT, Chance::REPEAT_CV_INPUT};
-		for (int i = 0; i < 9; i++) addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[i], 90.f)), module, rowBcv[i]));
+		for (int i = 0; i < 9; i++) addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[i], 90.f)), module, rowBcv[i]));
+		// each row-A trimpot over its CV jack
+		static const char* ROW_A[9] = {"START", "END", "GRAV", "DRIFT", "BRANCH",
+			"REST [ODD]", "REST [EVEN]", "LEAP", "RATCHET"};
+		for (int i = 0; i < 9; i++) lbl->pairDown(CX[i], 76.31f, 90.f, ROW_A[i]);
+		// the key and the two buttons, each over its jack
+		lbl->pairDown(CX[1], 106.67f, 121.91f, "SCALE");
+		lbl->pairDown(CX[2], 106.67f, 121.91f, "ROOT");
+		lbl->pairDown(CX[3], 106.67f, 121.91f, "RND");
+		lbl->pairDown(CX[4], 106.67f, 121.91f, "RST");
+		lbl->jack(CX[0], 121.91f, "CLK");
+		// HARMONY sets the interval of the H outputs, so its line runs to the plate
+		lbl->trim(CX[6], 121.91f, "HARMONY");
+		lbl->link(CX[6], 121.91f, 101.21f, 121.91f);
+		lbl->jackOnPlate(CX[7], 106.67f, "V/OCT");
+		lbl->jackOnPlate(CX[8], 106.67f, "GATE");
+		lbl->jackOnPlate(CX[7], 121.91f, "H V/OCT");
+		lbl->jackOnPlate(CX[8], 121.91f, "H GATE");
 
 		// Row C (y=106.67) — KEY ROOT trims · RND RST buttons · CV GATE outs (dark inset)
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[1], 106.67f)), module, Chance::KEY_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[2], 106.67f)), module, Chance::ROOT_PARAM));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CX[3], 106.67f)), module, Chance::RANDOMIZE_PARAM));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CX[4], 106.67f)), module, Chance::RESET_PARAM));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CX[7], 106.67f)), module, Chance::CV_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CX[8], 106.67f)), module, Chance::GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CX[7], 106.67f)), module, Chance::CV_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CX[8], 106.67f)), module, Chance::GATE_OUTPUT));
 
 		// Row D (y=121.91) — CLK SCALEcv ROOTcv RNDg RSTg · HARMONY trim · H CV H GATE outs
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[0], 121.91f)), module, Chance::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[1], 121.91f)), module, Chance::SCALE_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[2], 121.91f)), module, Chance::ROOT_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[3], 121.91f)), module, Chance::RANDOMIZE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CX[4], 121.91f)), module, Chance::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[0], 121.91f)), module, Chance::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[1], 121.91f)), module, Chance::SCALE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[2], 121.91f)), module, Chance::ROOT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[3], 121.91f)), module, Chance::RANDOMIZE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CX[4], 121.91f)), module, Chance::RESET_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CX[6], 121.91f)), module, Chance::HARMONY_PARAM));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CX[7], 121.91f)), module, Chance::HARMONY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CX[8], 121.91f)), module, Chance::HARM_GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CX[7], 121.91f)), module, Chance::HARMONY_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CX[8], 121.91f)), module, Chance::HARM_GATE_OUTPUT));
 		// (EOC output removed 2026-07-13 — the panel has 4 output holes: CV/GATE/H CV/H GATE.)
 	}
 

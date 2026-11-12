@@ -1454,7 +1454,7 @@ struct SlideStickSlider : ui::Slider {
 struct SlideWidget : ModuleWidget {
 	SlideWidget(Slide* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/slide.svg")));
+		setPanel(sfs::themedPanel("slide"));
 		using sfs::hp;
 
 		// NO sfs::PanelLabels HERE, DELIBERATELY. res/slide.svg is the designer's
@@ -1470,10 +1470,10 @@ struct SlideWidget : ModuleWidget {
 
 		// ── the bar ────────────────────────────────────────────────────────────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(2), hp(15))), module, Slide::BAR_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(2), hp(17))), module, Slide::BAR_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(2), hp(17))), module, Slide::BAR_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(4), hp(17))), module, Slide::GLIDE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(6), hp(15))), module, Slide::SLANT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(6), hp(17))), module, Slide::SLANT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(6), hp(17))), module, Slide::SLANT_CV_INPUT));
 
 		// ── vibrato and the hand ───────────────────────────────────────────────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(9), hp(15))), module, Slide::VIB_PARAM));
@@ -1484,46 +1484,46 @@ struct SlideWidget : ModuleWidget {
 
 		// ── string, pickup and amp ─────────────────────────────────────────────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(16), hp(14))), module, Slide::PICK_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(18), hp(14))), module, Slide::PICK_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(18), hp(14))), module, Slide::PICK_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(20), hp(14))), module, Slide::DAMP_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(22), hp(14))), module, Slide::DAMP_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(22), hp(14))), module, Slide::DAMP_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(24), hp(14))), module, Slide::SWELL_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(26), hp(14))), module, Slide::VOL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(26), hp(14))), module, Slide::VOL_INPUT));
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(16), hp(17))), module, Slide::PICKUP_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(18), hp(17))), module, Slide::DRIVE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(20), hp(17))), module, Slide::TONE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(22), hp(17))), module, Slide::TONE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(22), hp(17))), module, Slide::TONE_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(24), hp(17))), module, Slide::DECAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(26), hp(17))), module, Slide::DECAY_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(26), hp(17))), module, Slide::DECAY_CV_INPUT));
 
 		// ── playing in ─────────────────────────────────────────────────────────
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(2), hp(21))), module, Slide::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(4.5f), hp(21))), module, Slide::VEL_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(2), hp(24))), module, Slide::GATE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(4.5f), hp(24))), module, Slide::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(2), hp(21))), module, Slide::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(4.5f), hp(21))), module, Slide::VEL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(2), hp(24))), module, Slide::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(4.5f), hp(24))), module, Slide::VOCT_INPUT));
 
 		// ── the key ────────────────────────────────────────────────────────────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(8), hp(22))), module, Slide::ROOT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(8), hp(24))), module, Slide::ROOT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(8), hp(24))), module, Slide::ROOT_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(9.5f), hp(23))), module, Slide::OCT_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(11), hp(22))), module, Slide::SCALE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(11), hp(24))), module, Slide::SCALE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(11), hp(24))), module, Slide::SCALE_CV_INPUT));
 
 		// ── the auto player ────────────────────────────────────────────────────
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(hp(14), hp(22))), module, Slide::AUTO_PARAM, Slide::AUTO_LIGHT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(hp(14), hp(24))), module, Slide::RESET_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(16), hp(22))), module, Slide::PATTERN_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(16), hp(24))), module, Slide::PATTERN_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(16), hp(24))), module, Slide::PATTERN_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(19), hp(22))), module, Slide::DENSITY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(19), hp(24))), module, Slide::DENSITY_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(19), hp(24))), module, Slide::DENSITY_CV_INPUT));
 
 		// ── out ────────────────────────────────────────────────────────────────
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(23.375f), hp(21))), module, Slide::EVEN_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(26), hp(21))), module, Slide::ODD_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(23.375f), hp(24))), module, Slide::MIX_L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(26), hp(24))), module, Slide::MIX_R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(23.375f), hp(21))), module, Slide::EVEN_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(26), hp(21))), module, Slide::ODD_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(23.375f), hp(24))), module, Slide::MIX_L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(26), hp(24))), module, Slide::MIX_R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 // ─── Cycle: bar-synced quad LFO ──────────────────────────────────────────────
@@ -351,8 +352,8 @@ struct CycleDisplay : OpaqueWidget {
 	void drawContent(NVGcontext* vg, bool preview) {
 		float w = box.size.x, h = box.size.y;
 		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 3.f);
-		nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
-		nvgStrokeColor(vg, nvgRGB(0x35, 0x35, 0x4d)); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
+		nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
+		nvgStrokeColor(vg, sfs::SCREEN_PURP); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 		nvgIntersectScissor(vg, 1.f, 1.f, w - 2.f, h - 2.f);
 
 		float padL = 18.f, padR = 20.f, padT = 5.f, padB = 12.f;
@@ -365,7 +366,7 @@ struct CycleDisplay : OpaqueWidget {
 			for (int k = 1; k < K; k++) {
 				float x = padL + (float) k / K * plotW;
 				nvgBeginPath(vg); nvgMoveTo(vg, x, padT); nvgLineTo(vg, x, padT + plotH);
-				nvgStrokeColor(vg, nvgRGBA(0x35, 0x35, 0x4d, 0xff)); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
+				nvgStrokeColor(vg, sfs::SCREEN_PURP); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
 			}
 		}
 		float bf = preview ? 0.f : module->dispBeatFrac;
@@ -376,12 +377,12 @@ struct CycleDisplay : OpaqueWidget {
 			for (int bi = 1; (float)bi * bf < 0.999f; bi++) {
 				float x = padL + (float)bi * bf * plotW;
 				nvgBeginPath(vg); nvgMoveTo(vg, x, padT + plotH - 3.f); nvgLineTo(vg, x, padT + plotH);
-				nvgStrokeColor(vg, nvgRGBA(0x50, 0x5a, 0x70, 0xcc)); nvgStrokeWidth(vg, 0.7f); nvgStroke(vg);
+				nvgStrokeColor(vg, sfs::screenTone(nvgRGBA(0x50, 0x5a, 0x70, 0xcc))); nvgStrokeWidth(vg, 0.7f); nvgStroke(vg);
 			}
 		}
 
 		nvgBeginPath(vg); nvgMoveTo(vg, padL, midY); nvgLineTo(vg, w - padR, midY);
-		nvgStrokeColor(vg, nvgRGBA(0x35, 0x35, 0x4d, 0xaa)); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
+		nvgStrokeColor(vg, nvgTransRGBA(sfs::SCREEN_PURP, 0xaa)); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
 
 		for (int i = 0; i < N_CH; i++) {
 			float shape = preview ? (i * 0.33f) : module->dispShape[i];
@@ -478,28 +479,44 @@ struct CycleDisplay : OpaqueWidget {
 };
 
 
-struct CycleLabels : Widget {
-	std::shared_ptr<Font> font;
-	struct L { Vec p; std::string t; float sz; };
-	std::vector<L> labels;
-	void add(float x, float y, const std::string& t, float sz = 6.f) { labels.push_back({Vec(x, y), t, sz}); }
-	void draw(const DrawArgs& args) override {
-		if (!font || font->handle < 0)
-			font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
-		if (!font || font->handle < 0) return;
-		nvgFontFaceId(args.vg, font->handle);
-		nvgFillColor(args.vg, nvgRGB(0x40, 0x40, 0x40));
-		nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-		for (auto& l : labels) { nvgFontSize(args.vg, l.sz); nvgText(args.vg, mm2px(l.p.x), mm2px(l.p.y), l.t.c_str(), NULL); }
-		Widget::draw(args);
-	}
-};
-
-
 struct CycleWidget : ModuleWidget {
 	CycleWidget(Cycle* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/cycle.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps the
+		// diagrams (PHASE's spread, FREQ's scale, the link arrows) and the
+		// coloured channel letters.
+		setPanel(sfs::themedPanel("cycle"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("CYCLE");
+		{
+			// the globals: a label centred over each knob and its CV jack
+			const float gy[3] = {60.95f, 81.27f, 101.59f};
+			const char* gn[3] = {"PHASE", "STABILITY", "FREQ"};
+			for (int i = 0; i < 3; i++) {
+				lbl->rogan(17.78f, gy[i], gn[i]);
+				lbl->link(10.16f, gy[i], 25.4f, gy[i]);
+			}
+			lbl->note(4.2f, 109.21f, "/64");
+			lbl->note(17.0f, 109.21f, "X8");
+			lbl->jack(10.16f, 121.91f, "BAR");
+			lbl->jack(25.4f, 121.91f, "BEAT");
+			// the channel columns, headed on the same baseline as PHASE
+			lbl->rogan(58.42f, 60.95f, "SHAPE");
+			lbl->rogan(88.9f, 60.95f, "SCALE");
+			const float ry[4] = {60.95f, 76.19f, 91.43f, 106.67f};
+			for (int i = 0; i < 4; i++) {
+				lbl->link(50.8f, ry[i], 66.03f, ry[i]);
+				lbl->link(81.27f, ry[i], 96.52f, ry[i]);
+			}
+			lbl->jack(88.9f, 121.91f, "RESET");
+			lbl->link(81.27f, 121.91f, 96.52f, 121.91f);
+			lbl->jackOnPlate(111.76f, 60.95f, "UNI");
+			lbl->jackOnPlate(121.92f, 60.95f, "BI");
+			lbl->jackOnPlate(121.92f, 121.91f, "EOC");
+		}
 
 		CycleDisplay* disp = new CycleDisplay();
 		disp->module = module;
@@ -512,21 +529,21 @@ struct CycleWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 60.95f)), module, Cycle::PHASE_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 81.27f)), module, Cycle::STAB_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 101.59f)), module, Cycle::FREQ_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 60.95f)), module, Cycle::PHASE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 81.27f)), module, Cycle::STAB_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 101.59f)), module, Cycle::FREQ_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.4f, 60.95f)), module, Cycle::PHASE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.4f, 81.27f)), module, Cycle::STAB_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.4f, 101.59f)), module, Cycle::FREQ_INPUT));
 		// Bottom-left cluster: BAR | SYNC light | CLOCK (the beat/step grid).
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 121.91f)), module, Cycle::BAR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 121.91f)), module, Cycle::BAR_INPUT));
 		addChild(createLightCentered<SmallLight<GreenLight>>(mm2px(Vec(17.78f, 121.91f)), module, Cycle::SYNC_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 121.91f)), module, Cycle::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.4f, 121.91f)), module, Cycle::CLOCK_INPUT));
 		// Bottom-right: RESET button + RESET CV + EOC output.
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(81.27f, 121.91f)), module, Cycle::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(96.52f, 121.91f)), module, Cycle::RESET_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(121.92f, 121.91f)), module, Cycle::EOC_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(96.52f, 121.91f)), module, Cycle::RESET_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(121.92f, 121.91f)), module, Cycle::EOC_OUTPUT));
 
 		// Channels as rows (A–D top→bottom): SHAPE pot/CV, SCALE pot/CV, then
 		// UNI + BI outputs grouped on the right. Link latches sit between rows,
-		// aligned to the SHAPE / SCALE columns. Panel labels live in the SVG.
+		// aligned to the SHAPE / SCALE columns.
 		const float rowY[N_CH] = {60.95f, 76.19f, 91.43f, 106.67f};
 		const float xShp = 50.8f, xShpCv = 66.03f, xScl = 81.27f, xSclCv = 96.52f, xUni = 111.76f, xBi = 121.92f;
 		const float xShpLink = 58.42f, xSclLink = 88.9f;
@@ -540,11 +557,11 @@ struct CycleWidget : ModuleWidget {
 		for (int i = 0; i < N_CH; i++) {
 			float y = rowY[i];
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(xShp, y)), module, Cycle::SHAPE_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xShpCv, y)), module, Cycle::SHAPE_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xShpCv, y)), module, Cycle::SHAPE_INPUT + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(xScl, y)), module, Cycle::SCALE_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xSclCv, y)), module, Cycle::SCALE_INPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xUni, y)), module, Cycle::UNI_OUTPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xBi, y)), module, Cycle::BI_OUTPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xSclCv, y)), module, Cycle::SCALE_INPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xUni, y)), module, Cycle::UNI_OUTPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xBi, y)), module, Cycle::BI_OUTPUT + i));
 		}
 	}
 };

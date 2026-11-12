@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "fastmath.hpp"
+#include "panel-style.hpp"
 
 
 struct Gsx : Module {
@@ -360,8 +361,42 @@ struct Gsx : Module {
 struct GsxWidget : ModuleWidget {
 	GsxWidget(Gsx* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/gsx.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps only
+		// the waveforms round SHAPE and the ticks under SPREAD.
+		setPanel(sfs::themedPanel("gsx"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("GSX");
 
+		// three rows of knob over CV jack, each pair joined by a line
+		const float colX[3] = {10.16f, 30.48f, 50.8f};
+		const float knobY[3] = {28.79f, 59.27f, 89.75f};
+		const float jackY[3] = {41.49f, 71.97f, 102.45f};
+		const char* names[3][3] = {{"FREQ", "STREAMS", "SHAPE"},
+		                           {"RANGE", "DURATION", "DELAY"},
+		                           {"DENSITY", "VARIATION", "SPREAD"}};
+		for (int r = 0; r < 3; r++)
+			for (int c = 0; c < 3; c++) {
+				lbl->rogan(colX[c], knobY[r], names[r][c]);
+				lbl->link(colX[c], knobY[r], colX[c], jackY[r]);
+			}
+		// what the ends of each knob mean
+		lbl->note(5.09, 34.4, "50hz");
+		lbl->note(15.24, 34.4, "2kHz");
+		lbl->note(25.4, 34.4, "1");
+		lbl->note(35.56, 34.4, "20");
+		lbl->note(5.08, 64.9, "0hz");
+		lbl->note(15.25, 64.9, "500hz");
+		lbl->note(25.4, 64.9, "1ms");
+		lbl->note(35.56, 64.9, "100ms");
+		lbl->note(45.72, 64.9, ".1ms");
+		lbl->note(55.89, 64.9, "200ms");
+		lbl->note(5.08, 95.4, "1");
+		lbl->note(15.24, 95.4, "1k");
+		lbl->note(25.4, 95.4, "0%");
+		lbl->note(35.56, 95.4, "100%");
 
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16, 28.79)), module, Gsx::PARAMFREQUENCY_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48, 28.79)), module, Gsx::PARAMSTREAMS_PARAM));
@@ -373,19 +408,22 @@ struct GsxWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(30.48, 89.75)), module, Gsx::PARAMVARIATION_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(50.8, 89.75)), module, Gsx::PARAMSPREAD_PARAM));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 41.49)), module, Gsx::INFREQUENCY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 41.49)), module, Gsx::INSTREAMS_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 41.49)), module, Gsx::INSHAPE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 71.97)), module, Gsx::INRANGE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 71.97)), module, Gsx::INDURATION_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 71.97)), module, Gsx::INDELAY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 102.45)), module, Gsx::INDENSITY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48, 102.45)), module, Gsx::INVARIATION_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(50.8, 102.45)), module, Gsx::INSPREAD_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16, 120.23)), module, Gsx::INVCA_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16, 41.49)), module, Gsx::INFREQUENCY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48, 41.49)), module, Gsx::INSTREAMS_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(50.8, 41.49)), module, Gsx::INSHAPE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16, 71.97)), module, Gsx::INRANGE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48, 71.97)), module, Gsx::INDURATION_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(50.8, 71.97)), module, Gsx::INDELAY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16, 102.45)), module, Gsx::INDENSITY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48, 102.45)), module, Gsx::INVARIATION_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(50.8, 102.45)), module, Gsx::INSPREAD_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16, 120.23)), module, Gsx::INVCA_INPUT));
+		lbl->jack(10.16, 120.23, "VCA");
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(40.64, 120.23)), module, Gsx::OUTLEFT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(50.8, 120.23)), module, Gsx::OUTRIGHT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(40.64, 120.23)), module, Gsx::OUTLEFT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(50.8, 120.23)), module, Gsx::OUTRIGHT_OUTPUT));
+		lbl->jackOnPlate(40.64, 120.23, "L");
+		lbl->jackOnPlate(50.8, 120.23, "R");
 	}
 };
 

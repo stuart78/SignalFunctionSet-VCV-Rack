@@ -749,7 +749,7 @@ static const float FD_Y_POLY = 121.01f;      // on its plate, and not quite on t
 struct FieldWidget : ModuleWidget {
 	FieldWidget(Field* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/field.svg")));
+		setPanel(sfs::themedPanel("field"));
 
 		// NO sfs::PanelLabels: res/field.svg is the designer's export and carries
 		// its own labels as outlined paths, which Rack renders; the runtime
@@ -763,7 +763,7 @@ struct FieldWidget : ModuleWidget {
 		addChild(disp);
 
 		for (int i = 0; i < FD_N; i++)
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FD_JX[i], FD_JY[i])), module, Field::OUT_OUTPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(FD_JX[i], FD_JY[i])), module, Field::OUT_OUTPUT + i));
 
 		const char* nm[7] = {"AMP", "OFFSET", "COHER", "RATE", "FLOW", "DIR", "BIAS"};
 		const int pp[7] = {Field::AMP_PARAM, Field::OFFSET_PARAM, Field::COHER_PARAM, Field::RATE_PARAM,
@@ -772,15 +772,15 @@ struct FieldWidget : ModuleWidget {
 		                   Field::FLOW_INPUT, Field::DIR_INPUT, Field::BIAS_INPUT};
 		for (int i = 0; i < 7; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(FD_TX[i], FD_Y_TRIM)), module, pp[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FD_CVX[i], FD_Y_CV)), module, ii[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FD_CVX[i], FD_Y_CV)), module, ii[i]));
 		}
 		(void)nm;
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FD_FX[0], FD_Y_FOOT)), module, Field::TRIG_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FD_FX[0], FD_Y_FOOT)), module, Field::TRIG_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(FD_FX[1], FD_Y_FOOT)), module, Field::SMOOTH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FD_FX[2], FD_Y_FOOT)), module, Field::SMOOTH_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FD_FX[2], FD_Y_FOOT)), module, Field::SMOOTH_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(FD_FX[3], FD_Y_FOOT)), module, Field::ANIM_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FD_FX[4], FD_Y_FOOT)), module, Field::ANIM_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FD_FX[5], FD_Y_POLY)), module, Field::POLY_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FD_FX[4], FD_Y_FOOT)), module, Field::ANIM_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(FD_FX[5], FD_Y_POLY)), module, Field::POLY_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

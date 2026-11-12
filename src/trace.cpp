@@ -1544,7 +1544,7 @@ static const float TR_BTNY = 121.00f;
 struct TraceWidget : ModuleWidget {
 	TraceWidget(Trace* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/trace.svg")));
+		setPanel(sfs::themedPanel("trace"));
 
 		// NO PanelLabels, and no title. The 2026-08 artwork carries its own text
 		// as outlined paths, which Rack DOES render -- it ignores only <text> --
@@ -1559,15 +1559,15 @@ struct TraceWidget : ModuleWidget {
 
 		// ── one row per lane: brush, then what feeds it ────────────────────
 		for (int i = 0; i < TR_LANES; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_INX1, TR_ROW[i])),
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_INX1, TR_ROW[i])),
 			                                         module, Trace::LANE_INPUT + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_INX2, TR_ROW[i])),
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_INX2, TR_ROW[i])),
 			                                         module, Trace::THICK_INPUT + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_INX3, TR_ROW[i])),
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_INX3, TR_ROW[i])),
 			                                         module, Trace::OFFSET_INPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(TR_OUTX1, TR_ROW[i])),
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(TR_OUTX1, TR_ROW[i])),
 			                                           module, Trace::VALUE_OUTPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(TR_OUTX2, TR_ROW[i])),
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(TR_OUTX2, TR_ROW[i])),
 			                                           module, Trace::INK_OUTPUT + i));
 		}
 		// The brush buttons moved to the head of their own lane's row, which is
@@ -1595,15 +1595,15 @@ struct TraceWidget : ModuleWidget {
 		                          Trace::SLEW_INPUT, Trace::INK_INPUT, Trace::LEAK_INPUT,
 		                          Trace::SPREAD_INPUT};
 		for (int i = 0; i < 7; i++)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_MX[i], TR_JY)), module, MI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_MX[i], TR_JY)), module, MI[i]));
 
 		// ── the bottom strip ───────────────────────────────────────────────
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_MX[0], TR_BY)), module, Trace::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_MX[1], TR_BY)), module, Trace::BAR_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_MX[2], TR_BY)), module, Trace::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_MX[0], TR_BY)), module, Trace::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_MX[1], TR_BY)), module, Trace::BAR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_MX[2], TR_BY)), module, Trace::RESET_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(TR_RSTBX, TR_RSTBY)),
 		                                        module, Trace::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(TR_WRX, TR_BY)), module,
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(TR_WRX, TR_BY)), module,
 		                                         Trace::WRITE_INPUT));
 		// ERASE is the fifth brush, and it is RED: it latches, and a latched
 		// erase looks exactly like drawing that does not work.

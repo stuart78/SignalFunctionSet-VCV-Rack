@@ -24,6 +24,7 @@
 // =============================================================================
 
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "slide-messages.hpp"
 
 struct SlideX : Module {
@@ -96,7 +97,7 @@ struct SlideX : Module {
 struct SlideXWidget : ModuleWidget {
 	SlideXWidget(SlideX* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/slidex.svg")));
+		setPanel(sfs::themedPanel("slidex"));
 
 		// NO sfs::PanelLabels. res/slidex.svg is the designer's own file,
 		// published by `figma_panel_template.py --publish slidex`, and it carries
@@ -111,13 +112,13 @@ struct SlideXWidget : ModuleWidget {
 		const float y0 = 27.15f, dy = 13.543f;
 		for (int i = 0; i < SlideXMessage::NCH; i++) {
 			float y = y0 + dy * i;
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xg, y)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xg, y)), module,
 			                                         SlideX::GATE_INPUT + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xv, y)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xv, y)), module,
 			                                         SlideX::VELS_INPUT + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(xa, y)), module,
 			                                      SlideX::VELATT_PARAM + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xo, y)), module,
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xo, y)), module,
 			                                           SlideX::STRING_OUTPUT + i));
 			addChild(createLightCentered<SmallLight<GreenLight>>(
 				mm2px(Vec(xl, y)), module, SlideX::STRING_LIGHT + i));

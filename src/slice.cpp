@@ -1092,7 +1092,7 @@ void SliceDisplay::drawPreview(const DrawArgs& args) {
 struct SliceWidget : ModuleWidget {
 	SliceWidget(Slice* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/slice.svg")));
+		setPanel(sfs::themedPanel("slice"));
 
 		// NO PanelLabels HERE, and no title. This panel's artwork carries its own
 		// text as outlined paths -- which Rack does render, unlike <text> -- so
@@ -1128,22 +1128,22 @@ struct SliceWidget : ModuleWidget {
 			{102.40f, Slice::RANGE_INPUT  },
 		};
 		for (int i = 0; i < 9; i++)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CV[i].x, JY1)), module, CV[i].id));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CV[i].x, JY1)), module, CV[i].id));
 
 		// ── audio in, two trims, reset, then the outputs on their plate ──────
 		const float JY2 = 121.03f;
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.58f,  JY2)), module, Slice::L_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(19.43f, JY2)), module, Slice::R_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.58f,  JY2)), module, Slice::L_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(19.43f, JY2)), module, Slice::R_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(31.28f, JY2)), module, Slice::DIV_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(43.05f, JY2)), module, Slice::WINDOW_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(54.91f, JY2)), module, Slice::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(54.91f, JY2)), module, Slice::RESET_INPUT));
 		// TRIG, GATE, L, R -- the order the plate is lettered, which is not the
 		// order the enum is in. Getting this backwards puts the audio out under
 		// the label that says TRIG, and nothing about it looks wrong on screen.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(66.84f,  JY2)), module, Slice::SLICE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.70f,  JY2)), module, Slice::XF_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(90.47f,  JY2)), module, Slice::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(102.40f, JY2)), module, Slice::R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(66.84f,  JY2)), module, Slice::SLICE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(78.70f,  JY2)), module, Slice::XF_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(90.47f,  JY2)), module, Slice::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(102.40f, JY2)), module, Slice::R_OUTPUT));
 	}
 
 	// The audio thread hands the old buffer back by swapping it into the pending

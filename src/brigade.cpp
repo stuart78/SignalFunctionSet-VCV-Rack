@@ -372,7 +372,7 @@ static const float BG_KY = 76.0f, BG_JY = 92.0f, BG_TY = 110.0f;
 struct BrigadeWidget : ModuleWidget {
 	BrigadeWidget(Brigade* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/brigade.svg")));
+		setPanel(sfs::themedPanel("brigade"));
 
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
@@ -397,7 +397,7 @@ struct BrigadeWidget : ModuleWidget {
 		for (int i = 0; i < 6; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(BG_X[i], BG_KY)), module, row[i].p));
 			if (row[i].in >= 0) {
-				addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BG_X[i], BG_JY)), module, row[i].in));
+				addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BG_X[i], BG_JY)), module, row[i].in));
 				lbl->pairDown(BG_X[i], BG_KY, BG_JY, row[i].t);
 			} else {
 				lbl->trim(BG_X[i], BG_KY, row[i].t);
@@ -406,17 +406,17 @@ struct BrigadeWidget : ModuleWidget {
 		addChild(createLightCentered<MediumLight<GreenLight>>(
 			mm2px(Vec(BG_X[5], BG_JY)), module, Brigade::TICK_LIGHT));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BG_X[0], BG_TY)), module, Brigade::INL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BG_X[0], BG_TY)), module, Brigade::INL_INPUT));
 		lbl->jack(BG_X[0], BG_TY, "IN L");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BG_X[1], BG_TY)), module, Brigade::INR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BG_X[1], BG_TY)), module, Brigade::INR_INPUT));
 		lbl->jack(BG_X[1], BG_TY, "IN R");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BG_X[2], BG_TY)), module, Brigade::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BG_X[2], BG_TY)), module, Brigade::CLOCK_INPUT));
 		lbl->jack(BG_X[2], BG_TY, "CLOCK");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(BG_X[3], BG_TY)), module, Brigade::TICK_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(BG_X[3], BG_TY)), module, Brigade::TICK_OUTPUT));
 		lbl->jackOnPlate(BG_X[3], BG_TY, "TICK");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(BG_X[4], BG_TY)), module, Brigade::OUTL_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(BG_X[4], BG_TY)), module, Brigade::OUTL_OUTPUT));
 		lbl->jackOnPlate(BG_X[4], BG_TY, "OUT L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(BG_X[5], BG_TY)), module, Brigade::OUTR_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(BG_X[5], BG_TY)), module, Brigade::OUTR_OUTPUT));
 		lbl->jackOnPlate(BG_X[5], BG_TY, "OUT R");
 	}
 };

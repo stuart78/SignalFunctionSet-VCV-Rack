@@ -78,6 +78,16 @@ struct Cistern : Module {
 	std::atomic<uint32_t> posGen{1};
 	float camYaw = YAW0, camPitch = PITCH0;
 	bool trueDistance = false;                            // menu: far sources pulled in (musical) or where they are
+	// menu: the wet level set once per room at its default positions, so a
+	// source's distance is heard as level as well as reverberation (off: the
+	// level held the same wherever anything stands, as before 2026-11)
+	std::atomic<bool> levelByDistance{true};
+	// menu: MIX weighs the room's own direct sound against its reverberation
+	// (centre = the room as traced) rather than the dry input against the room;
+	// the dry input is a second direct sound, undelayed, at a level that
+	// ignores where the source stands, so it covered most of what placement did
+	bool mixDirect = true;
+	std::atomic<uint32_t> optGen{1};                      // a menu change that needs a new program, not a new trace
 
 	// what process() wants built, published for the worker
 	std::atomic<float> wSize{0.f}, wDecay{0.f}, wScatter{0.5f}, wHumid{50.f}, wSr{0.f};
@@ -131,6 +141,17 @@ struct Cistern : Module {
 		}
 	};
 
+	struct MixQ : ParamQuantity {
+		std::string getDisplayValueString() override {
+			float v = getValue();
+			Cistern* m = dynamic_cast<Cistern*>(module);
+			if (!m || !m->mixDirect) return string::f("%.0f%% wet", v * 100.f);
+			if (v < 0.495f) return string::f("direct sound + %.0f%% of the reverberation", v * 200.f);
+			if (v > 0.505f) return string::f("reverberation + %.0f%% of the direct sound", (1.f - v) * 200.f);
+			return "the room as traced";
+		}
+	};
+
 	Cistern() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
 		configParam<SizeQ>(SIZE_PARAM, -2.f, 1.f, 0.f, "Size (relative to the real room)", "", 2.f);
@@ -138,7 +159,7 @@ struct Cistern : Module {
 		configParam(SCATTER_PARAM, 0.f, 1.f, 0.5f, "Scatter (how much of each reflection goes diffuse)", "%", 0.f, 100.f);
 		configParam(HUMID_PARAM, 10.f, 90.f, 50.f, "Humidity (drier air absorbs more high frequencies)", "%");
 		configParam(MOD_PARAM, 0.f, 2.f, 1.f, "Movement in the tail", "%", 0.f, 100.f);
-		configParam(MIX_PARAM, 0.f, 1.f, 0.5f, "Mix", "% wet", 0.f, 100.f);
+		configParam<MixQ>(MIX_PARAM, 0.f, 1.f, 0.5f, "Mix");
 		configSwitch(FREEZE_PARAM, 0.f, 1.f, 0.f, "Freeze", {"Off", "On"});
 		std::vector<std::string> names;
 		for (int i = 0; i < NSPACES; i++) names.push_back(cistern::SPACES[i].name);
@@ -256,7 +277,9 @@ struct Cistern : Module {
 		cistern::Space space;
 		float tSize = 1e9f, tScatter = -1.f, tHumid = -1.f, tDecay = 1e9f, tSr = 0.f, rvSr = 0.f;
 		int tSpace = -1, rvSpace = -1;
-		uint32_t tPos = 0;
+		uint32_t tPos = 0, tOpt = 0;
+		std::unique_ptr<cistern::Program> ref;          // the room traced at its default positions, for the level
+		bool refTrue = false;
 		while (running) {
 			collect();
 			float sr = wSr.load();
@@ -268,7 +291,9 @@ struct Cistern : Module {
 			                && std::fabs(sc - tScatter) <= 0.01f && std::fabs(hu - tHumid) <= 0.5f;
 			bool retrace = !roomSame || pg != tPos;
 			bool fresh = sr != rvSr || id != rvSpace;      // a new reverb, not a new program for this one
-			bool redecay = retrace || std::fabs(de - tDecay) > 0.004f || fresh;
+			uint32_t og = optGen.load();
+			bool lvl = levelByDistance.load();
+			bool redecay = retrace || std::fabs(de - tDecay) > 0.004f || fresh || og != tOpt;
 			if (!redecay) { std::this_thread::sleep_for(ms10); continue; }
 			// the audio thread has not taken the last one yet
 			if (!fresh && incoming.load()) { std::this_thread::sleep_for(ms5); continue; }
@@ -295,10 +320,21 @@ struct Cistern : Module {
 				bp.rh = hu; bp.scatter = sc; bp.trueDistance = trueDistance;
 				if (space.mesh) bp.rays = 60000;            // two sources on two threads: ~0.6 s in the largest scans
 				traced = cistern::trace(space, bp, sr, src, 2, lis, roomSame ? traced.get() : nullptr);
+				// the level reference: the same room at its default positions,
+				// traced again only when the room or the distance law changes
+				// (it gives one number, so a third of the rays will do)
+				if (!roomSame || !ref || refTrue != trueDistance) ref.reset();
+				if (!ref) {
+					float d[NPOS][3]; defaultPositions(id, d);
+					V3 rs[2] = {toWorld(space, d[P_SRC_L]), toWorld(space, d[P_SRC_R])};
+					cistern::BuildParams rb = bp; rb.rays = bp.rays / 3;
+					ref = cistern::trace(space, rb, sr, rs, 2, toWorld(space, d[P_LIS]), traced.get());
+					refTrue = trueDistance;
+				}
 				tSize = size; tScatter = sc; tHumid = hu; tPos = pg; tSr = sr; tSpace = id;
 			}
-			std::unique_ptr<cistern::Program> P = cistern::assemble(*traced, std::exp2((double)de));
-			tDecay = de;
+			std::unique_ptr<cistern::Program> P = cistern::assemble(*traced, std::exp2((double)de), 1.0, 7, lvl ? ref.get() : nullptr);
+			tDecay = de; tOpt = og;
 			publishStats(id, space, *P, *traced);
 			if (fresh) {
 				// a fresh reverb: the first one, after a rate change (the old one
@@ -382,9 +418,10 @@ struct Cistern : Module {
 		float inR = inputs[IN_R_INPUT].isConnected() ? inputs[IN_R_INPUT].getVoltage() : inL;
 		float a = std::max(std::fabs(inL), std::fabs(inR)) * 0.2f;
 		env = a > env ? a : env * 0.9995f;
-		float wl = 0.f, wr = 0.f;
+		float wl = 0.f, wr = 0.f, dl = 0.f, dr = 0.f;
 		if (rv) {
 			rv->process(inL, inR, wl, wr);
+			dl = rv->dirL; dr = rv->dirR;
 			if (const cistern::Program* q = rv->finished()) retired = const_cast<cistern::Program*>(q);
 		}
 		if (ringing) {
@@ -398,8 +435,16 @@ struct Cistern : Module {
 			if ((ringGain <= 0.f || ringEnv < 2e-5f) && !oldRv.load()) { oldRv = ringing; ringing = nullptr; }
 		}
 		float m = mixNow;
-		outputs[OUT_L_OUTPUT].setVoltage(sfs::softClip((1.f - m) * inL + m * wl));
-		outputs[OUT_R_OUTPUT].setVoltage(sfs::softClip((1.f - m) * inR + m * wr));
+		if (mixDirect) {
+			// below the centre the reverberation fades out under the direct
+			// sound, above it the direct sound fades out under the reverberation
+			float gd = std::min(1.f, 2.f * (1.f - m)), gr = std::min(1.f, 2.f * m);
+			outputs[OUT_L_OUTPUT].setVoltage(sfs::softClip(gd * dl + gr * (wl - dl)));
+			outputs[OUT_R_OUTPUT].setVoltage(sfs::softClip(gd * dr + gr * (wr - dr)));
+		} else {
+			outputs[OUT_L_OUTPUT].setVoltage(sfs::softClip((1.f - m) * inL + m * wl));
+			outputs[OUT_R_OUTPUT].setVoltage(sfs::softClip((1.f - m) * inR + m * wr));
+		}
 	}
 
 	json_t* dataToJson() override {
@@ -416,6 +461,8 @@ struct Cistern : Module {
 		json_object_set_new(r, "camYaw", json_real(camYaw));
 		json_object_set_new(r, "camPitch", json_real(camPitch));
 		json_object_set_new(r, "trueDistance", json_boolean(trueDistance));
+		json_object_set_new(r, "levelByDistance", json_boolean(levelByDistance.load()));
+		json_object_set_new(r, "mixDirect", json_boolean(mixDirect));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
@@ -434,6 +481,12 @@ struct Cistern : Module {
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_number_value(j);
 		if (json_t* j = json_object_get(r, "camPitch")) camPitch = clamp((float)json_number_value(j), 0.05f, 1.5f);
 		if (json_t* j = json_object_get(r, "trueDistance")) trueDistance = json_boolean_value(j);
+		// a patch from before these existed keeps the behaviour it was saved with
+		json_t* lb = json_object_get(r, "levelByDistance");
+		levelByDistance = lb ? json_boolean_value(lb) : false;
+		json_t* md = json_object_get(r, "mixDirect");
+		mixDirect = md ? json_boolean_value(md) : false;
+		optGen++;
 	}
 };
 
@@ -1170,7 +1223,7 @@ static const float CI_RULE_X = 68.58f, CI_RTOP = 74.93f, CI_RBOT = 96.52f;
 struct CisternWidget : ModuleWidget {
 	CisternWidget(Cistern* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/cistern.svg")));
+		setPanel(sfs::themedPanel("cistern"));
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
@@ -1189,22 +1242,22 @@ struct CisternWidget : ModuleWidget {
 		                          Cistern::HUMID_INPUT, Cistern::MOD_INPUT, Cistern::MIX_INPUT};
 		for (int i = 0; i < 7; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CI_PX[i], CI_PY)), module, PP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CI_PX[i], CI_PCV)), module, PI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CI_PX[i], CI_PCV)), module, PI[i]));
 			lbl->pairDown(CI_PX[i], CI_PY, CI_PCV, PN[i]);
 		}
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(
 			mm2px(Vec(CI_PX[7], CI_PY)), module, Cistern::FREEZE_PARAM, Cistern::FREEZE_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CI_PX[7], CI_PCV)), module, Cistern::FREEZE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CI_PX[7], CI_PCV)), module, Cistern::FREEZE_INPUT));
 		lbl->pairDown(CI_PX[7], CI_PY, CI_PCV, "FREEZE");
 		lbl->divider(CI_RULE_X, CI_RTOP, CI_RULE_X, CI_RBOT);
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CI_PX[0], CI_FY)), module, Cistern::IN_L_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CI_PX[0], CI_FY)), module, Cistern::IN_L_INPUT));
 		lbl->jack(CI_PX[0], CI_FY, "IN L");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CI_PX[1], CI_FY)), module, Cistern::IN_R_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CI_PX[1], CI_FY)), module, Cistern::IN_R_INPUT));
 		lbl->jack(CI_PX[1], CI_FY, "IN R");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CI_PX[6], CI_FY)), module, Cistern::OUT_L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CI_PX[6], CI_FY)), module, Cistern::OUT_L_OUTPUT));
 		lbl->jackOnPlate(CI_PX[6], CI_FY, "OUT L");
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CI_PX[7], CI_FY)), module, Cistern::OUT_R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CI_PX[7], CI_FY)), module, Cistern::OUT_R_OUTPUT));
 		lbl->jackOnPlate(CI_PX[7], CI_FY, "OUT R");
 	}
 
@@ -1221,6 +1274,12 @@ struct CisternWidget : ModuleWidget {
 		menu->addChild(createIndexSubmenuItem("Distance", {"Musical (past 25 m, extra distance counts for less)", "True (the delay and level calculated for the room)"},
 			[=]() { return m->trueDistance ? 1 : 0; },
 			[=](size_t i) { m->trueDistance = i == 1; m->posGen++; }));
+		menu->addChild(createIndexSubmenuItem("Level", {"Follows distance (closer is louder, by up to 6 dB)", "The same wherever the sources stand"},
+			[=]() { return m->levelByDistance.load() ? 0 : 1; },
+			[=](size_t i) { m->levelByDistance = i == 0; m->optGen++; }));
+		menu->addChild(createIndexSubmenuItem("MIX blends", {"The room's direct sound against its reverberation", "The dry input against the room"},
+			[=]() { return m->mixDirect ? 0 : 1; },
+			[=](size_t i) { m->mixDirect = i == 0; }));
 		menu->addChild(createMenuLabel("Drag the sources and the listener on the screen; shift-drag changes height"));
 		menu->addChild(createMenuItem("Reset the positions", "", [=]() { m->resetPositions(clamp(m->wSpace.load(), 0, NSPACES - 1)); }));
 		menu->addChild(createMenuItem("Reset the view", "", [=]() { m->camYaw = Cistern::YAW0; m->camPitch = Cistern::PITCH0; }));

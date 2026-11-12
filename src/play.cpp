@@ -5,6 +5,7 @@ extern "C" {
 #include "miniz.h"         // implementation is src/miniz.c — .dslibrary is a zip
 }
 #include "scales.hpp"      // canonical sfs::SCALES (shared) — for the In-Key grid
+#include "panel-style.hpp"
 #include <osdialog.h>
 #include <vector>
 #include <string>
@@ -1044,7 +1045,7 @@ void PlayDisplay::drawTabs(NVGcontext* vg, int view) {
 	for (int i = 0; i < 2; i++) {
 		bool active = (view == PLAY_TAB_VIEW[i]);
 		nvgBeginPath(vg); nvgRoundedRect(vg, r[i].pos.x, r[i].pos.y, r[i].size.x, r[i].size.y, 2.f);
-		nvgFillColor(vg, active ? nvgRGB(0x0d, 0x59, 0x86) : nvgRGB(0x2a, 0x2a, 0x3e)); nvgFill(vg);
+		nvgFillColor(vg, active ? nvgRGB(0x0d, 0x59, 0x86) : sfs::screenTone(nvgRGB(0x2a, 0x2a, 0x3e))); nvgFill(vg);
 		if (font) {
 			nvgFontFaceId(vg, font->handle); nvgFontSize(vg, 9.f);
 			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -1066,12 +1067,12 @@ void PlayDisplay::drawGrid(NVGcontext* vg, const uint8_t* mapped, const uint8_t*
 			bool inScale = (n >= 0) && gridNoteInScale(n, gRoot, gScale);
 			bool isKeyRoot = (n >= 0) && (((n - gRoot) % 12 + 12) % 12 == 0);
 			NVGcolor c;
-			if (n < 0)              c = nvgRGB(0x14, 0x14, 0x22);
+			if (n < 0)              c = sfs::screenTone(nvgRGB(0x14, 0x14, 0x22));
 			else if (playing[n])    c = nvgRGB(0x00, 0xc8, 0xff);
 			else if (root[n])       c = nvgRGB(0x00, 0x97, 0xde);
 			else if (mapped[n])     c = nvgRGB(0x25, 0x4c, 0x66);
-			else if (layout == 2)   c = nvgRGB(0x40, 0x40, 0x54);
-			else                    c = inScale ? nvgRGB(0x3a, 0x3a, 0x4a) : nvgRGB(0x20, 0x20, 0x2c);
+			else if (layout == 2)   c = sfs::screenTone(nvgRGB(0x40, 0x40, 0x54));
+			else                    c = inScale ? sfs::screenTone(nvgRGB(0x3a, 0x3a, 0x4a)) : sfs::screenTone(nvgRGB(0x20, 0x20, 0x2c));
 			// chromatic grid: darken accidental (black-key) columns across every tier
 			// so they read as a piano-roll overlay even inside the lit/mapped region
 			if (layout == 2 && n >= 0 && !playing[n] && gridIsAccidental(n))
@@ -1097,7 +1098,7 @@ void PlayDisplay::drawLayer(const DrawArgs& args, int layer) {
 	if (!font) font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 	NVGcontext* vg = args.vg; const float w = box.size.x, h = box.size.y;
 	nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 3.f);
-	nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
+	nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 
 	const char* name = "Piano"; const char* info = "12 regions"; const char* err = "";
 	uint8_t mapped[128] = {0}, root[128] = {0}, playing[128] = {0}; int cnt = 0;
@@ -1179,7 +1180,7 @@ void PlayDisplay::drawList(NVGcontext* vg) {
 			nvgFillColor(vg, nvgRGB(0x6a, 0x6a, 0x88));
 			nvgText(vg, w * 0.5f, mid - 8.f, "no instruments loaded", NULL);
 			nvgFontSize(vg, 8.f);
-			nvgFillColor(vg, nvgRGB(0x4a, 0x4a, 0x66));
+			nvgFillColor(vg, sfs::SCREEN_PMID);
 			nvgText(vg, w * 0.5f, mid + 8.f, ".sfz  .dspreset  .dsbundle  .dslibrary", NULL);
 		}
 		drawLoad();
@@ -1195,7 +1196,7 @@ void PlayDisplay::drawList(NVGcontext* vg) {
 		bool hov = (i == hoverRow);
 		if (sel || hov) {
 			nvgBeginPath(vg); nvgRoundedRect(vg, 3, y, w - 6, ROW_H - 2.f, 2.f);
-			nvgFillColor(vg, sel ? nvgRGB(0x0d, 0x59, 0x86) : nvgRGB(0x2a, 0x2a, 0x3e)); nvgFill(vg);
+			nvgFillColor(vg, sel ? nvgRGB(0x0d, 0x59, 0x86) : sfs::screenTone(nvgRGB(0x2a, 0x2a, 0x3e))); nvgFill(vg);
 		}
 		if (!font) continue;
 		nvgFontFaceId(vg, font->handle);
@@ -1203,7 +1204,7 @@ void PlayDisplay::drawList(NVGcontext* vg) {
 
 		nvgFontSize(vg, 8.f);
 		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		nvgFillColor(vg, sel ? nvgRGB(0xa0, 0xd8, 0xf4) : nvgRGB(0x5a, 0x5a, 0x78));
+		nvgFillColor(vg, sel ? nvgRGB(0xa0, 0xd8, 0xf4) : sfs::screenTone(nvgRGB(0x5a, 0x5a, 0x78)));
 		nvgText(vg, 8, mid, string::f("%d", i + 1).c_str(), NULL);
 
 		// How far along this instrument is, per instrument — the header only ever
@@ -1220,7 +1221,7 @@ void PlayDisplay::drawList(NVGcontext* vg) {
 		// selected row's blue, so the selected row gets its own pair.
 		nvgFillColor(vg, (loaded != tot) ? nvgRGB(0xec, 0x65, 0x2e)
 		                 : sel           ? nvgRGB(0xa0, 0xd8, 0xf4)
-		                                 : nvgRGB(0x5a, 0x5a, 0x78));
+		                                 : sfs::screenTone(nvgRGB(0x5a, 0x5a, 0x78)));
 		nvgText(vg, w - (hov ? 26.f : 10.f), mid, status.c_str(), NULL);
 		// 8px/char at this size covers "431/431"; the name column stops short of it.
 
@@ -1253,7 +1254,7 @@ void PlayDisplay::drawList(NVGcontext* vg) {
 		float kh = std::max(10.f, trackH * vis / n);
 		float ky = top + (trackH - kh) * (float)first / (float)(n - vis);
 		nvgBeginPath(vg); nvgRoundedRect(vg, w - 4.5f, ky, 2.f, kh, 1.f);
-		nvgFillColor(vg, nvgRGB(0x4a, 0x4a, 0x66)); nvgFill(vg);
+		nvgFillColor(vg, sfs::SCREEN_PMID); nvgFill(vg);
 	}
 	drawLoad();
 }
@@ -1362,7 +1363,23 @@ void PlayDisplay::onDragEnd(const DragEndEvent& e) {
 struct PlayWidget : ModuleWidget {
 	PlayWidget(Play* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/play.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("play"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("PLAY");
+		// each knob joined to its CV jack
+		lbl->rogan(10.16f, 81.18f, "INSTRUMENT");
+		lbl->link(10.16f, 81.18f, 25.40f, 81.18f);
+		lbl->rogan(10.16f, 101.50f, "LEVEL");
+		lbl->link(10.16f, 101.50f, 25.40f, 101.50f);
+		lbl->jack(10.16f, 121.82f, "V/OCT");
+		lbl->jack(25.40f, 121.82f, "GATE");
+		lbl->jack(40.64f, 121.82f, "VELOCITY");
+		lbl->jackOnPlate(55.88f, 121.82f, "LEFT");   // on RIGHT's baseline; the jack sits 0.31 mm lower
+		lbl->jackOnPlate(71.12f, 121.82f, "RIGHT");
 		// No virtual screws — see CLAUDE.md.
 
 		PlayDisplay* disp = new PlayDisplay();
@@ -1374,13 +1391,13 @@ struct PlayWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 81.18f)), module, Play::INSTR_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(10.16f, 101.50f)), module, Play::LEVEL_PARAM));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 81.18f)), module, Play::INSTR_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 101.50f)), module, Play::LEVEL_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 121.82f)), module, Play::VOCT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 121.82f)), module, Play::GATE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(40.64f, 121.82f)), module, Play::VEL_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(55.88f, 122.13f)), module, Play::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(71.12f, 121.82f)), module, Play::R_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, 81.18f)), module, Play::INSTR_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, 101.50f)), module, Play::LEVEL_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 121.82f)), module, Play::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, 121.82f)), module, Play::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(40.64f, 121.82f)), module, Play::VEL_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(55.88f, 122.13f)), module, Play::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(71.12f, 121.82f)), module, Play::R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

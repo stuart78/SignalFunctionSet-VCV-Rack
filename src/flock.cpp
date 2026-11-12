@@ -948,12 +948,26 @@ static Flock* flockPreview() {
 // a bird at the moment it calls. The picture and the stereo image are the
 // same viewpoint, so turning ROTATE turns both.
 // =============================================================================
-static const NVGcolor FL_LINE = nvgRGB(0xB4, 0xB4, 0xB4);
-static const NVGcolor FL_SOFT = nvgRGB(0x7C, 0x7C, 0x7C);
-static const NVGcolor FL_INK  = nvgRGB(0x2E, 0x2E, 0x2E);
-static const NVGcolor FL_BIRD = nvgRGB(0x14, 0x14, 0x16);   // a bird, near: almost black
-static const NVGcolor FL_FAR  = nvgRGB(0x50, 0x50, 0x54);   // a bird, far
-static const NVGcolor FL_HOT  = nvgRGB(0xE8, 0x64, 0x1F);
+// Drawn on the faceplate, so it has a dark-panel palette too. On a dark
+// faceplate a near bird is almost white and a far one grey, so the nearest
+// birds still stand out most. The light values are unchanged.
+struct FlPal { NVGcolor line, soft, ink, bird, far, hot, face; };
+static inline const FlPal& flPal() {
+	static const FlPal L = {nvgRGB(0xB4, 0xB4, 0xB4), nvgRGB(0x7C, 0x7C, 0x7C), nvgRGB(0x2E, 0x2E, 0x2E),
+	                        nvgRGB(0x14, 0x14, 0x16), nvgRGB(0x50, 0x50, 0x54), nvgRGB(0xE8, 0x64, 0x1F),
+	                        nvgRGB(0xF0, 0xF0, 0xF0)};
+	static const FlPal D = {nvgRGB(0x6E, 0x6E, 0x74), nvgRGB(0xA0, 0xA0, 0xA6), nvgRGB(0xE6, 0xE6, 0xE8),
+	                        nvgRGB(0xF0, 0xF0, 0xF2), nvgRGB(0x8A, 0x8A, 0x90), nvgRGB(0xE8, 0x64, 0x1F),
+	                        nvgRGB(0x3A, 0x3A, 0x3E)};
+	return sfs::dark() ? D : L;
+}
+#define FL_LINE (flPal().line)
+#define FL_SOFT (flPal().soft)
+#define FL_INK  (flPal().ink)
+#define FL_BIRD (flPal().bird)   // a bird, near
+#define FL_FAR  (flPal().far)    // a bird, far
+#define FL_HOT  (flPal().hot)
+#define FL_FACE (flPal().face)   // the faceplate, painted over what is behind
 
 struct FlockDisplay : OpaqueWidget {
 	Flock* module = nullptr;
@@ -1110,7 +1124,7 @@ struct FlockDisplay : OpaqueWidget {
 				nvgStrokeColor(vg, FL_SOFT); nvgStrokeWidth(vg, 0.8f); nvgStroke(vg);
 				nvgBeginPath(vg);
 				nvgCircle(vg, ear[k]->sx, ear[k]->sy, rr);
-				nvgFillColor(vg, nvgRGB(0xF0, 0xF0, 0xF0)); nvgFill(vg);
+				nvgFillColor(vg, FL_FACE); nvgFill(vg);
 				nvgStrokeColor(vg, FL_INK); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 				if (font && font->handle >= 0) {
 					nvgFontFaceId(vg, font->handle);
@@ -1184,7 +1198,7 @@ static const float FL_X_GATE = 10.79f, FL_X_VOCT = 24.93f, FL_X_STARTLE = 38.90f
 struct FlockWidget : ModuleWidget {
 	FlockWidget(Flock* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/flock.svg")));
+		setPanel(sfs::themedPanel("flock"));
 
 		FlockDisplay* disp = new FlockDisplay();
 		disp->module = module;
@@ -1203,7 +1217,7 @@ struct FlockWidget : ModuleWidget {
 		};
 		for (int i = 0; i < 6; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_X[i], FL_AY)), module, rowA[i].p));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X[i], FL_ACV)), module, rowA[i].in));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FL_X[i], FL_ACV)), module, rowA[i].in));
 		}
 		// Row B in the ART's order, which is not the enum's: the designer put
 		// the two envelope controls beside the length and the two pitch
@@ -1218,15 +1232,15 @@ struct FlockWidget : ModuleWidget {
 		};
 		for (int i = 0; i < 6; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(FL_X[i], FL_BY)), module, rowB[i].p));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X[i], FL_BCV)), module, rowB[i].in));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FL_X[i], FL_BCV)), module, rowB[i].in));
 		}
 		// foot
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_GATE, FL_FY)), module, Flock::GATE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_VOCT, FL_FY)), module, Flock::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FL_X_GATE, FL_FY)), module, Flock::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FL_X_VOCT, FL_FY)), module, Flock::VOCT_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(FL_X_STARTLE, FL_FY_STARTLE)), module, Flock::STARTLE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(FL_X_STARTLE_IN, FL_FY_STARTLE)), module, Flock::STARTLE_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_X_L, FL_FY)), module, Flock::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(FL_X_R, FL_FY)), module, Flock::R_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(FL_X_STARTLE_IN, FL_FY_STARTLE)), module, Flock::STARTLE_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(FL_X_L, FL_FY)), module, Flock::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(FL_X_R, FL_FY)), module, Flock::R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

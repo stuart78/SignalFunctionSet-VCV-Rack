@@ -3,6 +3,7 @@
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "pulse-width.hpp"
+#include "panel-style.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
 // Scales come from the shared canonical list (src/scales.hpp) so SCALE CV
@@ -1071,7 +1072,16 @@ struct WanderSlider : app::SvgSlider {
 struct MetaFugueWidget : ModuleWidget {
 	MetaFugueWidget(MetaFugue* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/metafugue.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the fader scale and the WANDER ticks. The labels repeat Fugue's on
+		// the left and Fugue XL's, 101.6 mm across, on the right.
+		setPanel(sfs::themedPanel("metafugue"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("METAFUGUE");
+		static const char* const voiceNames[] = {"A", "B", "C"};
 
 
 		// ══════════════════════════════════════════════════════════════════════
@@ -1123,20 +1133,25 @@ struct MetaFugueWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow1Y)), module, MetaFugue::SCALE_PARAM));
 
 		// ── CV row 1: Root CV, Scale CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow1Y)), module, MetaFugue::ROOT_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow1Y)), module, MetaFugue::SCALE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, cvRow1Y)), module, MetaFugue::ROOT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol2X, cvRow1Y)), module, MetaFugue::SCALE_CV_INPUT));
 
 		// ── Knob row 2: Steps, Slew ──
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol1X, knobRow2Y)), module, MetaFugue::STEPS_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow2Y)), module, MetaFugue::SLEW_PARAM));
 
 		// ── CV row 2: Steps CV, Slew CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow2Y)), module, MetaFugue::STEPS_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow2Y)), module, MetaFugue::SLEW_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, cvRow2Y)), module, MetaFugue::STEPS_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol2X, cvRow2Y)), module, MetaFugue::SLEW_CV_INPUT));
 
 		// ── Reset: jack + momentary button ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, resetY)), module, MetaFugue::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, resetY)), module, MetaFugue::RESET_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(knobCol2X, resetY)), module, MetaFugue::RESET_BUTTON_PARAM));
+		lbl->rogan(knobCol1X, knobRow1Y, "ROOT");
+		lbl->rogan(knobCol2X, knobRow1Y, "SCALE");
+		lbl->rogan(knobCol1X, knobRow2Y, "STEPS");
+		lbl->rogan(knobCol2X, knobRow2Y, "SLEW");
+		lbl->jack(knobCol1X, resetY, "RESET");
 
 		// ══════════════════════════════════════════════════════════════════════
 		// SEQUENCER AREA (top-right)
@@ -1182,23 +1197,32 @@ struct MetaFugueWidget : ModuleWidget {
 		const int gateOutputs[] = {MetaFugue::GATE_A_OUTPUT, MetaFugue::GATE_B_OUTPUT, MetaFugue::GATE_C_OUTPUT};
 		const int cvOutputs[] = {MetaFugue::CV_A_OUTPUT, MetaFugue::CV_B_OUTPUT, MetaFugue::CV_C_OUTPUT};
 
+		lbl->jack(clockX, voiceA_Y, "CLOCK");
+		lbl->add(wanderSliderX, voiceA_Y - sfs::LABEL_GAP_JACK, "WANDER");
+		lbl->jackOnPlate(gateOutX, voiceA_Y, "GATE");
+		lbl->jackOnPlate(cvOutX, voiceA_Y, "CV");
+
 		for (int v = 0; v < NUM_VOICES; v++) {
 			float y = voiceYs[v];
+			// the voice's letter at the left edge, its cap height centred on the row
+			lbl->add(2.83f, y + 0.83f, voiceNames[v]);
+			// the WANDER CV jack tied to its slider
+			lbl->link(wanderCvX, y, 33.57f, y);
 
 			// Clock input
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(clockX, y)), module, clockInputs[v]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(clockX, y)), module, clockInputs[v]));
 
 			// Wander CV input (next to clock)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(wanderCvX, y)), module, wanderInputs[v]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(wanderCvX, y)), module, wanderInputs[v]));
 
 			// Wander horizontal slider
 			addParam(createParamCentered<WanderSlider>(mm2px(Vec(wanderSliderX, y)), module, wanderParams[v]));
 
 			// Gate output
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(gateOutX, y)), module, gateOutputs[v]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(gateOutX, y)), module, gateOutputs[v]));
 
 			// CV output
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(cvOutX, y)), module, cvOutputs[v]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(cvOutX, y)), module, cvOutputs[v]));
 		}
 
 		// ══════════════════════════════════════════════════════════════════════
@@ -1236,10 +1260,14 @@ struct MetaFugueWidget : ModuleWidget {
 
 		// ── Top row: Random button + jack + S&H toggle ──
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(10.16f + xOff, topRowY)), module, MetaFugue::RAND_SEQ_BUTTON_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f + xOff, topRowY)), module, MetaFugue::RAND_SEQ_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(20.32f + xOff, topRowY)), module, MetaFugue::RAND_SEQ_INPUT));
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(
 			mm2px(Vec(40.64f + xOff, topRowY)), module,
 			MetaFugue::SAMPLE_HOLD_PARAM, MetaFugue::SAMPLE_HOLD_LIGHT));
+		// one label over the RANDOM SEQ button and its jack, which a line joins
+		lbl->add(15.24f + xOff, topRowY - sfs::LABEL_GAP_JACK, "RANDOM SEQ");
+		lbl->link(10.16f + xOff, topRowY, 20.32f + xOff, topRowY);
+		lbl->add(40.64f + xOff, topRowY - sfs::LABEL_GAP_JACK, "S&H");
 
 		// ── LED matrix (8 cols × 3 rows red step indicators) ──
 		for (int step = 0; step < NUM_STEPS; step++) {
@@ -1260,20 +1288,42 @@ struct MetaFugueWidget : ModuleWidget {
 		// ── Per-voice parameter grid (knob + CV × 4 cols × 3 voices) ──
 		// Use the per-voice lookup arrays since the enums are voice-grouped.
 		const float voiceXYs[] = {voiceXA_Y, voiceXB_Y, voiceXC_Y};
+		// the four column groups: a rule under the top row, rules between the
+		// columns and a rule over the outputs
+		lbl->divider(5.08f + xOff, 33.80f, 116.84f + xOff, 33.80f);
+		lbl->divider(30.48f + xOff, 33.87f, 30.48f + xOff, 83.82f);
+		lbl->divider(61.07f + xOff, 33.87f, 61.07f + xOff, 83.82f);
+		lbl->divider(91.55f + xOff, 33.87f, 91.55f + xOff, 83.82f);
+		lbl->divider(5.08f + xOff, 83.82f, 117.92f + xOff, 83.82f);
+		lbl->knob(stpKnobX + xOff, voiceXA_Y, "STEPS");
+		lbl->knob(rngKnobX + xOff, voiceXA_Y, "RANGE");
+		lbl->knob(slpKnobX + xOff, voiceXA_Y, "SLEEP");
+		lbl->knob(prbKnobX + xOff, voiceXA_Y, "PROB");
+		{
+			const float knobXs[] = {stpKnobX, rngKnobX, slpKnobX, prbKnobX};
+			const float letterXs[] = {2.45f, 32.90f, 63.40f, 93.80f};
+			for (int v = 0; v < NUM_VOICES; v++) {
+				for (int c = 0; c < 4; c++) {
+					// each knob tied to its CV jack, and the voice letter left of the knob
+					lbl->link(knobXs[c] + xOff, voiceXYs[v], knobXs[c] + 10.16f + xOff, voiceXYs[v]);
+					lbl->add(letterXs[c] + xOff, voiceXYs[v] + 0.83f, voiceNames[v]);
+				}
+			}
+		}
 		for (int v = 0; v < NUM_VOICES; v++) {
 			float y = voiceXYs[v];
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(stpKnobX + xOff, y)), module, MetaFugue::STEPS_X_PARAMS[v]));
-			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(stpCvX  + xOff, y)), module, MetaFugue::STEPS_X_INPUTS[v]));
+			addInput(createInputCentered<sfs::Jack>(    mm2px(Vec(stpCvX  + xOff, y)), module, MetaFugue::STEPS_X_INPUTS[v]));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(rngKnobX + xOff, y)), module, MetaFugue::RANGE_X_PARAMS[v]));
-			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(rngCvX  + xOff, y)), module, MetaFugue::RANGE_X_INPUTS[v]));
+			addInput(createInputCentered<sfs::Jack>(    mm2px(Vec(rngCvX  + xOff, y)), module, MetaFugue::RANGE_X_INPUTS[v]));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(slpKnobX + xOff, y)), module, MetaFugue::SLEEP_X_PARAMS[v]));
-			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(slpCvX  + xOff, y)), module, MetaFugue::SLEEP_X_INPUTS[v]));
+			addInput(createInputCentered<sfs::Jack>(    mm2px(Vec(slpCvX  + xOff, y)), module, MetaFugue::SLEEP_X_INPUTS[v]));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(prbKnobX + xOff, y)), module, MetaFugue::PROB_X_PARAMS[v]));
-			addInput(createInputCentered<PJ301MPort>(    mm2px(Vec(prbCvX  + xOff, y)), module, MetaFugue::PROB_X_INPUTS[v]));
+			addInput(createInputCentered<sfs::Jack>(    mm2px(Vec(prbCvX  + xOff, y)), module, MetaFugue::PROB_X_INPUTS[v]));
 		}
 
 		// ── Per-step trigger outputs (3 rows × 8 cols) ──
@@ -1286,15 +1336,27 @@ struct MetaFugueWidget : ModuleWidget {
 		for (int s = 0; s < NUM_STEPS; s++) {
 			float x = gateStartX + s * gateSpacing + xOff;
 			for (int v = 0; v < NUM_VOICES; v++) {
-				addOutput(createOutputCentered<PJ301MPort>(
+				addOutput(createOutputCentered<sfs::Jack>(
 					mm2px(Vec(x, gateYs[v])), module, gateBaseOuts[v] + s));
 			}
 		}
 
+		// GATE heads the step-gate grid, CV the MAX/MID/MIN column; the voice
+		// letters and MAX/MID/MIN sit beside their rows, off the plates
+		lbl->add(7.31f + xOff, gateAY - sfs::LABEL_GAP_JACK, "GATE", sfs::PanelLabels::ON_PLATE, NVG_ALIGN_LEFT);
+		lbl->jackOnPlate(minMidMaxX + xOff, gateAY, "CV");
+		{
+			static const char* const cvNames[] = {"MAX", "MID", "MIN"};
+			for (int v = 0; v < NUM_VOICES; v++) {
+				lbl->add(2.45f + xOff, gateYs[v] + 0.83f, voiceNames[v]);
+				lbl->add(105.1f + xOff, gateYs[v] + 0.83f, cvNames[v], sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+			}
+		}
+
 		// ── Max / Mid / Min outputs (right of the per-step gates) ──
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateAY)), module, MetaFugue::MAX_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateBY)), module, MetaFugue::MID_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX + xOff, gateCY)), module, MetaFugue::MIN_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX + xOff, gateAY)), module, MetaFugue::MAX_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX + xOff, gateBY)), module, MetaFugue::MID_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX + xOff, gateCY)), module, MetaFugue::MIN_OUTPUT));
 	}
 
 	// ── Context Menu ──

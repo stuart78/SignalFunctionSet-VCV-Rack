@@ -2,6 +2,7 @@
 #include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -757,8 +758,8 @@ void MuseDisplay::drawLayer(const DrawArgs& args, int layer) {
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x70, 0x70, 0x80, 0xFF);
 	const NVGcolor COL_TEXT_MID    = nvgRGBA(0xB0, 0xB0, 0xC0, 0xFF);
-	const NVGcolor COL_LED_OFF     = nvgRGBA(0x18, 0x18, 0x24, 0xFF);
-	const NVGcolor COL_DIV         = nvgRGBA(0x2A, 0x2A, 0x40, 0xFF);
+	const NVGcolor COL_LED_OFF     = sfs::screenTone(nvgRGBA(0x18, 0x18, 0x24, 0xFF));
+	const NVGcolor COL_DIV         = sfs::screenTone(nvgRGBA(0x2A, 0x2A, 0x40, 0xFF));
 
 	if (!font || font->handle < 0) {
 		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -957,7 +958,7 @@ void MuseDisplay::drawLayer(const DrawArgs& args, int layer) {
 		float x1 = sliderColX[7] + rowH * 0.5f;
 		nvgBeginPath(args.vg);
 		nvgRect(args.vg, x0, 0.f, x1 - x0, headerH);
-		nvgFillColor(args.vg, nvgRGBA(0x1a, 0x1a, 0x2e, 0xb0));
+		nvgFillColor(args.vg, nvgTransRGBA(sfs::SCREEN_BG, 0xb0));
 		nvgFill(args.vg);
 	}
 
@@ -972,8 +973,8 @@ void MuseDisplay::drawPreview(const DrawArgs& args) {
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x70, 0x70, 0x80, 0xFF);
-	const NVGcolor COL_LED_OFF     = nvgRGBA(0x18, 0x18, 0x24, 0xFF);
-	const NVGcolor COL_DIV         = nvgRGBA(0x2A, 0x2A, 0x40, 0xFF);
+	const NVGcolor COL_LED_OFF     = sfs::screenTone(nvgRGBA(0x18, 0x18, 0x24, 0xFF));
+	const NVGcolor COL_DIV         = sfs::screenTone(nvgRGBA(0x2A, 0x2A, 0x40, 0xFF));
 
 	if (!font || font->handle < 0) {
 		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -1100,7 +1101,7 @@ void MuseScope::drawLayer(const DrawArgs& args, int layer) {
 	const NVGcolor COL_BLUE_DIM    = nvgRGBA(0x00, 0x97, 0xDE, 0x40);
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x70, 0x70, 0x80, 0xFF);
-	const NVGcolor COL_DIV         = nvgRGBA(0x2A, 0x2A, 0x40, 0xFF);
+	const NVGcolor COL_DIV         = sfs::screenTone(nvgRGBA(0x2A, 0x2A, 0x40, 0xFF));
 
 	if (!font || font->handle < 0) {
 		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -1225,7 +1226,7 @@ void MuseScope::drawPreview(const DrawArgs& args) {
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x70, 0x70, 0x80, 0xFF);
-	const NVGcolor COL_DIV         = nvgRGBA(0x2A, 0x2A, 0x40, 0xFF);
+	const NVGcolor COL_DIV         = sfs::screenTone(nvgRGBA(0x2A, 0x2A, 0x40, 0xFF));
 
 	if (!font || font->handle < 0) {
 		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -1301,7 +1302,14 @@ void MuseScope::drawPreview(const DrawArgs& args) {
 struct MuseWidget : ModuleWidget {
 	MuseWidget(Muse* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/muse.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the rules that group the taps across the sliders.
+		setPanel(sfs::themedPanel("muse"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("MUSE");
 
 		// 30HP = 152.4mm wide × 128.5mm tall.
 		// Layout: left column (x=0..20) for general controls + outputs;
@@ -1350,6 +1358,20 @@ struct MuseWidget : ModuleWidget {
 			addParam(s);
 		}
 
+		// The two slider groups, a letter over each slider, and the tap names
+		// down the gap between the groups, one per detent (tap 0 at 15.23 mm,
+		// 2.2144 mm apart, as the slider art places them). The names are the
+		// taps the sliders select, from TAP_LABELS.
+		lbl->add(25.40f, 11.8f, "INTERVAL");
+		lbl->add(71.12f, 11.8f, "THEME");
+		static const char* const sliderNames[] = {"A", "B", "C", "D", "W", "X", "Y", "Z"};
+		for (int i = 0; i < 4; i++) {
+			lbl->add(itvlX0 + i * sliderPitch, 14.2f, sliderNames[i]);
+			lbl->add(themeX0 + i * sliderPitch, 14.2f, sliderNames[4 + i]);
+		}
+		for (int t = 0; t < N_TAPS; t++)
+			lbl->note(48.26f, 15.23f + t * 2.2144f + 0.7f, t == TAP_C_HALF ? "C1/2" : TAP_LABELS[t]);
+
 		// Display (DisplayFrame rect: x264 y43.69 w153.07 h198.43 -> mm).
 		MuseDisplay* display = new MuseDisplay();
 		display->module = module;
@@ -1369,9 +1391,9 @@ struct MuseWidget : ModuleWidget {
 		for (int i = 0; i < 4; i++) {
 			float xI = itvlX0  + i * sliderPitch;
 			float xT = themeX0 + i * sliderPitch;
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(xI, cvJackY)), module, Muse::INTERVAL_CV_0 + i));
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(xT, cvJackY)), module, Muse::THEME_CV_0 + i));
 		}
 
@@ -1379,38 +1401,52 @@ struct MuseWidget : ModuleWidget {
 		//   Clock | Run(btn)+cv | Scale(pot)+cv | Root(pot)+cv | Reset(btn)+cv | Random(btn)+cv
 		const float rowY = 121.93f;
 		// CLOCK input
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, rowY)), module, Muse::CLOCK_INPUT));
 		// RUN latch + CV
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(20.32f, rowY)), module, Muse::RUN_PARAM, Muse::RUN_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(30.48f, rowY)), module, Muse::RUN_INPUT));
 		// SCALE pot (small) + CV
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(40.64f, rowY)), module, Muse::SCALE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(50.80f, rowY)), module, Muse::SCALE_CV_INPUT));
 		// ROOT pot (small) + CV
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(60.96f, rowY)), module, Muse::ROOT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(71.12f, rowY)), module, Muse::ROOT_CV_INPUT));
 		// RESET button + CV
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(81.28f, rowY)), module, Muse::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(91.44f, rowY)), module, Muse::RESET_INPUT));
 		// RANDOM button + CV
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(101.60f, rowY)), module, Muse::RAND_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(111.76f, rowY)), module, Muse::RAND_INPUT));
 
+		// One baseline for the whole row, so the trimpots' labels sit level with
+		// the jacks' and buttons'; each control is tied to its CV jack.
+		const float lblY = rowY - sfs::LABEL_GAP_JACK;
+		lbl->add(10.16f, lblY, "CLOCK");
+		lbl->add(20.32f, lblY, "RUN");
+		lbl->add(40.64f, lblY, "SCALE");
+		lbl->add(60.96f, lblY, "ROOT");
+		lbl->add(81.28f, lblY, "RESET");
+		lbl->add(101.60f, lblY, "RANDOM");
+		for (int i = 0; i < 5; i++)
+			lbl->link(20.32f + i * 20.32f, rowY, 30.48f + i * 20.32f, rowY);
+		lbl->jackOnPlate(132.08f, rowY, "V/OCT");
+		lbl->jackOnPlate(142.24f, rowY, "GATE");
+
 		// V/OCT and GATE outputs on the dark plate (bottom-right).
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(132.08f, rowY)), module, Muse::VOCT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(142.24f, rowY)), module, Muse::GATE_OUTPUT));
 	}
 
@@ -1423,7 +1459,8 @@ struct MuseWidget : ModuleWidget {
 		Muse* m = dynamic_cast<Muse*>(module);
 		if (!m || !m->isFollowing()) return;
 
-		const NVGcolor wash = nvgRGBA(0xf0, 0xf0, 0xf0, 0xb0);
+		// the faceplate colour of the theme in force, so the wash matches the panel
+		const NVGcolor wash = nvgTransRGBA(sfs::theme().panel, 0xb0);
 		auto dimJack = [&](float xMm, float yMm) {
 			Vec c  = mm2px(Vec(xMm, yMm));
 			float r = mm2px(4.5f);  // jack radius-ish

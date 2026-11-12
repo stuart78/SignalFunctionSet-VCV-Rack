@@ -24,6 +24,11 @@ applies until it comes out.
 
 - [ ] **No screws.** No `createWidget<ScrewSilver>` or equivalent, ever.
 
+- [ ] **Dark panel.** `sfs::themedPanel()`, `sfs::Jack`, its art registered in
+      `DARK` in `tools/panel_dark.py` and generated, and anything drawn on the
+      faceplate in code checked in a `SFS_PREFER_DARK=1 Rack -t` render. See
+      [panel-design.md](panel-design.md#dark-panels).
+
 - [ ] **`drawPreview()` on every custom display.** The VCV Library builds its
       thumbnail with `module == NULL`. Without one the browser shows a dark
       slab. `./tools/screenshots.sh` renders through the same path, so a missing

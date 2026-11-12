@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50.8mm" height="128.5mm" viewBox="0 0 50.8 128.5">
+<rect width="50.8" height="128.5" fill="#3A3A3E"/>
+  <!-- The harmonic diagram, kept from the original art at its 72 dpi scale: the
+       LEDs joined in a row, the even / odd / all rows of harmonic boxes, and the
+       leads from them down to the two jacks. The leads were mirrored here so the
+       one from the LED row reaches MASK, which is the LEFT jack in the widget
+       (the old art had MASK and FILTER the other way round). The numbers in the
+       boxes, labels, title and the switch link are drawn by the widget
+       (sfs::PanelLabels); screen, plate and logo by tools/panel_reticules.py. -->
+  <g id="Glyphs" transform="scale(0.352778)">
+    <rect x="16.8" y="146.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="45.6" y="146.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="74.4" y="146.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="103.2" y="146.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="31.2" y="158.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="60" y="158.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="88.8" y="158.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="117.6" y="158.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="16.8" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="31.2" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="45.6" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="60.0" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="74.4" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="88.8" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="103.2" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <rect x="117.6" y="170.4" width="9.6" height="9.6" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="26.4" y1="151.2" x2="45.6" y2="151.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="55.2" y1="151.2" x2="74.4" y2="151.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="84" y1="151.2" x2="103.2" y2="151.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="12" y1="163.2" x2="31.2" y2="163.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="40.8" y1="163.2" x2="60" y2="163.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="69.6" y1="163.2" x2="88.8" y2="163.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="98.4" y1="163.2" x2="117.6" y2="163.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="127.2" y1="163.2" x2="132" y2="163.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="12" y1="175.2" x2="16.8" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="26.4" y1="175.2" x2="31.2" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="40.8" y1="175.2" x2="45.6" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="55.2" y1="175.2" x2="60" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="69.6" y1="175.2" x2="74.4" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="84" y1="175.2" x2="88.8" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="98.4" y1="175.2" x2="103.2" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="112.8" y1="175.2" x2="117.6" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="127.2" y1="175.2" x2="132" y2="175.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="26.4" y1="115.2" x2="31.2" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="40.8" y1="115.2" x2="45.6" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="55.2" y1="115.2" x2="60.0" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="69.6" y1="115.2" x2="74.4" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="84.0" y1="115.2" x2="88.8" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="98.4" y1="115.2" x2="103.2" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="112.8" y1="115.2" x2="117.6" y2="115.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <polyline points="16.8 115.2 12 115.2 12 187.2 21.6 187.2 21.6 194.4" fill="none" stroke="#707078" stroke-width=".5"/>
+    <line x1="16.8" y1="151.2" x2="12" y2="151.2" fill="none" stroke="#707078" stroke-width=".5"/>
+    <polyline points="112.8 151.2 132 151.2 132 187.2 122.4 187.2 122.4 194.4" fill="none" stroke="#707078" stroke-width=".5"/>
+  </g>
+  <g id="PanelArt">
+    <rect x="38.10" y="108.37" width="10.16" height="13.55" rx="1.35" fill="#0D0D0E"/>
+    <rect x="5.80" y="14.00" width="39.20" height="24.00" rx="1.27" fill="#1C1C22"/>
+    <g id="Logo" transform="translate(31.390 6.350) scale(0.084667) translate(-1331 -75)">
+      <path d="M1331 90.0028H1336V85.0019H1341V95.0037H1346V80.0009H1351V100.005H1356V75H1361V100.005H1366V85.0019H1371V95.0037H1376V90.0028H1381" stroke="#B8B8BE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <path d="M1388.38 100.005L1403.37 75C1403.37 80.4594 1407.58 90.0028 1413.38 90.0028H1433.38L1438.38 100.005" stroke="#B8B8BE" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1455.21 75H1450.21V105.006H1455.21" stroke="#B8B8BE" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1495.21 75H1500.21V105.006H1495.21" stroke="#B8B8BE" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 77.6255L1470.21 87.6274" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1470.21 77.6255L1460.21 87.6274" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 92.6284L1470.21 102.63" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1460.21 102.63L1470.21 92.6284" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1480.21 77.6255L1490.21 87.6274" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1490.21 77.6255L1480.21 87.6274" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+      <path d="M1490.21 92.6284H1480.21V102.63H1490.21V92.6284Z" stroke="#B8B8BE" stroke-width="1.5" stroke-linejoin="bevel" fill="none"/>
+    </g>
+  </g>
+  <g id="Reticules" style="display:none">
+    <circle cx="7.62" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="12.70" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="17.78" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="22.86" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="27.94" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="33.02" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="38.10" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="43.18" cy="40.64" r="0.99" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="5.27" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="10.35" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="15.43" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="20.51" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="25.59" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="30.67" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="35.75" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="40.83" y="43.52" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="7.62" cy="77.05" r="3.97" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <rect x="23.08" y="73.59" width="4.69" height="6.92" rx="0.57" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="43.21" cy="77.05" r="3.97" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="7.62" cy="101.60" r="5.26" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="7.62" cy="116.84" r="3.97" fill="none" stroke="#707078" stroke-width="0.17"/>
+    <circle cx="43.18" cy="116.84" r="3.97" fill="none" stroke="#707078" stroke-width="0.17"/>
+  </g>
+</svg>

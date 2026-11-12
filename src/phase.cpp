@@ -265,7 +265,7 @@ struct PhaseWaveformDisplay : Widget {
 		int n = (int)mini.size();
 
 		// Dim region outside loop
-		NVGcolor dimColor = nvgRGBA(10, 10, 20, 200);
+		NVGcolor dimColor = sfs::screenTone(nvgRGBA(10, 10, 20, 200));
 		if (loopStart > 0.f) {
 			nvgBeginPath(args.vg);
 			nvgRect(args.vg, x, y, loopStart * w, h);
@@ -2165,6 +2165,38 @@ void PhaseWaveformDisplay::drawLayer(const DrawArgs& args, int layer) {
 
 // --- Widget ---
 
+// Drawn on the faceplate: the large A and B that name the two players' rows,
+// and the rule above each row, in the colours the screen draws A and B in.
+// They are the same in light and dark mode.
+struct PhaseArt : Widget {
+	std::shared_ptr<Font> font;
+	void draw(const DrawArgs& args) override {
+		if (!font || font->handle < 0) font = sfs::panelFont();
+		NVGcontext* vg = args.vg;
+		const NVGcolor colA = nvgRGB(0x53, 0x93, 0xD2), colB = nvgRGB(0xCE, 0x73, 0x49);
+		// the rule over each player's rows, edge to edge of the screen
+		const float ruleY[2] = {40.64f, 68.58f};
+		for (int k = 0; k < 2; k++) {
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, mm2px(2.54f), mm2px(ruleY[k]));
+			nvgLineTo(vg, mm2px(93.98f), mm2px(ruleY[k]));
+			nvgStrokeColor(vg, k == 0 ? colA : colB);
+			nvgStrokeWidth(vg, mm2px(0.176f));
+			nvgStroke(vg);
+		}
+		if (!font || font->handle < 0) return;
+		// the letters: 3.46 mm caps, as the original art set them
+		nvgFontFaceId(vg, font->handle);
+		nvgFontSize(vg, mm2px(4.94f * sfs::NVG_EM));
+		nvgTextLetterSpacing(vg, 0.f);
+		nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE);
+		nvgFillColor(vg, colA);
+		nvgText(vg, mm2px(2.54f), mm2px(45.79f), "A", NULL);
+		nvgFillColor(vg, colB);
+		nvgText(vg, mm2px(2.54f), mm2px(73.72f), "B", NULL);
+	}
+};
+
 struct PhaseWidget : ModuleWidget {
 	// GUI-thread tick: finalize any pending recordings off the audio thread.
 	// The audio thread sets pendingFinalize when a recording completes (after
@@ -2189,7 +2221,71 @@ struct PhaseWidget : ModuleWidget {
 
 	PhaseWidget(Phase* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/phase.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the tick marks round DRIFT, SPEED and PAN.
+		setPanel(sfs::themedPanel("phase"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("PHASE");
+		PhaseArt* art = new PhaseArt();
+		art->box.size = box.size;
+		addChild(art);
+		// The two players' rows are the same, B 27.94 mm under A.
+		for (int k = 0; k < 2; k++) {
+			const float dy = k * 27.94f;
+			// one baseline for the row of labels over the jacks and knobs, so the
+			// knob labels clear the tick marks between them and their knobs
+			const float top = 50.8f + dy - sfs::LABEL_GAP_JACK;
+			lbl->jack(10.16f, 50.8f + dy, "CLOCK");
+			lbl->jack(20.32f, 50.8f + dy, "START");
+			lbl->jack(30.48f, 50.8f + dy, "LEN.");
+			lbl->add(43.18f, top, "SLEEP");
+			lbl->add(55.88f, top, "DRIFT");
+			lbl->add(73.66f, top, "SPEED");
+			lbl->add(88.9f, top, "PAN");
+			lbl->add(43.18f, 63.5f + dy, "ROTATE");
+			// SLEEP's hook round to DRIFT: the switch picks what DRIFT does
+			const float hook = top - 0.83f;
+			lbl->link(51.64f, hook, 49.10f, hook);
+			lbl->link(49.10f, hook, 49.10f, 53.34f + dy);
+			lbl->link(49.10f, 53.34f + dy, 46.56f, 53.34f + dy);
+			// LEVEL, FILTER and its CV share a baseline at the trimpots' gap
+			lbl->trim(10.16f, 63.5f + dy, "LEVEL");
+			lbl->pair(20.32f, 63.5f + dy, "FILTER");
+			lbl->add(30.48f, 63.5f + dy - sfs::LABEL_GAP_TRIM, "CV");
+			// SPEED's scale: stopped at the top, 1x, 2x and 4x either way
+			lbl->note(68.9f, 47.16f + dy, "1x");
+			lbl->note(79.2f, 47.16f + dy, "1x");
+			lbl->note(64.9f, 51.82f + dy, "2x");
+			lbl->note(82.4f, 51.82f + dy, "2x");
+			lbl->note(68.6f, 60.7f + dy, "4x");
+			lbl->note(78.7f, 60.7f + dy, "4x");
+		}
+		// the columns of the two players' rows, and the rule over the foot
+		lbl->divider(36.40f, 40.64f, 36.40f, 96.52f);
+		lbl->divider(62.65f, 40.64f, 62.65f, 96.52f);
+		lbl->divider(5.24f, 96.52f, 71.78f, 96.52f);
+		// the foot: each button over its jack, REC A and REC B joined through LINK
+		lbl->trim(10.16f, 106.68f, "PLAY");
+		lbl->trim(20.32f, 106.68f, "SYNC");
+		lbl->trim(35.56f, 106.68f, "REC A");
+		lbl->trim(50.79f, 106.68f, "LINK");
+		lbl->trim(66.03f, 106.68f, "REC B");
+		lbl->link(10.16f, 106.68f, 10.16f, 116.84f);
+		lbl->link(20.32f, 106.68f, 20.32f, 116.84f);
+		lbl->link(35.56f, 106.68f, 35.56f, 116.84f);
+		lbl->link(66.03f, 106.68f, 66.03f, 116.84f);
+		lbl->link(35.56f, 106.68f, 66.03f, 106.68f);
+		lbl->jack(45.72f, 116.84f, "IN A");
+		lbl->jack(55.88f, 116.84f, "IN B");
+		lbl->link(45.72f, 111.75f, 45.72f, 116.84f);
+		lbl->link(55.88f, 111.75f, 55.88f, 116.84f);
+		lbl->jackOnPlate(78.74f, 104.5f, "POLY");
+		lbl->jackOnPlate(88.9f, 104.5f, "SYNC");
+		lbl->jackOnPlate(78.74f, 116.84f, "OUT L");
+		lbl->jackOnPlate(88.9f, 116.84f, "OUT R");
 
 
 		// Waveform display
@@ -2202,13 +2298,13 @@ struct PhaseWidget : ModuleWidget {
 		// --- Loop A controls ---
 		// Left side: CLK, START, LEN jacks (Y=50.8mm, a tenth of an inch above
 		// the knob row so the labels of the row under them fit)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 50.8f)), module, Phase::CLOCK_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 50.8f)), module, Phase::START_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 50.8f)), module, Phase::END_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 50.8f)), module, Phase::CLOCK_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(20.32f, 50.8f)), module, Phase::START_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48f, 50.8f)), module, Phase::END_A_INPUT));
 		// LEVEL, FILTER and its CV under them, on the CV row (Y=63.5mm)
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(10.16f, 63.5f)), module, Phase::LEVEL_A_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(20.32f, 63.5f)), module, Phase::FILTER_A_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 63.5f)), module, Phase::FILTER_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48f, 63.5f)), module, Phase::FILTER_A_INPUT));
 
 		// Mode switch A (Y=53.34mm)
 		addParam(createParamCentered<CKSS>(mm2px(Vec(43.18f, 53.34f)), module, Phase::MODE_A_PARAM));
@@ -2220,18 +2316,18 @@ struct PhaseWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(88.9f, 53.34f)), module, Phase::PAN_A_PARAM));
 
 		// CV inputs (Y=63.5mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 63.5f)), module, Phase::SLEEP_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(73.66f, 63.5f)), module, Phase::SPEED_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(88.9f, 63.5f)), module, Phase::PAN_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(55.88f, 63.5f)), module, Phase::SLEEP_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(73.66f, 63.5f)), module, Phase::SPEED_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(88.9f, 63.5f)), module, Phase::PAN_A_INPUT));
 
 		// --- Loop B controls ---
 		// Left side: CLK, START, LEN jacks (Y=78.74mm), then LEVEL, FILTER, CV (Y=91.44mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 78.74f)), module, Phase::CLOCK_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 78.74f)), module, Phase::START_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 78.74f)), module, Phase::END_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 78.74f)), module, Phase::CLOCK_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(20.32f, 78.74f)), module, Phase::START_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48f, 78.74f)), module, Phase::END_B_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(10.16f, 91.44f)), module, Phase::LEVEL_B_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(20.32f, 91.44f)), module, Phase::FILTER_B_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(30.48f, 91.44f)), module, Phase::FILTER_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(30.48f, 91.44f)), module, Phase::FILTER_B_INPUT));
 
 		// Mode switch B (Y=81.28mm)
 		addParam(createParamCentered<CKSS>(mm2px(Vec(43.18f, 81.28f)), module, Phase::MODE_B_PARAM));
@@ -2242,9 +2338,9 @@ struct PhaseWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(88.9f, 81.28f)), module, Phase::PAN_B_PARAM));
 
 		// CV inputs (Y=91.44mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 91.44f)), module, Phase::SLEEP_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(73.66f, 91.44f)), module, Phase::SPEED_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(88.9f, 91.44f)), module, Phase::PAN_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(55.88f, 91.44f)), module, Phase::SLEEP_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(73.66f, 91.44f)), module, Phase::SPEED_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(88.9f, 91.44f)), module, Phase::PAN_B_INPUT));
 
 		// --- Bottom section ---
 		// Play button + Sync button (Y=106.68mm)
@@ -2253,8 +2349,8 @@ struct PhaseWidget : ModuleWidget {
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(20.32f, 106.68f)), module, Phase::SYNC_PARAM));
 
 		// Play gate + Sync CV (Y=116.84mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 116.84f)), module, Phase::PLAY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, 116.84f)), module, Phase::SYNC_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 116.84f)), module, Phase::PLAY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(20.32f, 116.84f)), module, Phase::SYNC_INPUT));
 
 		// Record + link buttons (Y=106.68mm — same row as PLAY/SYNC).
 		// Buttons sit above the record jack row: REC A over GATE A (left),
@@ -2269,17 +2365,17 @@ struct PhaseWidget : ModuleWidget {
 		// Record jacks (Y=116.84mm). New layout: gates on the outside,
 		// audio inputs sandwiched in the middle.
 		// Order (left → right): GATE A · A IN · B IN · GATE B
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(35.56f, 116.84f)), module, Phase::REC_A_GATE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(45.72f, 116.84f)), module, Phase::REC_A_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 116.84f)), module, Phase::REC_B_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(66.13f, 116.84f)), module, Phase::REC_B_GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(35.56f, 116.84f)), module, Phase::REC_A_GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(45.72f, 116.84f)), module, Phase::REC_A_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(55.88f, 116.84f)), module, Phase::REC_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(66.13f, 116.84f)), module, Phase::REC_B_GATE_INPUT));
 
 		// Stereo outputs (Y=116.84mm), with POLY (A L, A R, B L, B R) and
 		// the two-channel SYNC above them on the same plate (Y=104.5mm)
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.74f, 116.84f)), module, Phase::LEFT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.9f, 116.84f)), module, Phase::RIGHT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(78.74f, 104.5f)), module, Phase::POLY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(88.9f, 104.5f)), module, Phase::SYNC_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(78.74f, 116.84f)), module, Phase::LEFT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(88.9f, 116.84f)), module, Phase::RIGHT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(78.74f, 104.5f)), module, Phase::POLY_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(88.9f, 104.5f)), module, Phase::SYNC_OUTPUT));
 	}
 
 	// Drag-and-drop WAV files onto the module to load samples. Dropping two

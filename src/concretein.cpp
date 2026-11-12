@@ -76,7 +76,7 @@ static const float RI_Y0 = 31.56f, RI_PITCH = 17.4f;
 struct ConcreteInWidget : ModuleWidget {
 	ConcreteInWidget(ConcreteIn* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/concretein.svg")));
+		setPanel(sfs::themedPanel("concretein"));
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
@@ -90,9 +90,9 @@ struct ConcreteInWidget : ModuleWidget {
 			lbl->add(RI_X_NUM, y + 0.83f, string::f("%d", l + 1));
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedLight>>>(
 				mm2px(Vec(RI_X_REC, y)), module, ConcreteIn::REC_PARAM + l, ConcreteIn::REC_LIGHT + l));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(RI_X_GATE, y)), module, ConcreteIn::REC_INPUT + l));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(RI_X_L, y)), module, ConcreteIn::L_INPUT + l));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(RI_X_R, y)), module, ConcreteIn::R_INPUT + l));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(RI_X_GATE, y)), module, ConcreteIn::REC_INPUT + l));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(RI_X_L, y)), module, ConcreteIn::L_INPUT + l));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(RI_X_R, y)), module, ConcreteIn::R_INPUT + l));
 			if (l > 0) lbl->divider(2.54f, y - RI_PITCH * 0.5f, 48.26f, y - RI_PITCH * 0.5f);
 		}
 	}

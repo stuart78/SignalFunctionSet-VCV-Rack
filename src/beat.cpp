@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "pulse-width.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -794,9 +795,9 @@ void BeatDisplay::drawLayer(const DrawArgs& args, int layer) {
 	const NVGcolor COL_BLUE       = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);  // primary active
 	const NVGcolor COL_BLUE_DARK  = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);  // selected mode tab bg
 	const NVGcolor COL_BLUE_LINE  = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);  // connector rails
-	const NVGcolor COL_PURPLE     = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);  // inactive cell
-	const NVGcolor COL_PURPLE_MID = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);  // beat-group accent / dim active
-	const NVGcolor COL_PURPLE_DK  = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);  // out of length / pattern indicator
+	const NVGcolor COL_PURPLE     = sfs::SCREEN_PURP;  // inactive cell
+	const NVGcolor COL_PURPLE_MID = sfs::SCREEN_PMID;  // beat-group accent / dim active
+	const NVGcolor COL_PURPLE_DK  = sfs::SCREEN_BG;  // out of length / pattern indicator
 	const NVGcolor COL_ORANGE     = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);  // currently playing
 	const NVGcolor COL_TEXT_DIM   = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
@@ -1073,9 +1074,9 @@ void BeatDisplay::drawPreview(const DrawArgs& args) {
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_BLUE_DARK   = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);
 	const NVGcolor COL_BLUE_LINE   = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);
-	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
-	const NVGcolor COL_PURPLE_DK   = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);
+	const NVGcolor COL_PURPLE      = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_MID  = sfs::SCREEN_PMID;
+	const NVGcolor COL_PURPLE_DK   = sfs::SCREEN_BG;
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 
@@ -1233,7 +1234,19 @@ void BeatDisplay::drawPreview(const DrawArgs& args) {
 struct BeatWidget : ModuleWidget {
 	BeatWidget(Beat* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/beat.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("beat"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("BEAT");
+		lbl->jack(10.16f, 91.45f, "RESET");
+		lbl->jack(10.16f, 106.68f, "BAR");
+		lbl->jack(10.16f, 121.92f, "CLOCK");
+		lbl->jackOnPlate(40.64f, 91.45f, "VEL");
+		lbl->jackOnPlate(40.64f, 106.68f, "ACC");
+		lbl->jackOnPlate(40.64f, 121.92f, "GATE");
 
 
 		// Display: x=2.4, y=12.2, w=46, h=41 (per updated Beat SVG)
@@ -1244,19 +1257,19 @@ struct BeatWidget : ModuleWidget {
 		addChild(display);
 
 		// Inputs (LEFT column at x=10.16mm) — top→bottom: RESET, BAR, CLOCK
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 91.45f)),  module, Beat::RESET_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 106.68f)), module, Beat::BAR_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 121.92f)), module, Beat::CLOCK_INPUT));
 
 		// Outputs (RIGHT column at x=40.64mm on dark plate) — top→bottom: VEL, ACC, GATE
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(40.64f, 91.45f)),  module, Beat::VELOCITY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(40.64f, 106.68f)), module, Beat::ACCENT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(40.64f, 121.92f)), module, Beat::GATE_OUTPUT));
 	}
 

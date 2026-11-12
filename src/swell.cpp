@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -246,8 +247,8 @@ void SwellDisplay::drawLayer(const DrawArgs& args, int layer) {
 	// Palette (matches Beat / Note / Meter)
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_BLUE_FAINT  = nvgRGBA(0x00, 0x97, 0xDE, 0x60);
-	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_DIM  = nvgRGBA(0x35, 0x35, 0x4D, 0x80);
+	const NVGcolor COL_PURPLE      = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_DIM  = nvgTransRGBA(sfs::SCREEN_PURP, 0x80);
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0xC0, 0xC0, 0xD0, 0xC0);
 
@@ -379,7 +380,7 @@ void SwellDisplay::drawLayer(const DrawArgs& args, int layer) {
 // Static scope trace: a few staggered rises stacked additively, then decaying.
 void SwellDisplay::drawPreview(const DrawArgs& args) {
 	const NVGcolor COL_BLUE       = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
-	const NVGcolor COL_PURPLE_DIM = nvgRGBA(0x35, 0x35, 0x4D, 0x80);
+	const NVGcolor COL_PURPLE_DIM = nvgTransRGBA(sfs::SCREEN_PURP, 0x80);
 
 	float w = box.size.x;
 	float h = box.size.y;
@@ -433,7 +434,14 @@ void SwellDisplay::drawPreview(const DrawArgs& args) {
 struct SwellWidget : ModuleWidget {
 	SwellWidget(Swell* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/swell.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// the triangle that labels DELTA and the marks beside CURVE.
+		setPanel(sfs::themedPanel("swell"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("SWELL");
 
 		// Display (top of panel)
 		SwellDisplay* display = new SwellDisplay();
@@ -448,33 +456,43 @@ struct SwellWidget : ModuleWidget {
 
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(xL, 45.72f)), module, Swell::DELTA_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 45.72f)), module, Swell::DELTA_CV_INPUT));
+		lbl->link(xL, 45.72f, xR, 45.72f);   // labelled by the triangle in the art
 
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(xL, 60.96f)), module, Swell::RISE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 60.96f)), module, Swell::RISE_CV_INPUT));
+		lbl->trim(xL, 60.96f, "RISE");
+		lbl->link(xL, 60.96f, xR, 60.96f);
 
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(xL, 76.2f)), module, Swell::DECAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 76.2f)), module, Swell::DECAY_CV_INPUT));
+		lbl->trim(xL, 76.2f, "FALL");
+		lbl->link(xL, 76.2f, xR, 76.2f);
 
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(xL, 91.44f)), module, Swell::CURVE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 91.44f)), module, Swell::CURVE_CV_INPUT));
+		lbl->trim(xL, 91.44f, "CURVE");
+		lbl->link(xL, 91.44f, xR, 91.44f);
 
 		// RESET (right column, alone)
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 106.68f)), module, Swell::RESET_INPUT));
+		lbl->jack(xR, 106.68f, "RESET");
 
 		// Bottom row: PING (left) + OUT (right, on dark plate)
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(xL, 121.92f)), module, Swell::PING_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(xR, 121.92f)), module, Swell::CV_OUTPUT));
+		lbl->jack(xL, 121.92f, "PING");
+		lbl->jackOnPlate(xR, 121.92f, "OUT");
 	}
 };
 

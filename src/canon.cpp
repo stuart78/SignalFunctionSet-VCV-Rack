@@ -988,7 +988,7 @@ static const float CN_CY = 91.3f, CN_CCV = 101.6f, CN_FY = 121.9f;
 struct CanonWidget : ModuleWidget {
 	CanonWidget(Canon* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/canon.svg")));
+		setPanel(sfs::themedPanel("canon"));
 
 		CanonDisplay* disp = new CanonDisplay();
 		disp->module = module;
@@ -998,29 +998,29 @@ struct CanonWidget : ModuleWidget {
 
 		// the key and the sets
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_GX[0], CN_GY)), module, Canon::ROOT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[1], CN_GY)), module, Canon::ROOT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[1], CN_GY)), module, Canon::ROOT_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_GX[2], CN_GY)), module, Canon::SCALE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[3], CN_GY)), module, Canon::SCALE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[3], CN_GY)), module, Canon::SCALE_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CN_GX[4], CN_GY)), module, Canon::SET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[5], CN_GY)), module, Canon::SET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[5], CN_GY)), module, Canon::SET_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_GX[6], CN_GY)), module, Canon::SETSEL_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[7], CN_GY)), module, Canon::SET_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[7], CN_GY)), module, Canon::SET_CV_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CN_GX[8], CN_GY)), module, Canon::LEARN_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[9], CN_GY)), module, Canon::LEARN_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[9], CN_GY)), module, Canon::LEARN_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CN_GX[10], CN_GY)), module, Canon::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_GX[11], CN_GY)), module, Canon::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_GX[11], CN_GY)), module, Canon::RESET_INPUT));
 
 		// the channels: three columns each, GATE in then GATE out and V/OCT out on the plate
 		for (int c = 0; c < CN_CH; c++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_CX[3 * c], CN_CY)), module, Canon::PATTERN_PARAM + c));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_CX[3 * c], CN_CCV)), module, Canon::PATTERN_INPUT + c));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_CX[3 * c], CN_CCV)), module, Canon::PATTERN_INPUT + c));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_CX[3 * c + 1], CN_CY)), module, Canon::WANDER_PARAM + c));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_CX[3 * c + 1], CN_CCV)), module, Canon::WANDER_INPUT + c));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_CX[3 * c + 1], CN_CCV)), module, Canon::WANDER_INPUT + c));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CN_CX[3 * c + 2], CN_CY)), module, Canon::OCTAVE_PARAM + c));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_CX[3 * c + 2], CN_CCV)), module, Canon::OCTAVE_INPUT + c));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CN_FX[3 * c], CN_FY)), module, Canon::GATE_INPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CN_FX[3 * c + 1], CN_FY)), module, Canon::GATE_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CN_FX[3 * c + 2], CN_FY)), module, Canon::CV_OUTPUT + c));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_CX[3 * c + 2], CN_CCV)), module, Canon::OCTAVE_INPUT + c));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CN_FX[3 * c], CN_FY)), module, Canon::GATE_INPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CN_FX[3 * c + 1], CN_FY)), module, Canon::GATE_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CN_FX[3 * c + 2], CN_FY)), module, Canon::CV_OUTPUT + c));
 		}
 	}
 

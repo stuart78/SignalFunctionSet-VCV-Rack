@@ -845,12 +845,30 @@ struct Wheel : Module {
 // The wheel is drawn ON the faceplate — no screen, no dark slab. That inverts
 // every colour decision: the display palette is built to glow out of a #1a1a32
 // ground and simply disappears on #f0f0f0. These are the panel's own inks.
-static const NVGcolor W_LINE = nvgRGB(0xB4, 0xB4, 0xB4);   // structure
-static const NVGcolor W_DIM  = nvgRGB(0xD0, 0xD0, 0xD0);   // inactive
-static const NVGcolor W_SOFT = nvgRGB(0x7C, 0x7C, 0x7C);   // secondary
-static const NVGcolor W_INK  = nvgRGB(0x2E, 0x2E, 0x2E);   // primary text
-static const NVGcolor W_LIVE = nvgRGB(0x3C, 0x3C, 0x3C);   // armed, sounding
-static const NVGcolor W_HOT  = nvgRGB(0xE8, 0x64, 0x1F);   // a buzz
+// Drawn on the faceplate, so it has a dark-panel palette too: the same greys
+// turned round, so more ink is lighter rather than darker. The light values are
+// the ones this drawing has always used.
+struct WhPal {
+	NVGcolor line, dim, soft, ink, live, hot;
+	NVGcolor slot, tread, face, tick;   // the slot's shade, the wheel's tread and near face, a strip tick
+};
+static inline const WhPal& whPal() {
+	static const WhPal L = {nvgRGB(0xB4, 0xB4, 0xB4), nvgRGB(0xD0, 0xD0, 0xD0), nvgRGB(0x7C, 0x7C, 0x7C),
+	                        nvgRGB(0x2E, 0x2E, 0x2E), nvgRGB(0x3C, 0x3C, 0x3C), nvgRGB(0xE8, 0x64, 0x1F),
+	                        nvgRGBA(0x9A, 0x9A, 0xA6, 0x26), nvgRGB(0xBE, 0xBE, 0xC6), nvgRGB(0xD6, 0xD6, 0xDC),
+	                        nvgRGBA(0x7C, 0x7C, 0x7C, 0x50)};
+	static const WhPal D = {nvgRGB(0x6E, 0x6E, 0x74), nvgRGB(0x4C, 0x4C, 0x52), nvgRGB(0xA0, 0xA0, 0xA6),
+	                        nvgRGB(0xE6, 0xE6, 0xE8), nvgRGB(0xD0, 0xD0, 0xD4), nvgRGB(0xE8, 0x64, 0x1F),
+	                        nvgRGBA(0x00, 0x00, 0x00, 0x30), nvgRGB(0x5A, 0x5A, 0x62), nvgRGB(0x4A, 0x4A, 0x50),
+	                        nvgRGBA(0xA0, 0xA0, 0xA6, 0x50)};
+	return sfs::dark() ? D : L;
+}
+#define W_LINE (whPal().line)    // structure
+#define W_DIM  (whPal().dim)     // inactive
+#define W_SOFT (whPal().soft)    // secondary
+#define W_INK  (whPal().ink)     // primary text
+#define W_LIVE (whPal().live)    // armed, sounding
+#define W_HOT  (whPal().hot)     // a buzz
 
 struct WheelDisplay : OpaqueWidget {
 	Wheel* module = nullptr;
@@ -1056,7 +1074,7 @@ struct WheelDisplay : OpaqueWidget {
 			if (i == 0) nvgMoveTo(vg, px, py); else nvgLineTo(vg, px, py);
 		}
 		nvgClosePath(vg);
-		nvgFillColor(vg, nvgRGBA(0x9A, 0x9A, 0xA6, 0x26));
+		nvgFillColor(vg, whPal().slot);
 		nvgFill(vg);
 		nvgStrokeColor(vg, W_DIM);
 		nvgStrokeWidth(vg, mm2px(0.2f));
@@ -1077,7 +1095,7 @@ struct WheelDisplay : OpaqueWidget {
 			nvgLineTo(vg, ox + p.x * sc, oy + p.y * sc);
 		}
 		nvgClosePath(vg);
-		nvgFillColor(vg, mixc(nvgRGB(0xBE, 0xBE, 0xC6), W_HOT, st.flash * 0.35f));
+		nvgFillColor(vg, mixc(whPal().tread, W_HOT, st.flash * 0.35f));
 		nvgFill(vg);
 
 		// the face toward us, filled: the wheel is a solid body, not a cage
@@ -1090,7 +1108,7 @@ struct WheelDisplay : OpaqueWidget {
 		}
 		{ P3 e = cam(xNearFace, YSB, -zc0); nvgLineTo(vg, ox + e.x * sc, oy + e.y * sc); }
 		nvgClosePath(vg);
-		nvgFillColor(vg, nvgRGB(0xD6, 0xD6, 0xDC));
+		nvgFillColor(vg, whPal().face);
 		nvgFill(vg);
 		nvgStrokeColor(vg, W_LINE);
 		nvgStrokeWidth(vg, mm2px(0.22f));
@@ -1226,7 +1244,7 @@ struct WheelDisplay : OpaqueWidget {
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, x, by - str * 0.91f * unit);
 			nvgLineTo(vg, x, by - str * 1.09f * unit);
-			nvgStrokeColor(vg, nvgRGBA(0x7C, 0x7C, 0x7C, 0x50));
+			nvgStrokeColor(vg, whPal().tick);
 			nvgStrokeWidth(vg, mm2px(1.5f));
 			nvgStroke(vg);
 
@@ -1312,7 +1330,7 @@ struct WheelDisplay : OpaqueWidget {
 struct WheelWidget : ModuleWidget {
 	WheelWidget(Wheel* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/wheel.svg")));
+		setPanel(sfs::themedPanel("wheel"));
 
 		// NO sfs::PanelLabels HERE, DELIBERATELY. res/wheel.svg is the designer's
 		// own Figma export and it carries every label as an outlined path. Rack
@@ -1345,19 +1363,19 @@ struct WheelWidget : ModuleWidget {
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(LX[i], LT1)), module,
 			         Wheel::ROOT_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(LX[i], LJ1)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(LX[i], LJ1)), module,
 			         Wheel::ROOT_INPUT + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(LX[i], LT2)), module,
 			         Wheel::PRESS_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(LX[i], LJ2)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(LX[i], LJ2)), module,
 			         Wheel::PRESS_INPUT + i));
 		}
 		// CLOCK above, COUP below — the art's order, which is the reverse of the
 		// code's previous layout.
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(LSIDE, LT1)), module, Wheel::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(LSIDE, LT2)), module, Wheel::COUP_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(LSIDE, LT1)), module, Wheel::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(LSIDE, LT2)), module, Wheel::COUP_INPUT));
 		for (int i = 0; i < 5; i++)
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(OUTX[i], OUTY)), module,
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(OUTX[i], OUTY)), module,
 			          Wheel::LEFT_OUTPUT + i));
 
 		// ── right: six voice columns, three sub-columns each ─────────────────
@@ -1408,18 +1426,18 @@ struct WheelWidget : ModuleWidget {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(xr, VT2)), module,
 			         Wheel::WAVE_PARAM + v));
 
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xl, VJ1)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xl, VJ1)), module,
 			         Wheel::DEG_INPUT + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xr, VJ1)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xr, VJ1)), module,
 			         Wheel::LEVELV_INPUT + v));
 			if (v != 0)
-				addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xl, VJ2)), module,
+				addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xl, VJ2)), module,
 				         Wheel::PHASE_INPUT + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xr, VJ2)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xr, VJ2)), module,
 			         Wheel::PRESSV_INPUT + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xl, VJ3)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xl, VJ3)), module,
 			         Wheel::GATE_INPUT + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xr, VJ3)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xr, VJ3)), module,
 			         Wheel::WAVE_INPUT + v));
 		}
 	}

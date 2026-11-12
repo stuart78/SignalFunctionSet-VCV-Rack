@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "fugue-messages.hpp"
 #include "pulse-width.hpp"
+#include "panel-style.hpp"
 
 static const int SLEEP_VALUES[] = {0, 1, 2, 4, 5, 8, 16, 32, 48, 64};
 static const int NUM_SLEEP_VALUES = 10;
@@ -271,7 +272,13 @@ struct FugueX : Module {
 struct FugueXWidget : ModuleWidget {
 	FugueXWidget(FugueX* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/fugue-expander.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("fugue-expander"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("FUGUE XL");
 
 
 		// ══════════════════════════════════════════════════════════════════════
@@ -312,12 +319,16 @@ struct FugueXWidget : ModuleWidget {
 
 		// Rand Seq button @ (10.16, 27.94), jack @ (20.32, 27.94)
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(10.16f, topRowY)), module, FugueX::RAND_SEQ_BUTTON_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(20.32f, topRowY)), module, FugueX::RAND_SEQ_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(20.32f, topRowY)), module, FugueX::RAND_SEQ_INPUT));
 
 		// S&H toggle @ (40.64, 27.94)
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<WhiteLight>>>(
 			mm2px(Vec(40.64f, topRowY)), module,
 			FugueX::SAMPLE_HOLD_PARAM, FugueX::SAMPLE_HOLD_LIGHT));
+		// one label over the RANDOM SEQ button and its jack, which a line joins
+		lbl->add(15.24f, topRowY - sfs::LABEL_GAP_JACK, "RANDOM SEQ");
+		lbl->link(10.16f, topRowY, 20.32f, topRowY);
+		lbl->add(40.64f, topRowY - sfs::LABEL_GAP_JACK, "S&H");
 
 		// ══════════════════════════════════════════════════════════════════════
 		// LED MATRIX (top-right): 9 cols x 3 rows
@@ -345,36 +356,69 @@ struct FugueXWidget : ModuleWidget {
 		// ══════════════════════════════════════════════════════════════════════
 
 		const float voiceYs[] = {voiceAY, voiceBY, voiceCY};
+		static const char* const voiceNames[] = {"A", "B", "C"};
+
+		// the four column groups: a rule under the top row, rules between the
+		// columns and a rule over the outputs
+		lbl->divider(5.08f, 33.80f, 116.84f, 33.80f);
+		lbl->divider(30.48f, 33.87f, 30.48f, 83.82f);
+		lbl->divider(61.07f, 33.87f, 61.07f, 83.82f);
+		lbl->divider(91.55f, 33.87f, 91.55f, 83.82f);
+		lbl->divider(5.08f, 83.82f, 117.92f, 83.82f);
+		lbl->knob(stpKnobX, voiceAY, "STEPS");
+		lbl->knob(rngKnobX, voiceAY, "RANGE");
+		lbl->knob(slpKnobX, voiceAY, "SLEEP");
+		lbl->knob(prbKnobX, voiceAY, "PROB");
+		const float knobXs[] = {stpKnobX, rngKnobX, slpKnobX, prbKnobX};
+		const float letterXs[] = {2.45f, 32.90f, 63.40f, 93.80f};
+		for (int v = 0; v < FUGUE_NUM_VOICES; v++) {
+			for (int c = 0; c < 4; c++) {
+				// each knob tied to its CV jack, and the voice letter left of the knob
+				lbl->link(knobXs[c], voiceYs[v], knobXs[c] + 10.16f, voiceYs[v]);
+				lbl->add(letterXs[c], voiceYs[v] + 0.83f, voiceNames[v]);
+			}
+		}
 
 		for (int v = 0; v < FUGUE_NUM_VOICES; v++) {
 			float y = voiceYs[v];
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(stpKnobX, y)), module, FugueX::STEPS_A_PARAM + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(stpCvX, y)), module, FugueX::STEPS_A_INPUT + v));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(stpCvX, y)), module, FugueX::STEPS_A_INPUT + v));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(rngKnobX, y)), module, FugueX::RANGE_A_PARAM + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(rngCvX, y)), module, FugueX::RANGE_A_INPUT + v));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(rngCvX, y)), module, FugueX::RANGE_A_INPUT + v));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(slpKnobX, y)), module, FugueX::SLEEP_A_PARAM + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(slpCvX, y)), module, FugueX::SLEEP_A_INPUT + v));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(slpCvX, y)), module, FugueX::SLEEP_A_INPUT + v));
 
 			addParam(createParamCentered<RoundSmallBlackKnob>(mm2px(Vec(prbKnobX, y)), module, FugueX::PROB_A_PARAM + v));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(prbCvX, y)), module, FugueX::PROB_A_INPUT + v));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(prbCvX, y)), module, FugueX::PROB_A_INPUT + v));
 		}
 
 		// ══════════════════════════════════════════════════════════════════════
 		// BOTTOM SECTION: Per-step triggers + Max/Mid/Min
 		// ══════════════════════════════════════════════════════════════════════
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX, gateAY)), module, FugueX::MAX_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX, gateBY)), module, FugueX::MID_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(minMidMaxX, gateCY)), module, FugueX::MIN_OUTPUT));
+		// GATE heads the step-gate grid, CV the MAX/MID/MIN column; the voice
+		// letters and MAX/MID/MIN sit beside their rows, off the plates
+		lbl->add(7.31f, gateAY - sfs::LABEL_GAP_JACK, "GATE", sfs::PanelLabels::ON_PLATE, NVG_ALIGN_LEFT);
+		lbl->jackOnPlate(minMidMaxX, gateAY, "CV");
+		const float gateYs[] = {gateAY, gateBY, gateCY};
+		static const char* const cvNames[] = {"MAX", "MID", "MIN"};
+		for (int v = 0; v < FUGUE_NUM_VOICES; v++) {
+			lbl->add(2.45f, gateYs[v] + 0.83f, voiceNames[v]);
+			lbl->add(105.1f, gateYs[v] + 0.83f, cvNames[v], sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+		}
+
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX, gateAY)), module, FugueX::MAX_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX, gateBY)), module, FugueX::MID_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(minMidMaxX, gateCY)), module, FugueX::MIN_OUTPUT));
 
 		for (int s = 0; s < FUGUE_NUM_STEPS; s++) {
 			float x = gateStartX + s * gateSpacing;
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, gateAY)), module, FugueX::GATE_A_OUTPUT_0 + s));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, gateBY)), module, FugueX::GATE_B_OUTPUT_0 + s));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, gateCY)), module, FugueX::GATE_C_OUTPUT_0 + s));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, gateAY)), module, FugueX::GATE_A_OUTPUT_0 + s));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, gateBY)), module, FugueX::GATE_B_OUTPUT_0 + s));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, gateCY)), module, FugueX::GATE_C_OUTPUT_0 + s));
 		}
 	}
 

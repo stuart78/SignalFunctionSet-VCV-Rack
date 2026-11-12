@@ -344,12 +344,12 @@ struct OpMorph : Module {
 };
 
 // ── display: the field on top, the live matrix underneath ───────────────────
-static const NVGcolor OPM_BG    = nvgRGB(0x1a, 0x1a, 0x32);
-static const NVGcolor OPM_DIM   = nvgRGB(0x35, 0x35, 0x4d);
-static const NVGcolor OPM_MID   = nvgRGB(0x4a, 0x4a, 0x66);
+#define OPM_BG (sfs::SCREEN_BG)
+#define OPM_DIM (sfs::SCREEN_PURP)
+#define OPM_MID (sfs::SCREEN_PMID)
 static const NVGcolor OPM_BLUE  = nvgRGB(0x00, 0x97, 0xde);
 static const NVGcolor OPM_HOT   = nvgRGB(0xec, 0x65, 0x2e);
-static const NVGcolor OPM_TEXT  = nvgRGB(0xe8, 0xe8, 0xf0);
+#define OPM_TEXT (sfs::SCREEN_TEXT)
 
 struct OpMorphDisplay : Widget {
 	OpMorph* module = nullptr;
@@ -483,7 +483,7 @@ struct OpMorphDisplay : Widget {
 		// the structurally empty half, painted back over the wash: no operator
 		// can modulate itself or anything above it, so those cells are not
 		// controls that happen to be at zero
-		nvgFillColor(vg, nvgRGB(0x22, 0x22, 0x38));
+		nvgFillColor(vg, sfs::dark() ? nvgRGB(0x24, 0x24, 0x2A) : nvgRGB(0x22, 0x22, 0x38));
 		for (int i = 0; i < 6; i++)
 			for (int j = 0; j < 7; j++)
 				if (!usableAt(i, j)) {
@@ -759,7 +759,7 @@ static const float BY = 121.26f;
 struct OpMorphWidget : ModuleWidget {
 	OpMorphWidget(OpMorph* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/opmorph.svg")));
+		setPanel(sfs::themedPanel("opmorph"));
 
 		static const int KP[4] = {OpMorph::SPEED_PARAM, OpMorph::SHAPE_PARAM,
 		                          OpMorph::SPREAD_PARAM, OpMorph::MODE_PARAM};
@@ -782,12 +782,12 @@ struct OpMorphWidget : ModuleWidget {
 		// so a cable hangs under the thing it modulates.
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(KX[i], KY)), module, KP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(JX[i], JY)), module, KI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(JX[i], JY)), module, KI[i]));
 		}
 		addParam(createParamCentered<CKSS>(mm2px(Vec(STEP_X, STEP_Y)), module, OpMorph::STEP_PARAM));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BX[0], BY)), module, OpMorph::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(BX[1], BY)), module, OpMorph::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BX[0], BY)), module, OpMorph::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(BX[1], BY)), module, OpMorph::RESET_INPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

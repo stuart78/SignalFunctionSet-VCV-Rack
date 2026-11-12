@@ -535,3 +535,38 @@ far true).
 ## Round 11: credits on the screen (2026-10-19)
 
 The scan credits used to sit as a line under the room name, for scanned rooms only. They are now behind a **CREDITS** button under the room size. Clicking it opens a list of all nine scans, each with its author, its link and its licence (CC BY asks for all three), with the room on screen drawn brighter. A last line names the three rooms built from published dimensions and points to this document for the estimated details. Any click closes the list, and while it is open a click neither drags a source nor turns the view. The links come from `res/spaces/CREDITS.txt` and are now part of each `SPACES[]` credit string, so the right-click "Scan credits" menu shows them too.
+
+## Round 12: placement you can hear (2026-11-12)
+
+Reported: moving the mics made little difference. Measured, the wet signal
+did change with placement: the direct sound ran from 0 dB to between −11 and
+−20 dB of the wet as a source went from beside the listener to its default
+position. Three things hid that change.
+
+- **Every room is past its critical distance almost everywhere.** It is
+  0.4 m (Salt Tower) to 3.7 m (Hintze Hall), and the cistern's is 1.4 m.
+  This part is true of the real rooms and stays.
+- **The wet level was normalised per trace** (`wetNorm`), so a near source
+  and a far one came out equally loud. Loudness is the first distance cue.
+- **MIX added a second direct sound.** The wet signal already contains the
+  direct path, delayed and attenuated for its distance. MIX at 50% added the
+  dry input over it, undelayed and at a fixed level, so the direct-to-reverb
+  ratio could not fall below about 0 dB. In the cistern that cut the change
+  from source at 1.5 m to source at 15 m from 18 dB to 3.5 dB.
+
+Two context-menu options, both on for a new module and off for a patch saved
+before they existed (no `levelByDistance` / `mixDirect` key):
+
+- **Level: follows distance.** The worker also traces the room at its default
+  positions (`ref`, a third of the rays, redone only when the room or the
+  distance law changes) and `assemble(..., levelFrom)` takes the wet level from
+  that trace. A source closer than its default comes up, capped at
+  `LEVEL_RISE_DB` = 6 dB; one further off goes quieter and wetter, with the
+  reverberation as the floor (−0.4 to −1.8 dB at 1.6× the default distance).
+  The cap is reached at about 2 m in the Pantheon, Hintze Hall and Houston.
+- **MIX blends the room's direct sound against its reverberation.** The trace
+  marks the direct path's tap (`Tap::direct`); `pack()` puts it in
+  `packedDirect`; `Reverb::process` reports it apart (`dirL/dirR`). At the
+  centre the output is the whole wet signal (the room as traced), below it the
+  reverberation fades out under the direct sound, above it the direct sound
+  fades out under the reverberation. The dry input is not used.

@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "op_env_engine.h"
+#include "panel-style.hpp"
 #include <osdialog.h>
 #include <vector>
 #include <string>
@@ -364,7 +365,7 @@ struct OpEnvDisplay : OpaqueWidget {
 			aL3 = module->levelAmps[2]; aL4 = module->levelAmps[3];
 			relX = module->releaseFrac;
 		}
-		NVGcolor dimLine = nvgRGB(0x2b, 0x2b, 0x42);
+		NVGcolor dimLine = sfs::screenTone(nvgRGB(0x2b, 0x2b, 0x42));
 		NVGcolor dimText = nvgRGBA(0x7a, 0x82, 0xa0, 0xbb);
 
 		nvgStrokeColor(vg, dimLine); nvgStrokeWidth(vg, std::max(0.5f, s * 0.7f));
@@ -424,8 +425,8 @@ struct OpEnvDisplay : OpaqueWidget {
 		NVGcontext* vg = args.vg;
 		float w = box.size.x, h = box.size.y;
 		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 4.f);
-		nvgFillColor(vg, nvgRGB(0x1A, 0x1A, 0x2E)); nvgFill(vg);
-		nvgStrokeColor(vg, nvgRGB(0x40, 0x40, 0x60)); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
+		nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
+		nvgStrokeColor(vg, sfs::screenTone(nvgRGB(0x40, 0x40, 0x60))); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 		nvgIntersectScissor(vg, 1, 1, w - 2, h - 2);
 		if (!font || font->handle < 0)
 			font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -437,13 +438,53 @@ struct OpEnvDisplay : OpaqueWidget {
 struct OpEnvWidget : ModuleWidget {
 	OpEnvWidget(OpEnv* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/op_env.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("op_env"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("OP-ENV");
+		{
+			static const char* NUM[4] = {"1", "2", "3", "4"};
+			const float cols[4] = {25.4f, 40.64f, 55.88f, 71.12f};
+			for (int i = 0; i < 4; i++) {
+				lbl->pairDown(cols[i], 55.88f, 66.04f, NUM[i]);
+				lbl->pairDown(cols[i], 81.28f, 91.44f, NUM[i]);
+			}
+			// each row's four pots joined, and the row named at its left
+			lbl->link(25.4f, 55.88f, 71.12f, 55.88f);
+			lbl->link(25.4f, 81.28f, 71.12f, 81.28f);
+			lbl->add(19.47f, 56.71f, "LEVEL", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+			lbl->add(19.47f, 82.11f, "RATE", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+			// VOICE over its CV; BANK's CV over its pot
+			lbl->pairDown(91.44f, 55.88f, 66.04f, "VOICE");
+			lbl->jack(91.44f, 81.28f, "BANK");
+			lbl->link(91.44f, 81.28f, 91.44f, 91.44f);
+			// the foot: LFO RATE, DEPTH and AM SENS joined, DELAY hooked off them
+			lbl->jack(10.16f, 106.68f, "V/OCT");
+			lbl->jack(10.16f, 121.92f, "GATE");
+			lbl->pairDown(25.4f, 106.68f, 121.92f, "LFO");
+			lbl->pairDown(40.64f, 106.68f, 121.92f, "DEPTH");
+			lbl->trim(55.88f, 106.68f, "AM SENS");
+			lbl->link(25.4f, 106.68f, 55.88f, 106.68f);
+			lbl->link(48.26f, 106.68f, 48.26f, 121.92f);
+			lbl->link(48.26f, 121.92f, 55.88f, 121.92f);
+			lbl->trim(55.88f, 121.92f, "DELAY");
+			lbl->pairDown(71.12f, 106.68f, 121.92f, "OUT LVL");
+			lbl->jackOnPlate(91.44f, 121.92f, "ENV");
+			// section rules
+			lbl->divider(81.28f, 55.88f, 81.28f, 96.52f);
+			lbl->divider(5.08f, 96.52f, 98.21f, 96.52f);
+			lbl->divider(18.63f, 96.52f, 18.63f, 127.f);
+			lbl->divider(63.5f, 96.52f, 63.5f, 127.f);
+		}
 
 		// No virtual screws — see CLAUDE.md (SFS panels omit them by design).
 
 		OpEnvDisplay* disp = new OpEnvDisplay();
 		disp->module = module;
-		disp->box.pos = mm2px(Vec(4.233f, 12.33f));   // matches res/op_env.svg screen rect
+		disp->box.pos = mm2px(Vec(4.233f, 12.33f));
 		disp->box.size = mm2px(Vec(93.f, 30.f));
 		addChild(disp);
 
@@ -456,32 +497,32 @@ struct OpEnvWidget : ModuleWidget {
 		// LEVELS: trimpot @ 55.88, CV @ 66.04.
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(colN[i], 55.88f)), module, OpEnv::L1_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colN[i], 66.04f)), module, OpEnv::L1_CV_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colN[i], 66.04f)), module, OpEnv::L1_CV_INPUT + i));
 		}
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(col5, 55.88f)), module, OpEnv::VOICE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(col5, 66.04f)), module, OpEnv::VOICE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(col5, 66.04f)), module, OpEnv::VOICE_CV_INPUT));
 
 		// RATES: trimpot @ 81.28, CV @ 91.44. BANK is mirrored (jack above, pot
 		// below) so the VOICE/BANK jacks sit adjacent in the middle.
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(colN[i], 81.28f)), module, OpEnv::R1_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colN[i], 91.44f)), module, OpEnv::R1_CV_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colN[i], 91.44f)), module, OpEnv::R1_CV_INPUT + i));
 		}
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(col5, 81.28f)), module, OpEnv::BANK_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(col5, 81.28f)), module, OpEnv::BANK_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(col5, 91.44f)), module, OpEnv::BANK_PARAM));
 
 		// Bottom: trimpots on the upper row (106.68), jacks on the lower (121.92).
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 106.68f)), module, OpEnv::VOCT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 121.92f)), module, OpEnv::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 106.68f)), module, OpEnv::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 121.92f)), module, OpEnv::GATE_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(25.4f, 106.68f)), module, OpEnv::LFO_RATE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.4f, 121.92f)), module, OpEnv::LFO_RATE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.4f, 121.92f)), module, OpEnv::LFO_RATE_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(40.64f, 106.68f)), module, OpEnv::LFO_DEPTH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(40.64f, 121.92f)), module, OpEnv::LFO_DEPTH_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(40.64f, 121.92f)), module, OpEnv::LFO_DEPTH_CV_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(55.88f, 106.68f)), module, OpEnv::AM_SENS_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(55.88f, 121.92f)), module, OpEnv::LFO_DELAY_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(71.12f, 106.68f)), module, OpEnv::OUTLVL_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(71.12f, 121.92f)), module, OpEnv::OUTLVL_CV_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(91.44f, 121.92f)), module, OpEnv::ENV_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(71.12f, 121.92f)), module, OpEnv::OUTLVL_CV_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(91.44f, 121.92f)), module, OpEnv::ENV_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

@@ -16,6 +16,7 @@ import glob
 import keyword
 import math
 import os
+import json
 import re
 import sys
 
@@ -41,6 +42,7 @@ SIZES = {
     "RoundHugeBlackKnob": (53.859, 53.859), "RoundLargeBlackKnob": (36.0, 36.0),
     "RoundBlackKnob": (28.348, 28.348), "RoundSmallBlackKnob": (22.676, 22.676),
     "Trimpot": (17.856, 17.859), "PJ301MPort": (23.7, 23.7),
+    "ThemedPJ301MPort": (23.7, 23.7), "Jack": (23.7, 23.7),   # sfs::Jack
     "Rogan1PBlue": (31.398, 31.398), "Rogan1PSBlue": (39.684, 39.684),
     "Rogan2PBlue": (34.293, 34.293), "Rogan3PBlue": (41.762, 41.762),
     "Rogan3PSBlue": (51.844, 51.844), "Rogan5PSGray": (59.527, 59.527),
@@ -54,7 +56,7 @@ SIZES = {
     "TinyLight": (1.0 * MM, 1.0 * MM), "SmallLight": (2.0 * MM, 2.0 * MM),
     "MediumLight": (3.0 * MM, 3.0 * MM), "LargeLight": (5.0 * MM, 5.0 * MM),
 }
-ROUND = ("Knob", "Rogan", "Trimpot", "PJ301MPort", "VCVButton", "VCVLightBezel",
+ROUND = ("Knob", "Rogan", "Trimpot", "PJ301MPort", "Jack", "VCVButton", "VCVLightBezel",
          "VCVLightLatch", "Light")
 
 
@@ -62,8 +64,9 @@ def component(call):
     """Component class from create*Centered<X<Y<Z>>>(...) — outermost wins."""
     # `\s*` on both sides of the `<`: key.cpp writes `createInputCentered <PJ301MPort>`
     # and without it every one of Key's channel controls was silently skipped.
-    m = re.search(r"create\w*?Centered\s*<\s*([A-Za-z0-9_]+)", call)
-    return m.group(1) if m else None
+    # a namespace is dropped, so sfs::Jack reads as Jack
+    m = re.search(r"create\w*?Centered\s*<\s*((?:[A-Za-z0-9_]+::)*)([A-Za-z0-9_]+)", call)
+    return m.group(2) if m else None
 
 
 def widget_source(src, module):
@@ -510,6 +513,9 @@ PLATES = {
     "loom": [(hp(6.2), hp(15.8), hp(19.0), hp(4.7)),
              (hp(23.5), hp(20.9), hp(4.2), hp(2.9))],
     "slidex": [], "opmorph": [], "gravity": [],
+    # MIN and MAX columns joined by the A-D row: the old art's U, in three rects
+    "drift": [(0.85, 91.44, 10.93, 32.17), (38.18, 91.44, 11.77, 32.17),
+              (0.85, 108.37, 49.10, 15.24)],
 }
 
 MODULES = {
@@ -545,6 +551,31 @@ MODULES = {
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "canopy":  ("Canopy",  "src/canopy.cpp",  "res/canopy.svg",  {}),
+    "drift":   ("Drift",   "src/quadlfo.cpp", "res/drift.svg",   {}),
+    # the legacy panels, redrawn in code for dark panels (2026-11)
+    "gsx": ("Gsx", "src/gsx.cpp", "res/gsx.svg", {}),
+    "fugue": ("Fugue", "src/fugue.cpp", "res/fugue.svg", {}),
+    "phase": ("Phase", "src/phase.cpp", "res/phase.svg", {}),
+    "overtone": ("Overtone", "src/overtone.cpp", "res/overtone.svg", {}),
+    "intone": ("Intone", "src/intone.cpp", "res/intone.svg", {}),
+    "tine": ("Tine", "src/tine.cpp", "res/tine.svg", {}),
+    "fuguex": ("FugueX", "src/fugue-expander.cpp", "res/fugue-expander.svg", {}),
+    "metafugue": ("MetaFugue", "src/metafugue.cpp", "res/metafugue.svg", {}),
+    "meter": ("Meter", "src/meter.cpp", "res/meter.svg", {}),
+    "meterx": ("MeterX", "src/meterx.cpp", "res/meterx.svg", {}),
+    "beat": ("Beat", "src/beat.cpp", "res/beat.svg", {}),
+    "note": ("Note", "src/note.cpp", "res/note.svg", {}),
+    "swell": ("Swell", "src/swell.cpp", "res/swell.svg", {}),
+    "shift": ("Shift", "src/shift.cpp", "res/shift.svg", {}),
+    "vac": ("Vac", "src/vac.cpp", "res/vac.svg", {}),
+    "muse": ("Muse", "src/muse.cpp", "res/muse.svg", {}),
+    "band": ("Band", "src/band.cpp", "res/band.svg", {}),
+    "cycle": ("Cycle", "src/cycle.cpp", "res/cycle.svg", {}),
+    "operator": ("Bell", "src/bell.cpp", "res/operator.svg", {}),
+    "openv": ("OpEnv", "src/op_env.cpp", "res/op_env.svg", {}),
+    "record": ("Record", "src/record.cpp", "res/record.svg", {}),
+    "play": ("Play", "src/play.cpp", "res/play.svg", {}),
+    "arrange": ("Arrange", "src/arrange.cpp", "res/arrange.svg", {}),
     "wheel":   ("Wheel",   "src/wheel.cpp",   "res/wheel.svg",   {"WH_V": 6, "WH_TRP": 5}),
 }
 
@@ -572,6 +603,13 @@ if __name__ == "__main__":
             print(f"{key}: skipped — finished artwork, layout comes FROM the panel (--force to draw over it)")
             continue
         mod, cpp, svg, defs = MODULES[key]
+        # A panel may keep its plates, loop constants and screen mode in its own
+        # file, tools/panel-layout/<key>.json, so panels can be laid out without
+        # editing this one: {"plates": [[x, y, w, h], ...] (mm), "defs": {...},
+        # "screens": "filled" | "none"}.
+        lay_path = os.path.join(root, "tools", "panel-layout", key + ".json")
+        lay = json.load(open(lay_path)) if os.path.exists(lay_path) else {}
+        defs = dict(defs, **lay.get("defs", {}))
         src = open(os.path.join(root, cpp)).read()
         body = widget_source(src, mod)
         if not body:
@@ -591,7 +629,8 @@ if __name__ == "__main__":
         env = constants(defs, body, src)
         elems = [(k, x / MM * upmm, y / MM * upmm, w / MM * upmm, h / MM * upmm)
                  for (k, x, y, w, h) in collect(body, env, defs)]
-        pl = [(x * upmm, y * upmm, w * upmm, h * upmm) for (x, y, w, h) in PLATES.get(key, [])]
-        nc, ns = splice(p, old, elems, pl, upmm,
-                        "none" if key in NO_SCREEN_SLAB else "filled", wmm)
+        plates = PLATES.get(key) or [tuple(r) for r in lay.get("plates", [])]
+        pl = [(x * upmm, y * upmm, w * upmm, h * upmm) for (x, y, w, h) in plates]
+        screens = "none" if key in NO_SCREEN_SLAB else lay.get("screens", "filled")
+        nc, ns = splice(p, old, elems, pl, upmm, screens, wmm)
         print(f"{key:8} {nc:3} controls, {ns} screen(s) -> {svg}  ({upmm:.4f} units/mm)")

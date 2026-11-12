@@ -2208,7 +2208,7 @@ struct ConcreteWidget : ModuleWidget {
 
 	ConcreteWidget(Concrete* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/concrete.svg")));
+		setPanel(sfs::themedPanel("concrete"));
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
@@ -2226,17 +2226,17 @@ struct ConcreteWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(CC_C2, CC_Y_CTL)), module, Concrete::LENGTH_PARAM));
 		lbl->rogan(CC_C2, CC_Y_CTL, "BARS");
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(mm2px(Vec(CC_C3, CC_Y_CTL)), module, Concrete::PLAY_PARAM, Concrete::PLAY_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C3, CC_Y_JACK)), module, Concrete::PLAY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CC_C3, CC_Y_JACK)), module, Concrete::PLAY_INPUT));
 		// on the knobs' baseline, so the row of labels reads as one line
 		lbl->add(CC_C3, CC_Y_CTL - sfs::LABEL_GAP_ROGAN, "PLAY");
 		lbl->link(CC_C3, CC_Y_CTL, CC_C3, CC_Y_JACK);
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CC_C4, CC_Y_CTL)), module, Concrete::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C4, CC_Y_JACK)), module, Concrete::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CC_C4, CC_Y_JACK)), module, Concrete::RESET_INPUT));
 		lbl->add(CC_C4, CC_Y_CTL - sfs::LABEL_GAP_ROGAN, "RESET");
 		lbl->link(CC_C4, CC_Y_CTL, CC_C4, CC_Y_JACK);
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C1, CC_Y_JACK)), module, Concrete::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CC_C1, CC_Y_JACK)), module, Concrete::CLOCK_INPUT));
 		lbl->jack(CC_C1, CC_Y_JACK, "CLOCK");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(CC_C2, CC_Y_JACK)), module, Concrete::BAR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CC_C2, CC_Y_JACK)), module, Concrete::BAR_INPUT));
 		lbl->jack(CC_C2, CC_Y_JACK, "BAR");
 
 		// the outputs: L on the control row, R on the jack row
@@ -2244,12 +2244,12 @@ struct ConcreteWidget : ModuleWidget {
 		lbl->add(CC_X_LR, CC_Y_JACK + 0.83f, "R");
 		for (int l = 0; l < CC_N; l++) {
 			float x = CC_X_LANE + CC_X_LPITCH * l;
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, CC_Y_CTL)), module, Concrete::LANE_L_OUTPUT + l));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, CC_Y_JACK)), module, Concrete::LANE_R_OUTPUT + l));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, CC_Y_CTL)), module, Concrete::LANE_L_OUTPUT + l));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, CC_Y_JACK)), module, Concrete::LANE_R_OUTPUT + l));
 			lbl->jackOnPlate(x, CC_Y_CTL, string::f("%d", l + 1));
 		}
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_MIX, CC_Y_CTL)), module, Concrete::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(CC_X_MIX, CC_Y_JACK)), module, Concrete::R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CC_X_MIX, CC_Y_CTL)), module, Concrete::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CC_X_MIX, CC_Y_JACK)), module, Concrete::R_OUTPUT));
 		lbl->jackOnPlate(CC_X_MIX, CC_Y_CTL, "MIX");
 	}
 

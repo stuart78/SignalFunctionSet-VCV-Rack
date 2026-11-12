@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 // =============================================================================
@@ -248,38 +249,65 @@ struct Vac : Module {
 struct VacWidget : ModuleWidget {
 	VacWidget(Vac* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/vac.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the small marks beside the STABILITY and CURVE trimpots.
+		setPanel(sfs::themedPanel("vac"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("VAC");
 
-		// 2-column layout; row centers read from the reticules in res/vac.svg
-		// (SVG units ÷ 2.83465 → mm). Columns: xL=7.62, xR=22.86.
+		// 2-column layout. Columns: xL=7.62, xR=22.86.
 		const float xL = 7.62f;
 		const float xR = 22.86f;
+		// Each row is a trimpot and its CV jack three cells apart, joined by a
+		// connector, with the label centred over the pair as on the old panel
+		// (centred on the trimpot, STABILITY would run into the -|+ mark). A
+		// short stem drops from each RISE / FALL connector towards the
+		// STABILITY row under it, which says which stage that STABILITY sets.
+		const float xMid = 0.5f * (xL + xR);
+		auto row = [&](float y, const char* name) {
+			lbl->add(xMid, y - sfs::LABEL_GAP_TRIM, name);
+			lbl->link(xL, y, xR, y);
+		};
 
 		// Rise group
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 20.32f)), module, Vac::RISE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 20.32f)), module, Vac::RISE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xR, 20.32f)), module, Vac::RISE_CV_INPUT));
+		row(20.32f, "RISE");
+		lbl->link(xMid, 20.32f, xMid, 26.24f);
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 35.56f)), module, Vac::RISE_STAB_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 35.56f)), module, Vac::RISE_STAB_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xR, 35.56f)), module, Vac::RISE_STAB_CV_INPUT));
+		row(35.56f, "STABILITY");
 
 		// Fall / curve group
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 55.88f)), module, Vac::FALL_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 55.88f)), module, Vac::FALL_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xR, 55.88f)), module, Vac::FALL_CV_INPUT));
+		row(55.88f, "FALL");
+		lbl->link(xMid, 55.88f, xMid, 61.8f);
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 71.12f)), module, Vac::FALL_STAB_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 71.12f)), module, Vac::FALL_STAB_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xR, 71.12f)), module, Vac::FALL_STAB_CV_INPUT));
+		row(71.12f, "STABILITY");
 
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(xL, 86.35f)), module, Vac::CURVE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xR, 86.35f)), module, Vac::CURVE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xR, 86.35f)), module, Vac::CURVE_CV_INPUT));
+		row(86.35f, "CURVE");
 
 		// LOOP — light latch with embedded green LED + TRIG in
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(xL, 106.67f)), module, Vac::LOOP_PARAM, Vac::LOOP_LIGHT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 106.67f)), module, Vac::END_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xR, 106.67f)), module, Vac::END_OUTPUT));
+		lbl->trim(xL, 106.67f, "LOOP");
+		lbl->jackOnPlate(xR, 106.67f, "EOC");
 
 		// END trig out, ENV audio out
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(xL, 121.92f)), module, Vac::TRIG_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(xR, 121.92f)), module, Vac::ENV_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(xL, 121.92f)), module, Vac::TRIG_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(xR, 121.92f)), module, Vac::ENV_OUTPUT));
+		lbl->jack(xL, 121.92f, "TRIG");
+		lbl->jackOnPlate(xR, 121.92f, "OUT");
 	}
 
 	void appendContextMenu(Menu* menu) override {

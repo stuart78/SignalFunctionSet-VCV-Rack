@@ -2385,7 +2385,7 @@ struct ParamSlider : ui::Slider {
 struct SigmaWidget : ModuleWidget {
 	SigmaWidget(Sigma* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/sigma.svg")));
+		setPanel(sfs::themedPanel("sigma"));
 
 		// NO PanelLabels, and no title. The 2026-08 artwork carries its own text
 		// as outlined paths, which Rack DOES render -- it ignores only <text> --
@@ -2410,14 +2410,14 @@ struct SigmaWidget : ModuleWidget {
 			Sigma::WIDTH_INPUT, Sigma::STRETCH_INPUT, Sigma::MORPH_INPUT};
 		for (int i = 0; i < 5; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_MX[i], SG_MKY)), module, MP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_MJX[i], SG_MJY)), module, MI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_MJX[i], SG_MJY)), module, MI[i]));
 		}
 
 		// ── the filter, in its own column ──────────────────────────────────
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_FX[0], SG_MKY)), module, Sigma::CUTOFF_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_FJX[0], SG_MJY)), module, Sigma::CUTOFF_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_FJX[0], SG_MJY)), module, Sigma::CUTOFF_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_FX[1], SG_MKY)), module, Sigma::RESO_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_FJX[1], SG_MJY)), module, Sigma::RESO_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_FJX[1], SG_MJY)), module, Sigma::RESO_INPUT));
 
 		// ── the LFO block: three columns, RATE / SPREAD / SYNC ─────────────
 		for (int i = 0; i < 3; i++) {
@@ -2425,27 +2425,27 @@ struct SigmaWidget : ModuleWidget {
 			                                      Sigma::LFORATE_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_LSX[i], SG_LSY)), module,
 			                                      Sigma::LFOSPREAD_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_LYX[i], SG_LYY)), module,
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_LYX[i], SG_LYY)), module,
 			                                         Sigma::LFOSYNC_INPUT + i));
 		}
 
 		// ── the bottom row ─────────────────────────────────────────────────
 		static const int JI[3] = {Sigma::GATE_INPUT, Sigma::VOCT_INPUT, Sigma::VEL_INPUT};
 		for (int i = 0; i < 3; i++)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_JX[i], SG_JY)), module, JI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_JX[i], SG_JY)), module, JI[i]));
 		// The two HORIZONTAL pairs: the trimpot sits beside its jack rather than
 		// above it, which is what freed the height the filter column needed.
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_HPX[0], SG_HPY)), module, Sigma::ENVRATE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_HJX[0], SG_JY)), module, Sigma::ENVRATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_HJX[0], SG_JY)), module, Sigma::ENVRATE_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(SG_HPX[1], SG_HPY)), module, Sigma::ENVSPREAD_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_HJX[1], SG_JY)), module, Sigma::ENVSPREAD_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SG_VCAX, SG_JY)), module, Sigma::VCA_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_HJX[1], SG_JY)), module, Sigma::ENVSPREAD_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SG_VCAX, SG_JY)), module, Sigma::VCA_INPUT));
 
 		// The plate's two jacks. NOTE: the art labels them GATE and V/OCT, which
 		// cannot be right -- Sigma's only outputs are the stereo pair, and both
 		// of those labels already appear on the input row. Placed as L and R.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(SG_OUTX[0], SG_JY)), module, Sigma::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(SG_OUTX[1], SG_JY)), module, Sigma::R_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(SG_OUTX[0], SG_JY)), module, Sigma::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(SG_OUTX[1], SG_JY)), module, Sigma::R_OUTPUT));
 
 	}
 

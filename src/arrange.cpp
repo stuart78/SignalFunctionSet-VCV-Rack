@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "scales.hpp"
 #include "scale-bus.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 #include <cstring>
 
@@ -253,7 +254,7 @@ struct ArrangeDisplay : OpaqueWidget {
 		if (layer != 1) { OpaqueWidget::drawLayer(args, layer); return; }
 		if (!font) font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 		NVGcontext* vg = args.vg; float s = S();
-		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, 4.f*s); nvgFillColor(vg, nvgRGB(0x1a,0x1a,0x2e)); nvgFill(vg);
+		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, 4.f*s); nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 
 		int bars[NUM_PHRASES], root[NUM_PHRASES], scl[NUM_PHRASES], bpm[NUM_PHRASES];
 		bool active[NUM_PHRASES], chan[NUM_PHRASES][NUM_CHANNELS];
@@ -287,7 +288,7 @@ struct ArrangeDisplay : OpaqueWidget {
 		for (int i = 0; i < NUM_PHRASES; i++) {
 			rack::math::Rect rc = cellRect(i);
 			bool play = (i==cur) && running, focus = (i==ep);
-			NVGcolor bg = !active[i] ? nvgRGB(0x1f,0x1f,0x34) : focus ? nvgRGB(0x00,0x97,0xde) : nvgRGB(0x35,0x35,0x4d);
+			NVGcolor bg = !active[i] ? sfs::screenTone(nvgRGB(0x1f,0x1f,0x34)) : focus ? nvgRGB(0x00,0x97,0xde) : sfs::SCREEN_PURP;
 			nvgBeginPath(vg); nvgRoundedRect(vg, rc.pos.x, rc.pos.y, rc.size.x, rc.size.y, 2.f*s); nvgFillColor(vg, bg); nvgFill(vg);
 			if (play) { nvgBeginPath(vg); nvgRoundedRect(vg, rc.pos.x+0.7f*s, rc.pos.y+0.7f*s, rc.size.x-1.4f*s, rc.size.y-1.4f*s, 2.f*s); nvgStrokeColor(vg, nvgRGB(0xec,0x65,0x2e)); nvgStrokeWidth(vg, 1.5f*s); nvgStroke(vg); }
 			NVGcolor tcCol = focus ? nvgRGB(0xff,0xff,0xff) : !active[i] ? nvgRGB(0x6e,0x6e,0x8a) : nvgRGB(0xe6,0xe6,0xf0);
@@ -316,7 +317,7 @@ struct ArrangeDisplay : OpaqueWidget {
 				rack::math::Rect g = gridCell(i,k);
 				bool on = k < clamp(bars[i],1,MAX_BARS), here = running && (i==cur) && (k==barIn);
 				nvgBeginPath(vg); nvgRoundedRect(vg, g.pos.x, g.pos.y, g.size.x, g.size.y, 1.f*s);
-				nvgFillColor(vg, here ? nvgRGB(0xec,0x65,0x2e) : on ? nvgRGB(0x00,0x97,0xde) : nvgRGB(0x35,0x35,0x4d)); nvgFill(vg);
+				nvgFillColor(vg, here ? nvgRGB(0xec,0x65,0x2e) : on ? nvgRGB(0x00,0x97,0xde) : sfs::SCREEN_PURP); nvgFill(vg);
 			}
 
 		// per-phrase channel enable bars (solid darker color when off — no transparency)
@@ -379,7 +380,10 @@ struct LinkDotButton : app::Switch {
 	void draw(const DrawArgs& args) override {
 		float cx = box.size.x * 0.5f, r = mm2px(1.7f);
 		nvgBeginPath(args.vg); nvgCircle(args.vg, cx, cx, r);
-		nvgFillColor(args.vg, isOn() ? nvgRGB(0xf2,0xf2,0xf2) : nvgRGB(0x3a,0x3a,0x44)); nvgFill(args.vg);
+		// unlinked is a dark disc; on the dark faceplate (#3A3A3E) the light
+		// mode's #3A3A44 would disappear, so it is near-black there
+		NVGcolor off = sfs::dark() ? nvgRGB(0x1c,0x1c,0x20) : nvgRGB(0x3a,0x3a,0x44);
+		nvgFillColor(args.vg, isOn() ? nvgRGB(0xf2,0xf2,0xf2) : off); nvgFill(args.vg);
 		nvgStrokeColor(args.vg, nvgRGB(0x2a,0x2a,0x33)); nvgStrokeWidth(args.vg, 1.0f); nvgStroke(args.vg);
 	}
 	void drawLayer(const DrawArgs& args, int layer) override {
@@ -392,11 +396,81 @@ struct LinkDotButton : app::Switch {
 	}
 };
 
+// Drawn on the channel inset, over the plate the panel art puts there: each
+// channel's name in its colour, and a line in that colour down through its
+// divider and its four outputs. The colours are the screen's channel bars, the
+// same in both themes.
+struct ArrangeChannelArt : Widget {
+	std::shared_ptr<Font> font;
+	void draw(const DrawArgs& args) override {
+		NVGcontext* vg = args.vg;
+		for (int c = 0; c < NUM_CHANNELS; c++) {
+			float x = mm2px(134.62f + c * 10.16f);
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, x, mm2px(17.78f));
+			nvgLineTo(vg, x, mm2px(99.17f));
+			nvgStrokeColor(vg, CH_COLOR[c]);
+			nvgStrokeWidth(vg, mm2px(0.353f));
+			nvgStroke(vg);
+		}
+		if (!font || font->handle < 0) font = sfs::panelFont();
+		if (!font || font->handle < 0) return;
+		nvgFontFaceId(vg, font->handle);
+		nvgFontSize(vg, mm2px(sfs::NVG_EM * sfs::TYPE_LABEL));
+		nvgTextLetterSpacing(vg, 0.f);
+		nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
+		for (int c = 0; c < NUM_CHANNELS; c++) {
+			nvgFillColor(vg, CH_COLOR[c]);
+			nvgText(vg, mm2px(134.62f + c * 10.16f), mm2px(16.93f),
+			        string::f("CH%d", c + 1).c_str(), NULL);
+		}
+	}
+};
+
 struct ArrangeWidget : ModuleWidget {
 	ArrangeWidget(Arrange* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/arrange.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("arrange"));
 		// No virtual screws — see CLAUDE.md.
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("ARRANGE");
+		{
+			// the phrase grid: a line down each column from the screen through its
+			// three trimpots, and one along each row through the link dots
+			const float rowY[3] = {70.f, 82.f, 94.f};
+			const char* rowName[3] = {"SCALE", "ROOT", "BPM"};
+			for (int i = 0; i < NUM_PHRASES; i++) {
+				float x = 13.92f + i * 14.88f;
+				lbl->link(x, 60.7f, x, 94.f);
+			}
+			for (int r = 0; r < 3; r++) {
+				lbl->link(13.74f, rowY[r], 118.08f, rowY[r]);
+				lbl->add(8.4f, rowY[r] + 0.72f, rowName[r], sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+			}
+			lbl->add(8.4f, 106.68f + 0.83f, "GATE", sfs::PanelLabels::ON_PLATE, NVG_ALIGN_RIGHT);
+			lbl->jack(13.92f, 121.92f, "BAR");
+			lbl->jack(28.8f, 121.92f, "CLOCK");
+			lbl->jack(43.68f, 121.92f, "RESET");
+			lbl->link(43.68f, 121.92f, 58.56f, 121.92f);
+			// the channel inset: the column names sit between CH2 and CH3
+			const float cx = 149.86f;
+			lbl->add(cx, 25.4f - sfs::LABEL_GAP_TRIM, "DIV", sfs::PanelLabels::ON_PLATE);
+			lbl->jackOnPlate(cx, 40.64f, "CLOCK");
+			lbl->jackOnPlate(cx, 60.96f, "BAR");
+			lbl->jackOnPlate(cx, 81.28f, "RESET");
+			lbl->jackOnPlate(cx, 99.9f, "EOC");
+			lbl->jackOnPlate(134.62f, 121.92f, "BPM");
+			lbl->jackOnPlate(144.78f, 121.92f, "ROOT");
+			lbl->jackOnPlate(154.94f, 121.92f, "SCALE");
+			lbl->jackOnPlate(165.1f, 121.92f, "PHRASE");
+		}
+		ArrangeChannelArt* chArt = new ArrangeChannelArt();
+		chArt->box.size = box.size;
+		addChild(chArt);
 
 		ArrangeDisplay* disp = new ArrangeDisplay();
 		disp->module = module;
@@ -412,7 +486,7 @@ struct ArrangeWidget : ModuleWidget {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(x, 70.f)), module, Arrange::SCALE_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(x, 82.f)), module, Arrange::ROOT_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(x, 94.f)), module, Arrange::BPM_PARAM + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 106.68f)), module, Arrange::PGATE_OUTPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, 106.68f)), module, Arrange::PGATE_OUTPUT + i));
 			if (i < NUM_LINKS) {
 				float lx = x + 7.44f;
 				addParam(createParamCentered<LinkDotButton>(mm2px(Vec(lx, 70.f)), module, Arrange::LINK_SCALE_PARAM + i));
@@ -426,20 +500,20 @@ struct ArrangeWidget : ModuleWidget {
 		for (int c = 0; c < NUM_CHANNELS; c++) {
 			float x = 134.62f + c * 10.16f;
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(x, 25.4f)), module, Arrange::DIV_PARAM + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 40.64f)), module, Arrange::CH_CLOCK_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 60.96f)), module, Arrange::CH_BAR_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 81.28f)), module, Arrange::CH_RESET_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, 99.9f)), module, Arrange::CH_EOC_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, 40.64f)), module, Arrange::CH_CLOCK_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, 60.96f)), module, Arrange::CH_BAR_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, 81.28f)), module, Arrange::CH_RESET_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, 99.9f)), module, Arrange::CH_EOC_OUTPUT + c));
 		}
 		const float yb = 121.92f;
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(134.62f, yb)), module, Arrange::BPM_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(144.78f, yb)), module, Arrange::ROOT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(154.94f, yb)), module, Arrange::SCALE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(165.1f, yb)),  module, Arrange::PHRASE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(134.62f, yb)), module, Arrange::BPM_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(144.78f, yb)), module, Arrange::ROOT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(154.94f, yb)), module, Arrange::SCALE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(165.1f, yb)),  module, Arrange::PHRASE_OUTPUT));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(13.92f, yb)), module, Arrange::BAR_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(28.8f, yb)),  module, Arrange::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(43.68f, yb)), module, Arrange::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(13.92f, yb)), module, Arrange::BAR_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(28.8f, yb)),  module, Arrange::CLOCK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(43.68f, yb)), module, Arrange::RESET_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(58.56f, yb)),  module, Arrange::RESET_PARAM));
 	}
 

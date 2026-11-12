@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -258,30 +259,43 @@ struct Tine : Module {
 struct TineWidget : ModuleWidget {
 	TineWidget(Tine* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/tine.svg")));
-
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("tine"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("TINE");
 
 		// 8HP = 40.64mm, 3 columns: 10.16, 20.32, 30.48
 
 		// Freq knob (huge, centered) Y=30.48
 		addParam(createParamCentered<Rogan3PSWhite>(
 			mm2px(Vec(20.32f, 30.48f)), module, Tine::FREQ_PARAM));
+		// Rogan3PS is 17.56 mm, larger than any knob with a label gap of its
+		// own, so the label sits the same 2 mm clear of its edge as the others.
+		lbl->add(20.32f, 30.48f - 10.9f, "FREQ");
 
 		// Middle row Y=60.96: Damping knob (small), Damp CV (center), Ping (right)
 		addParam(createParamCentered<Trimpot>(
 			mm2px(Vec(10.16f, 60.96f)), module, Tine::DAMPING_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(20.32f, 60.96f)), module, Tine::DAMPING_CV_INPUT));
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(30.48f, 60.96f)), module, Tine::PING_PARAM));
+		lbl->pair(10.16f, 60.96f, "DAMP");
+		lbl->trim(30.48f, 60.96f, "PING");
 
 		// Bottom row Y=116.84: Trig (left), V/Oct (center), Out (right)
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 116.84f)), module, Tine::IN_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(20.32f, 116.84f)), module, Tine::VOCT_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(30.48f, 116.84f)), module, Tine::OUT_OUTPUT));
+		lbl->jack(10.16f, 116.84f, "TRIG");
+		lbl->jack(20.32f, 116.84f, "V/OCT");
+		lbl->jackOnPlate(30.48f, 116.84f, "OUT");
 	}
 
 	void appendContextMenu(Menu* menu) override {

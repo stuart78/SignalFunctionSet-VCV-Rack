@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "fastmath.hpp"
 #include "opmorph-messages.hpp"
+#include "panel-style.hpp"
 #include "bell_voice.h"
 #include <osdialog.h>
 #include <vector>
@@ -591,7 +592,7 @@ struct BellDisplay : OpaqueWidget {
 			const char* tl[2] = { "OPERATORS", "ENVELOPE" };
 			for (int i = 0; i < 2; i++) {
 				roundRect(tabX(i), TAB_Y, TAB_W, TAB_H, 2);
-				nvgFillColor(vg, (tab == i) ? nvgRGB(0x0D, 0x59, 0x86) : nvgRGB(0x35, 0x35, 0x4D));
+				nvgFillColor(vg, (tab == i) ? nvgRGB(0x0D, 0x59, 0x86) : sfs::SCREEN_PURP);
 				nvgFill(vg);
 				if (font && font->handle >= 0) {
 					nvgFontSize(vg, s * 9.f);          // match Note's tab font height
@@ -641,7 +642,7 @@ struct BellDisplay : OpaqueWidget {
 		// --- empty 6x4 grid ---
 		for (int r = 0; r < 4; r++) for (int c = 0; c < 6; c++) {
 			roundRect(cellGX(c), cellGY(r), 18, 18, 2);
-			nvgFillColor(vg, nvgRGB(0x35, 0x35, 0x4D)); nvgFill(vg);
+			nvgFillColor(vg, sfs::SCREEN_PURP); nvgFill(vg);
 		}
 
 		const AlgoOp* a = kAlgo[clamp(algo, 0, 31)];
@@ -706,7 +707,7 @@ struct BellDisplay : OpaqueWidget {
 			float gx = cellGX(a[i].x), gy = cellGY(a[i].y);
 			bool o = on(id), car = carrier(id);
 			NVGcolor fill = o ? (car ? nvgRGB(0xEC, 0x65, 0x2E) : nvgRGB(0x33, 0xAC, 0xE5))
-			                  : (car ? nvgRGB(0x4A, 0x4A, 0x66) : nvgRGB(0x35, 0x35, 0x4D));
+			                  : (car ? sfs::SCREEN_PMID : sfs::SCREEN_PURP);
 			roundRect(gx, gy, 18, 18, 2); nvgFillColor(vg, fill); nvgFill(vg);
 			// Outline: modulators get a blue outline (dimmed when off). Carriers
 			// have NO blue outline (orange fill stands alone); an off carrier
@@ -741,7 +742,7 @@ struct BellDisplay : OpaqueWidget {
 		const float t2 = 110.f, b2 = 156.f;   // live follower (bottom half)
 		auto baseline = [&](float yB) {
 			nvgBeginPath(vg); nvgMoveTo(vg, X(ex0), Y(yB)); nvgLineTo(vg, X(ex1), Y(yB));
-			nvgStrokeColor(vg, nvgRGB(0x35, 0x35, 0x4D));
+			nvgStrokeColor(vg, sfs::SCREEN_PURP);
 			nvgStrokeWidth(vg, std::max(0.6f, s)); nvgStroke(vg);
 		};
 		baseline(b1); baseline(b2);
@@ -781,8 +782,8 @@ struct BellDisplay : OpaqueWidget {
 		NVGcontext* vg = args.vg;
 		float w = box.size.x, h = box.size.y;
 		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 4.f);
-		nvgFillColor(vg, nvgRGB(0x1A, 0x1A, 0x2E)); nvgFill(vg);
-		nvgStrokeColor(vg, nvgRGB(0x40, 0x40, 0x60)); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
+		nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
+		nvgStrokeColor(vg, sfs::screenTone(nvgRGB(0x40, 0x40, 0x60))); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 		nvgIntersectScissor(vg, 1, 1, w - 2, h - 2);
 		if (!font || font->handle < 0)
 			font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
@@ -816,11 +817,29 @@ struct BellDisplay : OpaqueWidget {
 struct BellWidget : ModuleWidget {
 	BellWidget(Bell* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/operator.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the chevrons beside PREV and NEXT.
+		setPanel(sfs::themedPanel("operator"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("OPERATOR");
+		// each pot over its CV jack
+		lbl->pairDown(7.62f, 64.14f, 77.69f, "BANK");
+		lbl->pairDown(29.63f, 64.14f, 77.69f, "VOICE");
+		lbl->pairDown(7.62f, 91.23f, 106.47f, "FEED");
+		lbl->pairDown(18.63f, 91.23f, 106.47f, "TUNE");
+		lbl->pairDown(29.63f, 91.23f, 106.47f, "BRIGHT");
+		lbl->jack(7.62f, 121.71f, "V/OCT");
+		lbl->jack(18.63f, 121.71f, "GATE");
+		lbl->jack(29.63f, 121.71f, "VEL");
+		lbl->jackOnPlate(43.18f, 91.23f, "ENV");
+		lbl->jackOnPlate(43.18f, 106.47f, "VCO");
+		lbl->jackOnPlate(43.18f, 121.71f, "VCA");
 
 		// No virtual screws — see CLAUDE.md (SFS panels omit them by design).
 
-		// Positions synced to res/operator.svg reticules (viewBox units / 2.83465).
 		BellDisplay* disp = new BellDisplay();
 		disp->module = module;
 		disp->box.pos = mm2px(Vec(2.4f, 12.f));
@@ -832,26 +851,26 @@ struct BellWidget : ModuleWidget {
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(22.01f, 64.14f)), module, Bell::VOICE_PREV_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(29.63f, 64.14f)), module, Bell::VOICE_PARAM));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(37.25f, 64.14f)), module, Bell::VOICE_NEXT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 77.69f)), module, Bell::BANK_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(29.63f, 77.69f)), module, Bell::VOICE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 77.69f)), module, Bell::BANK_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(29.63f, 77.69f)), module, Bell::VOICE_CV_INPUT));
 
 		// Timbre: FEEDBACK | TUNE | BRIGHTNESS, with CV below.
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(7.62f, 91.23f)), module, Bell::FEEDBACK_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(18.63f, 91.23f)), module, Bell::TUNE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(29.63f, 91.23f)), module, Bell::BRIGHTNESS_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 106.47f)), module, Bell::FEEDBACK_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(18.63f, 106.47f)), module, Bell::TUNE_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(29.63f, 106.47f)), module, Bell::BRIGHTNESS_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 106.47f)), module, Bell::FEEDBACK_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(18.63f, 106.47f)), module, Bell::TUNE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(29.63f, 106.47f)), module, Bell::BRIGHTNESS_CV_INPUT));
 
 		// I/O row: V/OCT | GATE | VEL.
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 121.71f)), module, Bell::VOCT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(18.63f, 121.71f)), module, Bell::GATE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(29.63f, 121.71f)), module, Bell::VEL_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 121.71f)), module, Bell::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(18.63f, 121.71f)), module, Bell::GATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(29.63f, 121.71f)), module, Bell::VEL_INPUT));
 
 		// Output column: ENV | VCO | AUDIO.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43.18f, 91.23f)), module, Bell::ENV_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43.18f, 106.47f)), module, Bell::VCO_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43.18f, 121.71f)), module, Bell::AUDIO_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(43.18f, 91.23f)), module, Bell::ENV_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(43.18f, 106.47f)), module, Bell::VCO_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(43.18f, 121.71f)), module, Bell::AUDIO_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

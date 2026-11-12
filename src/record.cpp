@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "dr_wav.h"        // implementation lives in phase.cpp; headers only here
 #include "pushgrid.hpp"    // shared Push-style pad grid (GRID_COLS, gridNoteAt, …)
+#include "panel-style.hpp"
 #include <osdialog.h>
 #include <vector>
 #include <string>
@@ -525,12 +526,12 @@ void RecordDisplay::drawKeys(NVGcontext* vg, float x, float y, float w, float h,
 	nvgBeginPath(vg); nvgRect(vg, bx0, y - 2, bx1 - bx0, h + 4);
 	nvgFillColor(vg, nvgRGBA(0x00, 0x97, 0xde, 0x22)); nvgFill(vg);
 	// white keys — flat top, rounded bottom, with a gap so adjacent keys stay distinct
-	NVGcolor gap = nvgRGB(0x1a, 0x1a, 0x2e);
+	NVGcolor gap = sfs::SCREEN_BG;
 	int k = 0;
 	for (int m = KB_LO; m <= KB_HI; m++) {
 		if (!recIsWhite(m)) continue;
 		float x0 = x + k * ww;
-		NVGcolor col = (m == cur) ? cyan : (sampled[m] ? blue : nvgRGB(0x3a, 0x3a, 0x4a));
+		NVGcolor col = (m == cur) ? cyan : (sampled[m] ? blue : sfs::screenTone(nvgRGB(0x3a, 0x3a, 0x4a)));
 		nvgBeginPath(vg); nvgRoundedRectVarying(vg, x0 + 0.6f, y, ww - 1.2f, h, 0.f, 0.f, 1.4f, 1.4f);
 		nvgFillColor(vg, col); nvgFill(vg);
 		k++;
@@ -542,7 +543,7 @@ void RecordDisplay::drawKeys(NVGcontext* vg, float x, float y, float w, float h,
 		float bx = x + recWhiteBefore(m) * ww - bw * 0.5f;
 		nvgBeginPath(vg); nvgRoundedRectVarying(vg, bx - 0.9f, y, bw + 1.8f, bh + 0.9f, 0.f, 0.f, 1.6f, 1.6f);
 		nvgFillColor(vg, gap); nvgFill(vg);
-		NVGcolor col = (m == cur) ? cyan : (sampled[m] ? blue : nvgRGB(0x20, 0x20, 0x2c));
+		NVGcolor col = (m == cur) ? cyan : (sampled[m] ? blue : sfs::screenTone(nvgRGB(0x20, 0x20, 0x2c)));
 		nvgBeginPath(vg); nvgRoundedRectVarying(vg, bx, y, bw, bh, 0.f, 0.f, 1.2f, 1.2f);
 		nvgFillColor(vg, col); nvgFill(vg);
 	}
@@ -567,7 +568,7 @@ void RecordDisplay::drawTabs(NVGcontext* vg, int view) {
 	for (int i = 0; i < 2; i++) {
 		bool active = (view == REC_TAB_VIEW[i]);
 		nvgBeginPath(vg); nvgRoundedRect(vg, r[i].pos.x, r[i].pos.y, r[i].size.x, r[i].size.y, 2.f);
-		nvgFillColor(vg, active ? nvgRGB(0x0d, 0x59, 0x86) : nvgRGB(0x2a, 0x2a, 0x3e)); nvgFill(vg);
+		nvgFillColor(vg, active ? nvgRGB(0x0d, 0x59, 0x86) : sfs::screenTone(nvgRGB(0x2a, 0x2a, 0x3e))); nvgFill(vg);
 		if (font) {
 			nvgFontFaceId(vg, font->handle); nvgFontSize(vg, 9.f);
 			nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -590,12 +591,12 @@ void RecordDisplay::drawGrid(NVGcontext* vg, const uint8_t* sampled, int cur, in
 			bool isKeyRoot = (n >= 0) && (((n - gRoot) % 12 + 12) % 12 == 0);
 			bool inRange = (n >= rlo && n <= rhi);
 			NVGcolor c;
-			if (n < 0)              c = nvgRGB(0x14, 0x14, 0x22);
+			if (n < 0)              c = sfs::screenTone(nvgRGB(0x14, 0x14, 0x22));
 			else if (n == cur)      c = nvgRGB(0x00, 0xc8, 0xff);   // current / auditioning
 			else if (sampled[n])    c = nvgRGB(0x00, 0x97, 0xde);   // captured
 			else if (inRange)       c = nvgRGB(0x25, 0x4c, 0x66);   // will be sampled
-			else if (layout == 2)   c = nvgRGB(0x40, 0x40, 0x54);
-			else                    c = inScale ? nvgRGB(0x3a, 0x3a, 0x4a) : nvgRGB(0x20, 0x20, 0x2c);
+			else if (layout == 2)   c = sfs::screenTone(nvgRGB(0x40, 0x40, 0x54));
+			else                    c = inScale ? sfs::screenTone(nvgRGB(0x3a, 0x3a, 0x4a)) : sfs::screenTone(nvgRGB(0x20, 0x20, 0x2c));
 			// chromatic grid: darken accidental (black-key) columns across every tier
 			// so they read as a piano-roll overlay even inside the lit/sampled region
 			if (layout == 2 && n >= 0 && n != cur && gridIsAccidental(n))
@@ -621,7 +622,7 @@ void RecordDisplay::drawLayer(const DrawArgs& args, int layer) {
 	NVGcontext* vg = args.vg;
 	const float w = box.size.x, h = box.size.y;
 	nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, w, h, 3.f);
-	nvgFillColor(vg, nvgRGB(0x1a, 0x1a, 0x2e)); nvgFill(vg);
+	nvgFillColor(vg, sfs::SCREEN_BG); nvgFill(vg);
 
 	const char *name = "Instrument", *status = "ready";
 	int lo = 48, hi = 84, cur = 60; float prog = 0.f;
@@ -647,7 +648,7 @@ void RecordDisplay::drawLayer(const DrawArgs& args, int layer) {
 	}
 	// progress
 	nvgBeginPath(vg); nvgRoundedRect(vg, 6, 35, w - 12, 2.5f, 1.f);
-	nvgFillColor(vg, nvgRGB(0x35, 0x35, 0x4d)); nvgFill(vg);
+	nvgFillColor(vg, sfs::SCREEN_PURP); nvgFill(vg);
 	nvgBeginPath(vg); nvgRoundedRect(vg, 6, 35, (w - 12) * clamp(prog, 0.f, 1.f), 2.5f, 1.f);
 	nvgFillColor(vg, nvgRGB(0x00, 0x97, 0xde)); nvgFill(vg);
 
@@ -718,7 +719,35 @@ void RecordDisplay::onDragEnd(const DragEndEvent& e) {
 struct RecordWidget : ModuleWidget {
 	RecordWidget(Record* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/record.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("record"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("RECORD");
+		lbl->rogan(10.16f, 79.83f, "FIRST NOTE");
+		lbl->rogan(30.48f, 79.83f, "STEPS");
+		lbl->rogan(10.16f, 100.81f, "RANGE (OCT)");
+		lbl->rogan(30.48f, 100.81f, "VEL LAYERS");
+		lbl->rogan(10.16f, 122.16f, "TAIL");
+		lbl->rogan(30.48f, 122.16f, "SUSTAIN");
+		lbl->divider(43.18f, 71.27f, 43.18f, 126.39f);
+		// AUDITION and RECORD both drive the same stereo input pair
+		lbl->trim(55.88f, 78.14f, "AUDITION");
+		lbl->trim(71.12f, 78.14f, "RECORD");
+		lbl->link(60.11f, 78.13f, 62.65f, 78.13f);
+		lbl->link(62.65f, 78.13f, 63.5f, 78.98f);
+		lbl->link(63.5f, 78.98f, 64.35f, 78.13f);
+		lbl->link(64.35f, 78.13f, 66.88f, 78.13f);
+		lbl->link(63.5f, 78.98f, 63.5f, 90.84f);
+		lbl->link(55.88f, 90.84f, 71.12f, 90.84f);
+		lbl->jack(55.88f, 90.84f, "LEFT");
+		lbl->jack(71.12f, 90.84f, "RIGHT");
+		lbl->jackOnPlate(55.88f, 106.92f, "VEL");
+		lbl->jackOnPlate(70.27f, 106.92f, "DONE");
+		lbl->jackOnPlate(55.88f, 122.16f, "V/OCT");
+		lbl->jackOnPlate(70.27f, 122.16f, "GATE");
 		// No virtual screws — see CLAUDE.md.
 
 		RecordDisplay* disp = new RecordDisplay();
@@ -740,12 +769,12 @@ struct RecordWidget : ModuleWidget {
 		addParam(createLightParamCentered<VCVLightButton<MediumSimpleLight<RedLight>>>(
 			mm2px(Vec(71.12f, 78.14f)), module, Record::RECORD_PARAM, Record::RECORD_LIGHT));
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.88f, 90.84f)), module, Record::L_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(71.12f, 90.84f)), module, Record::R_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(55.88f, 106.92f)), module, Record::VEL_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(70.27f, 106.92f)), module, Record::DONE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(55.88f, 122.16f)), module, Record::VOCT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(70.27f, 122.16f)), module, Record::GATE_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(55.88f, 90.84f)), module, Record::L_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(71.12f, 90.84f)), module, Record::R_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(55.88f, 106.92f)), module, Record::VEL_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(70.27f, 106.92f)), module, Record::DONE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(55.88f, 122.16f)), module, Record::VOCT_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(70.27f, 122.16f)), module, Record::GATE_OUTPUT));
 	}
 
 	void step() override {

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 #include <functional>
 
@@ -329,8 +330,8 @@ struct BandDisplay : OpaqueWidget {
 	}
 
 	void drawContent(NVGcontext* vg, bool preview) {
-		const NVGcolor COL_BG    = nvgRGB(0x1a, 0x1a, 0x2e);
-		const NVGcolor COL_GRID  = nvgRGB(0x35, 0x35, 0x4d);
+		const NVGcolor COL_BG    = sfs::SCREEN_BG;
+		const NVGcolor COL_GRID  = sfs::SCREEN_PURP;
 		// Per-band colors — match the A/B/C/D selector labels on the panel.
 		const NVGcolor BAND_COL[N_BANDS] = {
 			nvgRGB(0x00, 0x97, 0xde),   // A
@@ -360,7 +361,7 @@ struct BandDisplay : OpaqueWidget {
 		for (int n = 1; n <= MAX_HARM; n++) {
 			float x = hx((float) n);
 			nvgBeginPath(vg); nvgMoveTo(vg, x, padT); nvgLineTo(vg, x, baseY);
-			nvgStrokeColor(vg, nvgRGBA(0x35, 0x35, 0x4d, (n % 4 == 1) ? 0xcc : 0x44));
+			nvgStrokeColor(vg, nvgTransRGBA(sfs::SCREEN_PURP, (n % 4 == 1) ? 0xcc : 0x44));
 			nvgStrokeWidth(vg, (n % 4 == 1) ? 1.f : 0.6f); nvgStroke(vg);
 		}
 		nvgBeginPath(vg); nvgMoveTo(vg, padL, baseY); nvgLineTo(vg, w - padR, baseY);
@@ -439,48 +440,79 @@ struct BandDisplay : OpaqueWidget {
 struct BandWidget : ModuleWidget {
 	BandWidget(Band* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/band.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// the band letters in their colours.
+		setPanel(sfs::themedPanel("band"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("BAND");
+		{
+			const float bx[4] = {10.16f, 38.10f, 66.04f, 93.98f};
+			const float ry[3] = {60.95f, 81.27f, 101.59f};
+			const char* rn[3] = {"LEVEL", "HARMONIC", "ENABLE"};
+			for (int i = 0; i < 4; i++) {
+				// a rule under each band's letter, then the three rows
+				lbl->divider(bx[i] - 5.08f, 50.79f, bx[i] + 20.32f, 50.79f);
+				for (int r = 0; r < 3; r++) {
+					lbl->trim(bx[i] + 7.62f, ry[r], rn[r]);
+					lbl->link(bx[i], ry[r], bx[i] + 15.24f, ry[r]);
+				}
+			}
+			const float yG = 121.91f;
+			lbl->divider(5.08f, 111.75f, 86.36f, 111.75f);
+			lbl->jack(10.16f, yG, "AUDIO IN");
+			lbl->jack(25.40f, yG, "V/OCT");
+			lbl->jack(40.64f, yG, "SHIFT");
+			lbl->jack(53.70f, yG, "TUNE");
+			lbl->jack(66.04f, yG, "WIDTH");
+			lbl->link(66.04f, yG, 81.28f, yG);
+			lbl->jackOnPlate(95.67f, yG, "POLY");
+			lbl->jackOnPlate(109.22f, yG, "MIX");
+		}
 
-		// Display screen (matches the dashed reticule in res/band.svg)
+		// Display screen
 		BandDisplay* display = new BandDisplay();
 		display->module = module;
 		display->box.pos = mm2px(Vec(5.08f, 11.85f));
 		display->box.size = mm2px(Vec(111.76f, 30.f));
 		addChild(display);
 
-		// Per-band controls — positions read from the reticules in res/band.svg.
+		// Per-band controls, positions read from the original art's reticules.
 		// Each band = a knob column + a CV-jack column; three rows: LVL, HRM, EN.
 		const float knobX[N_BANDS] = {10.16f, 38.10f, 66.04f, 93.98f};
 		const float jackX[N_BANDS] = {25.40f, 53.34f, 81.28f, 109.22f};
 		const float yLvl = 60.95f, yHrm = 81.27f, yEn = 101.59f;
 		for (int i = 0; i < N_BANDS; i++) {
-			float kx = knobX[i], jx = jackX[i];
+			float kx = knobX[i];
+			float jx = jackX[i];
 			// Row 1: level + CV
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(kx, yLvl)), module, Band::LEVEL_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(jx, yLvl)), module, Band::LEVEL_CV_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(jx, yLvl)), module, Band::LEVEL_CV_INPUT + i));
 			// Row 2: harmonic selector (A/B/C/D) + CV
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(kx, yHrm)), module, Band::HARM_PARAM + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(jx, yHrm)), module, Band::HARM_CV_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(jx, yHrm)), module, Band::HARM_CV_INPUT + i));
 			// Row 3: enable + gate CV
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 				mm2px(Vec(kx, yEn)), module, Band::ENABLE_PARAM + i, Band::ENABLE_LIGHT + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(jx, yEn)), module, Band::ENABLE_CV_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(jx, yEn)), module, Band::ENABLE_CV_INPUT + i));
 		}
 
 		// Global bottom row (y = 121.91 mm)
 		const float yG = 121.91f;
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, yG)), module, Band::AUDIO_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, yG)), module, Band::VOCT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(40.64f, yG)), module, Band::HARM_INPUT));   // SHIFT
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, yG)), module, Band::AUDIO_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, yG)), module, Band::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(40.64f, yG)), module, Band::HARM_INPUT));   // SHIFT
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(53.70f, yG)), module, Band::TUNE_PARAM));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(66.04f, yG)), module, Band::WIDTH_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(81.28f, yG)), module, Band::WIDTH_INPUT));  // W-CV
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(81.28f, yG)), module, Band::WIDTH_INPUT));  // W-CV
 		// The art labels the plate POLY then MIX, left to right, and the jacks
 		// were placed the other way round, so a cable in the jack marked MIX
 		// carried the poly bus (reported by a user, 2026-09). The enum order
 		// stays; only the positions swap.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(95.67f, yG)), module, Band::POLY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(109.22f, yG)), module, Band::MIX_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(95.67f, yG)), module, Band::POLY_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(109.22f, yG)), module, Band::MIX_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

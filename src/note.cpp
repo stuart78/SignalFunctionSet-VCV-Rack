@@ -3,6 +3,7 @@
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "pulse-width.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -1005,9 +1006,9 @@ void NoteDisplay::drawLayer(const DrawArgs& args, int layer) {
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_BLUE_DARK   = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);
 	const NVGcolor COL_BLUE_LINE   = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);
-	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
-	const NVGcolor COL_PURPLE_DK   = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);
+	const NVGcolor COL_PURPLE      = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_MID  = sfs::SCREEN_PMID;
+	const NVGcolor COL_PURPLE_DK   = sfs::SCREEN_BG;
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
@@ -1355,9 +1356,9 @@ void NoteDisplay::drawPreview(const DrawArgs& args) {
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_BLUE_DARK   = nvgRGBA(0x0D, 0x59, 0x86, 0xFF);
 	const NVGcolor COL_BLUE_LINE   = nvgRGBA(0x0D, 0x59, 0x88, 0xFF);
-	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
-	const NVGcolor COL_PURPLE_DK   = nvgRGBA(0x1A, 0x1A, 0x32, 0xFF);
+	const NVGcolor COL_PURPLE      = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_MID  = sfs::SCREEN_PMID;
+	const NVGcolor COL_PURPLE_DK   = sfs::SCREEN_BG;
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
 
@@ -1507,7 +1508,25 @@ void NoteDisplay::drawPreview(const DrawArgs& args) {
 struct NoteWidget : ModuleWidget {
 	NoteWidget(Note* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/note.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("note"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("NOTE");
+		lbl->pairDown(23.70f, 81.30f, 91.45f, "ROOT");
+		lbl->pairDown(33.86f, 81.30f, 91.45f, "SCALE");
+		lbl->pairDown(44.03f, 81.30f, 91.45f, "OCT");
+		lbl->jack(6.77f, 91.45f, "RESET");
+		lbl->jack(6.77f, 106.68f, "BAR");
+		lbl->jack(6.77f, 121.92f, "CLOCK");
+		lbl->jackOnPlate(23.70f, 106.68f, "ROOT");
+		lbl->jackOnPlate(33.86f, 106.68f, "VEL");
+		lbl->jackOnPlate(44.03f, 106.68f, "ACC");
+		lbl->jackOnPlate(23.70f, 121.92f, "SCALE");
+		lbl->jackOnPlate(33.86f, 121.92f, "GATE");
+		lbl->jackOnPlate(44.03f, 121.92f, "V/OCT");
 
 
 		// Display: x=2.4, y=12, w=46, h=60
@@ -1527,33 +1546,33 @@ struct NoteWidget : ModuleWidget {
 			mm2px(Vec(44.03f, 81.30f)), module, Note::OCT_PARAM));
 
 		// Inputs row 1 (y=91.45): RESET (x=6.77), ROOT CV, SCALE CV, OCT CV
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(6.77f,  91.45f)), module, Note::RESET_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(23.70f, 91.45f)), module, Note::ROOT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(33.86f, 91.45f)), module, Note::SCALE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(44.03f, 91.45f)), module, Note::OCT_INPUT));
 
 		// Row 2 (y=106.68): BAR (left), then on dark plate: ROOT OUT, VEL, ACC
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(6.77f,  106.68f)), module, Note::BAR_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(23.70f, 106.68f)), module, Note::ROOT_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(33.86f, 106.68f)), module, Note::VELOCITY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(44.03f, 106.68f)), module, Note::ACCENT_OUTPUT));
 
 		// Row 3 (y=121.92): CLOCK (left), then on dark plate: SCALE OUT, GATE, V/OCT
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(6.77f,  121.92f)), module, Note::CLOCK_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(23.70f, 121.92f)), module, Note::SCALE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(33.86f, 121.92f)), module, Note::GATE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(44.03f, 121.92f)), module, Note::VOCT_OUTPUT));
 	}
 

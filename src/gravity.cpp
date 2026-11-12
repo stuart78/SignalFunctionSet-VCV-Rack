@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "fastmath.hpp"
 #include <cmath>
 #include <vector>
@@ -2019,7 +2020,7 @@ struct GravityDisplay : OpaqueWidget {
 struct GravityWidget : ModuleWidget {
 	GravityWidget(Gravity* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/gravity.svg")));
+		setPanel(sfs::themedPanel("gravity"));
 
 		// Centred circular display (centred at 76,64 on the 30HP panel)
 		const float CX = 76.f, CY = 64.f;
@@ -2041,8 +2042,8 @@ struct GravityWidget : ModuleWidget {
 			float as = (k * 60.f + 30.f) * DEG;
 			Vec gp(CX + std::sin(ag) * Rg, CY + std::cos(ag) * Rg);
 			Vec sp(CX + std::sin(as) * Rs, CY + std::cos(as) * Rs);
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(gp), module, Gravity::GATE_OUTPUT + k));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(sp), module, Gravity::SECTOR_OUTPUT + k));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(gp), module, Gravity::GATE_OUTPUT + k));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(sp), module, Gravity::SECTOR_OUTPUT + k));
 			Vec gl(CX + std::sin(ag) * (Rg + ledOffset), CY + std::cos(ag) * (Rg + ledOffset));
 			Vec sl(CX + std::sin(as) * (Rs + ledOffset), CY + std::cos(as) * (Rs + ledOffset));
 			addChild(createLightCentered<SmallLight<RedLight>>(
@@ -2063,7 +2064,7 @@ struct GravityWidget : ModuleWidget {
 		};
 		for (int i = 0; i < 4; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(colL, lc[i].py)), module, lc[i].param));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colL, lc[i].jy)), module, lc[i].input));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colL, lc[i].jy)), module, lc[i].input));
 		}
 
 		// Derived gates: 2x2 plate, top-right, mirroring the position outputs at
@@ -2073,16 +2074,16 @@ struct GravityWidget : ModuleWidget {
 		// Reading order across the plate is ANY / NEW, ODD / EVEN, which is what
 		// the artwork says: the two that fire on every crossing on top, the two
 		// that split the ring by parity below.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f,  22.01f)), module, Gravity::ANY_GATE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f,  22.01f)), module, Gravity::NEW_GATE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f,  37.25f)), module, Gravity::ODD_GATE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f,  37.25f)), module, Gravity::EVEN_GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(127.00f,  22.01f)), module, Gravity::ANY_GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(142.24f,  22.01f)), module, Gravity::NEW_GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(127.00f,  37.25f)), module, Gravity::ODD_GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(142.24f,  37.25f)), module, Gravity::EVEN_GATE_OUTPUT));
 
 		// Right outputs: 2x2 plate, bottom-right. X Y on top, ANGLE RADIUS below.
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f, 106.67f)), module, Gravity::X_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f, 106.67f)), module, Gravity::Y_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(127.00f, 121.93f)), module, Gravity::ANGLE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(142.24f, 121.93f)), module, Gravity::RADIUS_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(127.00f, 106.67f)), module, Gravity::X_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(142.24f, 106.67f)), module, Gravity::Y_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(127.00f, 121.93f)), module, Gravity::ANGLE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(142.24f, 121.93f)), module, Gravity::RADIUS_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

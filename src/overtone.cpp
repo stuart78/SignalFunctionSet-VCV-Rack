@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -399,7 +400,35 @@ void OvertoneDisplay::drawLayer(const DrawArgs& args, int layer) {
 struct OvertoneWidget : ModuleWidget {
 	OvertoneWidget(Overtone* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/overtone.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps the
+		// harmonic diagram between the switches and the jacks.
+		setPanel(sfs::themedPanel("overtone"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("OVERTONE");
+		// the harmonic numbers in the diagram's boxes: even, odd, all
+		const char* evens[4] = {"2", "4", "6", "8"};
+		const char* odds[4] = {"3", "5", "7", "9"};
+		for (int i = 0; i < 4; i++) {
+			lbl->note(7.62f + 10.16f * i, 54.04f, evens[i]);
+			lbl->note(12.7f + 10.16f * i, 58.27f, odds[i]);
+		}
+		for (int i = 0; i < 8; i++)
+			lbl->note(7.62f + 5.08f * i, 62.51f, std::to_string(i + 2));
+		// the switch's three positions, and its link to the FILTER CV jack
+		lbl->add(21.9f, 74.4f, "EVEN", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+		lbl->add(21.9f, 77.81f, "ODD", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+		lbl->add(21.9f, 81.17f, "ALL", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+		lbl->link(25.43f, 77.05f, 43.21f, 77.05f);
+		// The left jack is MASK_INPUT and the right FILTER_INPUT. The old art
+		// labelled them the other way round; these labels follow the code.
+		lbl->jack(7.62f, 77.05f, "MASK");
+		lbl->jack(43.21f, 77.05f, "FILTER");
+		lbl->rogan(7.62f, 101.6f, "FREQ");
+		lbl->jack(7.62f, 116.84f, "V/OCT");
+		lbl->jackOnPlate(43.18f, 116.84f, "OUT");
 
 
 		// Waveform display (matches Phase: same Y, same margins from panel edge)
@@ -422,17 +451,17 @@ struct OvertoneWidget : ModuleWidget {
 		}
 
 		// Mask CV + Even/Odd toggle + Filter CV (Y=77.05mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 77.05f)), module, Overtone::MASK_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 77.05f)), module, Overtone::MASK_INPUT));
 		addParam(createParamCentered<CKSSThree>(
 			mm2px(Vec(25.43f, 77.05f)), module, Overtone::EVENODD_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(43.21f, 77.05f)), module, Overtone::FILTER_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(43.21f, 77.05f)), module, Overtone::FILTER_INPUT));
 
 		// Frequency knob (Y=101.6mm)
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(7.62f, 101.6f)), module, Overtone::FREQ_PARAM));
 
 		// Bottom row (Y=116.84mm)
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(7.62f, 116.84f)), module, Overtone::VOCT_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(43.18f, 116.84f)), module, Overtone::AUDIO_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(7.62f, 116.84f)), module, Overtone::VOCT_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(43.18f, 116.84f)), module, Overtone::AUDIO_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

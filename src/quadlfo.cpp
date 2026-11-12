@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "fastmath.hpp"
+#include "panel-style.hpp"
 
 
 struct Drift : Module {
@@ -59,6 +60,9 @@ struct Drift : Module {
 	float brownianValue[4] = {0.f, 0.f, 0.f, 0.f};
 	float brownianTarget[4] = {0.f, 0.f, 0.f, 0.f};
 	float lastBrownianPhase[4] = {0.f, 0.f, 0.f, 0.f};
+
+	// what the panel's scope draws: the controls after their CVs
+	float dShape = 0.5f, dCenter = 0.f, dYSpread = 5.f, dXSpread = 0.f;
 
 	Drift() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -216,6 +220,8 @@ struct Drift : Module {
 		ySpread = clamp(ySpread, 0.f, 5.f);
 
 		// Calculate phase spreads for the 4 outputs
+		dShape = shape; dCenter = center; dYSpread = ySpread; dXSpread = xSpread;
+
 		float phaseOffsets[4] = {0.f, 0.25f, 0.5f, 0.75f};
 		
 		// Apply x spread to phase offsets
@@ -320,11 +326,153 @@ struct Drift : Module {
 };
 
 
+// The base waveform, as generateWave() makes it before the instability acts on
+// it. The random walk at the top of SHAPE is drawn from a fixed table, so the
+// drawing holds still.
+static float driftBaseWave(float phase, float shape) {
+	float sine = std::sin(2.f * (float)M_PI * phase);
+	float tri = phase < 0.25f ? 4.f * phase : phase < 0.75f ? 2.f - 4.f * phase : 4.f * phase - 4.f;
+	float saw = phase < 0.5f ? 2.f * phase : 2.f * phase - 2.f;
+	float sq = sine >= 0.f ? 1.f : -1.f;
+	static const float WALK[9] = {0.1f, 0.45f, 0.3f, -0.2f, -0.5f, -0.15f, 0.35f, 0.6f, 0.1f};
+	float wp = phase * 8.f;
+	int wi = std::min((int)wp, 7);
+	float walk = WALK[wi] + (WALK[wi + 1] - WALK[wi]) * (wp - (float)wi);
+	if (shape <= 0.25f) { float m = shape * 4.f; return sine + (tri - sine) * m; }
+	if (shape <= 0.5f) { float m = (shape - 0.25f) * 4.f; return tri + (saw - tri) * m; }
+	if (shape <= 0.75f) { float m = (shape - 0.5f) * 4.f; return saw + (sq - saw) * m; }
+	float m = (shape - 0.75f) * 4.f; return sq + (walk - sq) * m;
+}
+
+// Drawn on the faceplate, under the controls: the five shapes round the SHAPE
+// knob at the positions they occupy on its travel, and a small scope between
+// CENTER and Y SPRD showing the waveform SHAPE gives, the range CENTER and
+// Y SPRD give it, and where A-D are in it now.
+struct DriftArt : Widget {
+	Drift* module = nullptr;
+
+	// one glyph, centred at (cx, cy), w x h in px
+	static void glyph(NVGcontext* vg, float cx, float cy, float w, float h, int kind) {
+		nvgBeginPath(vg);
+		const int N = 24;
+		for (int i = 0; i <= N; i++) {
+			float t = (float)i / N;
+			float v;
+			switch (kind) {
+				case 0: v = std::sin(2.f * (float)M_PI * t); break;                        // sine
+				case 1: v = t < 0.25f ? 4.f * t : t < 0.75f ? 2.f - 4.f * t : 4.f * t - 4.f; break;  // triangle
+				default: v = 0.f;
+			}
+			if (kind <= 1) {
+				float x = cx - w / 2 + w * t, y = cy - v * h / 2;
+				if (i == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y);
+			}
+		}
+		float x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
+		if (kind == 2) {                                   // saw: up, drop, up
+			nvgMoveTo(vg, x0, cy); nvgLineTo(vg, cx, y0); nvgLineTo(vg, cx, y1); nvgLineTo(vg, x1, cy);
+		}
+		else if (kind == 3) {                              // square
+			nvgMoveTo(vg, x0, y1); nvgLineTo(vg, x0, y0); nvgLineTo(vg, cx, y0);
+			nvgLineTo(vg, cx, y1); nvgLineTo(vg, x1, y1); nvgLineTo(vg, x1, y0);
+		}
+		else if (kind == 4) {                              // a random walk
+			static const float W[7] = {0.1f, 0.7f, 0.3f, -0.4f, -0.8f, 0.2f, 0.6f};
+			for (int i = 0; i < 7; i++) {
+				float x = x0 + w * i / 6.f, y = cy - W[i] * h / 2;
+				if (i == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y);
+			}
+		}
+		nvgStroke(vg);
+	}
+
+	void draw(const DrawArgs& args) override {
+		NVGcontext* vg = args.vg;
+		const sfs::Theme& T = sfs::theme();
+		nvgLineCap(vg, NVG_ROUND); nvgLineJoin(vg, NVG_ROUND);
+
+		// ── SHAPE glyphs ── a row under the knob, sine at the left end of its
+		// travel to the random walk at the right, as the 0% and 100% notes sit
+		// under STABIL. Round the knob at their true angles the saw would sit
+		// on top, where the label and the title leave no room. The row bends
+		// up at its ends, following the knob's lower edge.
+		nvgStrokeColor(vg, T.rule);
+		nvgStrokeWidth(vg, mm2px(0.18f));
+		const float kx = 12.7f;
+		for (int k = 0; k < 5; k++) {
+			float dx = 3.2f * (float)(k - 2);
+			glyph(vg, mm2px(kx + dx), mm2px(27.6f - 0.025f * dx * dx),
+			      mm2px(2.2f), mm2px(1.2f), k);
+		}
+
+		// ── the scope ──
+		const float x0 = 19.2f, x1 = 31.6f, yt = 35.6f, yb = 45.6f;
+		auto vy = [&](float v) { return mm2px(yt + (yb - yt) * (0.5f - v / 20.f)); };   // ±10 V
+		const float sx0 = x0 + 1.4f, sx1 = x1 - 1.6f;                                   // the plot
+		// scale ticks at -10, -5, 0, 5, 10 V
+		nvgStrokeColor(vg, T.rule);
+		nvgStrokeWidth(vg, mm2px(0.15f));
+		for (int i = -2; i <= 2; i++) {
+			float y = vy(5.f * (float)i);
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, mm2px(x0), y); nvgLineTo(vg, mm2px(x0 + (i == 0 ? 0.9f : 0.6f)), y);
+			nvgStroke(vg);
+		}
+		float shape = 0.5f, center = 0.f, ysp = 5.f, xsp = 0.f, ph = 0.f;
+		if (module) {
+			shape = module->dShape; center = module->dCenter; ysp = module->dYSpread;
+			xsp = module->dXSpread; ph = module->phases[0];
+		}
+		// the range: a bracket from CENTER - Y SPRD to CENTER + Y SPRD
+		float lo = vy(clamp(center - ysp, -10.f, 10.f)), hi = vy(clamp(center + ysp, -10.f, 10.f));
+		float bx = mm2px(x1);
+		nvgBeginPath(vg);
+		nvgMoveTo(vg, bx - mm2px(0.6f), hi); nvgLineTo(vg, bx, hi);
+		nvgLineTo(vg, bx, lo); nvgLineTo(vg, bx - mm2px(0.6f), lo);
+		nvgStrokeColor(vg, T.inkSoft);
+		nvgStrokeWidth(vg, mm2px(0.18f));
+		nvgStroke(vg);
+		// one cycle of the waveform, in that range
+		nvgBeginPath(vg);
+		const int N = 72;
+		for (int i = 0; i <= N; i++) {
+			float p = (float)i / N;
+			float x = mm2px(sx0 + (sx1 - sx0) * p);
+			float y = vy(clamp(center + driftBaseWave(std::min(p, 0.9999f), shape) * ysp, -10.f, 10.f));
+			if (i == 0) nvgMoveTo(vg, x, y); else nvgLineTo(vg, x, y);
+		}
+		nvgStrokeColor(vg, T.ink);
+		nvgStrokeWidth(vg, mm2px(0.22f));
+		nvgStroke(vg);
+		// where A-D are now: A in orange, the rest in ink
+		for (int i = 3; i >= 0; i--) {
+			float p = ph + 0.25f * (float)i * xsp;
+			p -= std::floor(p);
+			float x = mm2px(sx0 + (sx1 - sx0) * p);
+			float y = vy(clamp(center + driftBaseWave(p, shape) * ysp, -10.f, 10.f));
+			nvgBeginPath(vg);
+			nvgCircle(vg, x, y, mm2px(i == 0 ? 0.45f : 0.35f));
+			nvgFillColor(vg, i == 0 ? sfs::SCREEN_HOT : T.ink);
+			nvgFill(vg);
+		}
+	}
+};
+
 struct DriftWidget : ModuleWidget {
 	DriftWidget(Drift* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/drift.svg")));
-
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was, so patches and
+		// cables are unaffected; the art keeps only the diagrams beside the knobs.
+		setPanel(sfs::themedPanel("drift"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("DRIFT");
+		DriftArt* art = new DriftArt();
+		art->module = module;
+		art->box.size = box.size;
+		addChild(art);
 
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(38.1, 20.32)), module, Drift::PARAMSTABILITY_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(12.7, 20.32)), module, Drift::PARAMSHAPE_PARAM));
@@ -332,20 +480,45 @@ struct DriftWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(12.7, 40.64)), module, Drift::PARAMCENTER_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(12.7, 60.96)), module, Drift::PARAMFREQUENCY_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(38.1, 40.64)), module, Drift::PARAMYSPREAD_PARAM));
+		lbl->rogan(12.7, 20.32, "SHAPE");
+		lbl->rogan(38.1, 20.32, "STABIL");
+		lbl->rogan(12.7, 40.64, "CENTER");
+		lbl->rogan(38.1, 40.64, "Y SPRD");
+		lbl->rogan(12.7, 60.96, "FREQ");
+		lbl->rogan(38.1, 60.96, "X SPRD");
+		// what the ends of three knobs mean
+		lbl->note(33.6, 28.3, "0%");
+		lbl->note(43.2, 28.3, "100%");
+		lbl->note(7.7, 48.6, "-5V");
+		lbl->note(17.7, 48.6, "+5V");
+		lbl->note(33.6, 48.6, "0V");
+		lbl->note(42.8, 48.6, "5V");
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(6.306, 85.365)), module, Drift::INSHAPE_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(18.955, 85.365)), module, Drift::INSTABILITY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(31.568, 85.365)), module, Drift::INFREQUENCY_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(44.182, 85.365)), module, Drift::INSPREAD_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(18.955, 102.033)), module, Drift::INCENTER_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(31.568, 102.033)), module, Drift::INYSPREAD_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(6.306, 85.365)), module, Drift::INSHAPE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(18.955, 85.365)), module, Drift::INSTABILITY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(31.568, 85.365)), module, Drift::INFREQUENCY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(44.182, 85.365)), module, Drift::INSPREAD_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(18.955, 102.033)), module, Drift::INCENTER_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(31.568, 102.033)), module, Drift::INYSPREAD_INPUT));
+		lbl->jack(6.306, 85.365, "SHAPE");
+		lbl->jack(18.955, 85.365, "STAB");
+		lbl->jack(31.568, 85.365, "FREQ");
+		lbl->jack(44.182, 85.365, "X SPR");
+		lbl->jack(18.955, 102.033, "CNTR");
+		lbl->jack(31.568, 102.033, "Y SPR");
 
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(44.182, 102.033)), module, Drift::OUTMAX_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(6.255, 102.454)), module, Drift::OUTMIN_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(6.306, 117.363)), module, Drift::OUTA_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(18.955, 117.363)), module, Drift::OUTB_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(31.568, 117.363)), module, Drift::OUTC_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(44.182, 117.363)), module, Drift::OUTD_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(44.182, 102.033)), module, Drift::OUTMAX_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(6.255, 102.454)), module, Drift::OUTMIN_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(6.306, 117.363)), module, Drift::OUTA_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(18.955, 117.363)), module, Drift::OUTB_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(31.568, 117.363)), module, Drift::OUTC_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(44.182, 117.363)), module, Drift::OUTD_OUTPUT));
+		lbl->jackOnPlate(6.255, 102.454, "MIN");
+		lbl->jackOnPlate(44.182, 102.033, "MAX");
+		lbl->jackOnPlate(6.306, 117.363, "A");
+		lbl->jackOnPlate(18.955, 117.363, "B");
+		lbl->jackOnPlate(31.568, 117.363, "C");
+		lbl->jackOnPlate(44.182, 117.363, "D");
 	}
 };
 

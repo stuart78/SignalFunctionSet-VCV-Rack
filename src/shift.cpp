@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -473,22 +474,30 @@ struct CKSSHoriz : app::SvgSwitch {
 struct ShiftWidget : ModuleWidget {
 	ShiftWidget(Shift* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/shift.svg")));
-
-		// All positions taken from the centerpoints of the placeholders in
-		// res/shift.svg (1mm = 2.835 viewBox units).
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("shift"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("SHIFT");
 
 		// --- Top inputs row at y=25.40 ---
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 25.40f)), module, Shift::CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(25.40f, 25.40f)), module, Shift::CLOCK_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(40.64f, 25.40f)), module, Shift::N_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(55.88f, 25.40f)), module, Shift::RESET_INPUT));
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(73.66f, 25.40f)), module, Shift::RESET_PARAM));
+		lbl->jack(10.16f, 25.40f, "CV");
+		lbl->jack(25.40f, 25.40f, "CLOCK");
+		lbl->jack(40.64f, 25.40f, "DELAY");
+		lbl->jack(55.88f, 25.40f, "RESET");
+		lbl->link(55.88f, 25.40f, 73.66f, 25.40f);   // the RESET button beside its jack
 
 		// --- Per-output rows ---
 		const float rowYs[NUM_OUTS] = { 60.95f, 76.19f, 91.43f, 106.67f };
@@ -499,12 +508,26 @@ struct ShiftWidget : ModuleWidget {
 		const float xLED     = 55.88f;
 		const float xCV      = 63.49f;
 		const float xGate    = 73.66f;
+		// Column heads, on one baseline: the one the DELAY knobs need.
+		const float yHead = rowYs[0] - sfs::LABEL_GAP_ROGAN;
+		lbl->add(xPot, yHead, "DELAY");
+		lbl->add(xDiv, yHead, "DIV");
+		lbl->add(xCV, yHead, "CV", sfs::PanelLabels::ON_PLATE);
+		lbl->add(xGate, yHead, "GATE", sfs::PanelLabels::ON_PLATE);
+		// What the mode switches choose between, under row A.
+		lbl->note(28.8f, 67.73f, "CASCADE");
+		lbl->note(40.9f, 67.73f, "DIRECT");
+		// A row name is centred on its row: a baseline half a cap height low.
+		const float capHalf = 0.83f;
+		static const char* const ROW_NAMES[NUM_OUTS] = {"A", "B", "C", "D"};
 		for (int i = 0; i < NUM_OUTS; i++) {
 			float y = rowYs[i];
 			addParam(createParamCentered<Rogan1PWhite>(
 				mm2px(Vec(xPot, y)), module, Shift::N_PARAM_A + i));
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(xStepCV, y)), module, Shift::STEP_CV_INPUT_A + i));
+			lbl->add(2.54f, y + capHalf, ROW_NAMES[i]);
+			lbl->link(xPot, y, xStepCV, y);
 			// No mode switch on row A — cascade-on-A falls back to
 			// parallel anyway, so the panel hides A's switch. The
 			// MODE_PARAM_A param still exists in the enum (preserved for
@@ -512,24 +535,32 @@ struct ShiftWidget : ModuleWidget {
 			if (i > 0) {
 				addParam(createParamCentered<CKSSHoriz>(
 					mm2px(Vec(xMode, y)), module, Shift::MODE_PARAM_A + i));
+				// CASCADE: from the row above's DELAY knob to the switch's
+				// left end. DIRECT: down the switches' right ends.
+				float yUp = rowYs[i - 1];
+				lbl->link(xPot, yUp, xPot, yUp + 7.62f);
+				lbl->link(xPot, yUp + 7.62f, 33.87f, yUp + 7.62f);
+				lbl->link(33.87f, yUp + 7.62f, 33.87f, y - 2.54f);
+				lbl->link(37.25f, i == 1 ? yUp + 7.62f : yUp + 2.54f, 37.25f, y - 2.54f);
 			}
 			addParam(createParamCentered<Trimpot>(
 				mm2px(Vec(xDiv, y)), module, Shift::DIV_PARAM_A + i));
 			addChild(createLightCentered<SmallLight<GreenLight>>(
 				mm2px(Vec(xLED, y)), module, Shift::LIGHT_A + i));
-			addOutput(createOutputCentered<PJ301MPort>(
+			addOutput(createOutputCentered<sfs::Jack>(
 				mm2px(Vec(xCV, y)), module, Shift::OUT_A + i));
-			addOutput(createOutputCentered<PJ301MPort>(
+			addOutput(createOutputCentered<sfs::Jack>(
 				mm2px(Vec(xGate, y)), module, Shift::GATE_A + i));
 		}
 
 		// --- Jumble row at y=121.91, same output column positions ---
 		addChild(createLightCentered<SmallLight<GreenLight>>(
 			mm2px(Vec(xLED,  121.91f)), module, Shift::LIGHT_JUMBLE));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(xCV,   121.91f)), module, Shift::JUMBLE_CV));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(xGate, 121.91f)), module, Shift::JUMBLE_CLK));
+		lbl->add(1.8f, 121.91f + capHalf, "JUMBLE", sfs::PanelLabels::LABEL, NVG_ALIGN_LEFT);
 	}
 
 	void appendContextMenu(Menu* menu) override {

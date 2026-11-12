@@ -1270,7 +1270,7 @@ struct SpoolWidget : ModuleWidget {
 	SpoolWidget(Spool* module) {
 		mod = module;
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/spool.svg")));
+		setPanel(sfs::themedPanel("spool"));
 
 		// NO sfs::PanelLabels HERE, DELIBERATELY. res/spool.svg is the
 		// designer's Figma export and carries its own labels as OUTLINED PATHS
@@ -1303,19 +1303,19 @@ struct SpoolWidget : ModuleWidget {
 		// of the pre-2026-09 panel -- the art joins them with a line, so they
 		// read as one setup block.
 		for (int i = 0; i < SP_N; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_SUB[2 * i], SP_Y_PLAY)), module, Spool::GATE_INPUT + i));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_SUB[2 * i + 1], SP_Y_PLAY)), module, Spool::VOCT_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_SUB[2 * i], SP_Y_PLAY)), module, Spool::GATE_INPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_SUB[2 * i + 1], SP_Y_PLAY)), module, Spool::VOCT_INPUT + i));
 
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_SUB[2 * i], SP_Y_IO)), module, Spool::RECIN_INPUT + i));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(SP_SUB[2 * i + 1], SP_Y_IO)), module, Spool::OUT_OUTPUT + i));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_SUB[2 * i], SP_Y_IO)), module, Spool::RECIN_INPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(SP_SUB[2 * i + 1], SP_Y_IO)), module, Spool::OUT_OUTPUT + i));
 
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedLight>>>(
 				mm2px(Vec(SP_SUB[2 * i], SP_Y_SET)), module, Spool::REC_PARAM + i, Spool::REC_LIGHT + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(SP_SUB[2 * i + 1], SP_Y_SET)), module, Spool::LEVEL_PARAM + i));
 		}
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_FOOT[0], SP_Y_FOOT)), module, Spool::ROOT_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_FOOT[1], SP_Y_FOOT)), module, Spool::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_FOOT[0], SP_Y_FOOT)), module, Spool::ROOT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_FOOT[1], SP_Y_FOOT)), module, Spool::RESET_INPUT));
 		// On the panel rather than in the menu: it changes what every V/OCT cable
 		// on the module MEANS, and a setting that reinterprets your patch cables
 		// should not be two clicks deep.
@@ -1326,9 +1326,9 @@ struct SpoolWidget : ModuleWidget {
 		// the old trim row left no room beneath it.
 		const int cvI[3] = {Spool::ATTACK_CV_INPUT, Spool::RELEASE_CV_INPUT, Spool::RAMP_CV_INPUT};
 		for (int k = 0; k < 3; k++)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(SP_FOOT[2 + k], SP_Y_FOOT)), module, cvI[k]));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(SP_FOOT[5], SP_Y_MIX)), module, Spool::MIX_L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(SP_FOOT[6], SP_Y_MIX)), module, Spool::MIX_R_OUTPUT));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(SP_FOOT[2 + k], SP_Y_FOOT)), module, cvI[k]));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(SP_FOOT[5], SP_Y_MIX)), module, Spool::MIX_L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(SP_FOOT[6], SP_Y_MIX)), module, Spool::MIX_R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

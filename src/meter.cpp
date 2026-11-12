@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "meter-messages.hpp"
 #include "pulse-width.hpp"
+#include "panel-style.hpp"
 #include <cmath>
 
 
@@ -1120,8 +1121,8 @@ void MeterDisplay::drawLayer(const DrawArgs& args, int layer) {
 	// --- Shared palette (matches Beat) ---
 	const NVGcolor COL_BLUE         = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
 	const NVGcolor COL_BLUE_DIM     = nvgRGBA(0x00, 0x97, 0xDE, 0x70);
-	const NVGcolor COL_PURPLE       = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_MID   = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
+	const NVGcolor COL_PURPLE       = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_MID   = sfs::SCREEN_PMID;
 	const NVGcolor COL_ORANGE       = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT  = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM     = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
@@ -1227,7 +1228,7 @@ void MeterDisplay::drawLayer(const DrawArgs& args, int layer) {
 		nvgBeginPath(args.vg);
 		nvgMoveTo(args.vg, 3.f, yRow);
 		nvgLineTo(args.vg, 3.f + trackerW, yRow);
-		nvgStrokeColor(args.vg, nvgRGBA(0x35, 0x35, 0x4D, 0x80));
+		nvgStrokeColor(args.vg, nvgTransRGBA(sfs::SCREEN_PURP, 0x80));
 		nvgStrokeWidth(args.vg, 0.5f);
 		nvgStroke(args.vg);
 
@@ -1270,10 +1271,10 @@ void MeterDisplay::drawLayer(const DrawArgs& args, int layer) {
 		bool hasSwing = std::fabs(swingAmt) > 0.001f;
 		NVGcolor ghostColor = enabled
 			? nvgRGBA(0x00, 0x97, 0xDE, 70)
-			: nvgRGBA(0x35, 0x35, 0x4D, 60);
+			: nvgTransRGBA(sfs::SCREEN_PURP, 60);
 		NVGcolor lineColor = enabled
 			? nvgRGBA(0x00, 0x97, 0xDE, 110)
-			: nvgRGBA(0x35, 0x35, 0x4D, 80);
+			: nvgTransRGBA(sfs::SCREEN_PURP, 80);
 
 		while (pos < (float)cells - 0.0001f && safety < 256) {
 			float basePos = (float)pulseN * baseSpacing;
@@ -1343,8 +1344,8 @@ void MeterDisplay::drawPreview(const DrawArgs& args) {
 		font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 	}
 	const NVGcolor COL_BLUE        = nvgRGBA(0x00, 0x97, 0xDE, 0xFF);
-	const NVGcolor COL_PURPLE      = nvgRGBA(0x35, 0x35, 0x4D, 0xFF);
-	const NVGcolor COL_PURPLE_MID  = nvgRGBA(0x4A, 0x4A, 0x66, 0xFF);
+	const NVGcolor COL_PURPLE      = sfs::SCREEN_PURP;
+	const NVGcolor COL_PURPLE_MID  = sfs::SCREEN_PMID;
 	const NVGcolor COL_ORANGE      = nvgRGBA(0xEC, 0x65, 0x2E, 0xFF);
 	const NVGcolor COL_TEXT_BRIGHT = nvgRGBA(0xFF, 0xFF, 0xFF, 0xFF);
 	const NVGcolor COL_TEXT_DIM    = nvgRGBA(0x80, 0x80, 0x80, 0xFF);
@@ -1390,7 +1391,7 @@ void MeterDisplay::drawPreview(const DrawArgs& args) {
 		nvgBeginPath(args.vg);
 		nvgMoveTo(args.vg, 3.f, yRow);
 		nvgLineTo(args.vg, 3.f + trackerW, yRow);
-		nvgStrokeColor(args.vg, nvgRGBA(0x35, 0x35, 0x4D, 0x80));
+		nvgStrokeColor(args.vg, nvgTransRGBA(sfs::SCREEN_PURP, 0x80));
 		nvgStrokeWidth(args.vg, 0.5f);
 		nvgStroke(args.vg);
 		int hits = hitsPerRow[row];
@@ -1423,8 +1424,37 @@ void MeterDisplay::drawPreview(const DrawArgs& args) {
 struct MeterWidget : ModuleWidget {
 	MeterWidget(Meter* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/meter.svg")));
-
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was.
+		setPanel(sfs::themedPanel("meter"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("METER");
+		lbl->rogan(10.06f, 50.79f, "BPM");
+		lbl->link(10.06f, 50.79f, 20.22f, 50.79f);
+		lbl->jack(10.16f, 71.11f, "SYNC");
+		lbl->rogan(9.525f, 88.89f, "NUM");
+		lbl->rogan(20.955f, 88.89f, "DEN");
+		lbl->jack(10.01f, 121.92f, "RUN");
+		lbl->link(10.01f, 121.92f, 20.32f, 121.92f);
+		// the swing rows are named to the left of their trimpots, as RESET is
+		// of its button; a label's baseline sits 0.83 mm under the row so its
+		// capitals are centred on it
+		const char* rowNames[5] = {"Q", "8TH", "16TH", "QT", "8T"};
+		const float rowYs[5] = {60.95f, 71.11f, 81.27f, 91.43f, 101.59f};
+		for (int i = 0; i < 5; i++) {
+			lbl->add(46.0f, rowYs[i] + 0.83f, rowNames[i], sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+			lbl->link(50.79f, rowYs[i], 60.95f, rowYs[i]);
+		}
+		lbl->add(46.0f, 121.92f + 0.83f, "RESET", sfs::PanelLabels::LABEL, NVG_ALIGN_RIGHT);
+		// RESET button, its input, and on across the plate to RESET OUT
+		lbl->link(50.79f, 121.92f, 64.35f, 121.92f);
+		lbl->link(67.73f, 121.92f, 81.27f, 121.92f, true);
+		lbl->jackOnPlate(71.11f, 60.95f, "SWING");
+		lbl->jackOnPlate(81.27f, 60.95f, "GRID");
+		lbl->link(67.73f, 106.68f, 84.67f, 106.68f, true);
+		lbl->add(76.3f, 111.75f + 0.83f, "BAR", sfs::PanelLabels::ON_PLATE, NVG_ALIGN_RIGHT);
 
 		// 18HP = 91.44mm
 		// Display top, full width
@@ -1439,11 +1469,11 @@ struct MeterWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(10.06f, 50.79f)), module, Meter::BPM_PARAM));
 		// BPM CV jack (right of BPM knob)
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(20.22f, 50.79f)), module, Meter::BPM_INPUT));
 
 		// SYNC / EXT clock input
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(10.16f, 71.11f)), module, Meter::EXT_CLOCK_INPUT));
 
 		// NUM + DEN knobs and their CV jacks, 11.43 mm apart: a Rogan1P is 10.63 across
@@ -1451,21 +1481,21 @@ struct MeterWidget : ModuleWidget {
 			mm2px(Vec(9.525f, 88.89f)), module, Meter::NUMERATOR_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(
 			mm2px(Vec(20.955f, 88.89f)), module, Meter::DENOMINATOR_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(9.525f, 101.59f)), module, Meter::NUMERATOR_INPUT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(20.955f, 101.59f)), module, Meter::DENOMINATOR_INPUT));
 
 		// Bottom row (y=121.92): RUN button + RUN gate, RST button, RESET out
 		addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<GreenLight>>>(
 			mm2px(Vec(10.01f, 121.92f)), module, Meter::RUN_PARAM, Meter::RUN_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(20.32f, 121.92f)), module, Meter::RUN_INPUT));
 		addParam(createParamCentered<VCVButton>(
 			mm2px(Vec(50.79f, 121.92f)), module, Meter::RESET_PARAM));
-		addInput(createInputCentered<PJ301MPort>(
+		addInput(createInputCentered<sfs::Jack>(
 			mm2px(Vec(60.95f, 121.92f)), module, Meter::RESET_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(81.27f, 121.92f)), module, Meter::RESET_OUTPUT));
 
 		// --- RIGHT COLUMN: 5 swing rows + BAR row ---
@@ -1493,16 +1523,16 @@ struct MeterWidget : ModuleWidget {
 			float y = swingRowYs[i];
 			addParam(createParamCentered<Trimpot>(
 				mm2px(Vec(xTrimpot, y)), module, Meter::SWING_PARAM_0 + sub));
-			addInput(createInputCentered<PJ301MPort>(
+			addInput(createInputCentered<sfs::Jack>(
 				mm2px(Vec(xCV, y)), module, Meter::SWING_CV_0 + sub));
-			addOutput(createOutputCentered<PJ301MPort>(
+			addOutput(createOutputCentered<sfs::Jack>(
 				mm2px(Vec(xSwung, y)), module, Meter::BAR_OUTPUT + sub));
-			addOutput(createOutputCentered<PJ301MPort>(
+			addOutput(createOutputCentered<sfs::Jack>(
 				mm2px(Vec(xGrid, y)), module, gridOutIds[i]));
 		}
 
 		// BAR row (no swing): single output jack in the grid column
-		addOutput(createOutputCentered<PJ301MPort>(
+		addOutput(createOutputCentered<sfs::Jack>(
 			mm2px(Vec(81.27f, 111.75f)), module, Meter::BAR_OUTPUT));
 	}
 

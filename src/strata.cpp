@@ -1905,7 +1905,7 @@ static const float ST_OX[7] = {50.38f, 60.54f, 70.70f, 80.86f, 91.02f, 101.18f, 
 struct StrataWidget : ModuleWidget {
 	StrataWidget(Strata* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/strata.svg")));
+		setPanel(sfs::themedPanel("strata"));
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
@@ -1924,7 +1924,7 @@ struct StrataWidget : ModuleWidget {
 		                           Strata::GLIDE_INPUT, Strata::WARP_INPUT, Strata::FOLD_INPUT, Strata::TILT_INPUT, Strata::SYNC_INPUT};
 		for (int i = 0; i < 10; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(ST_PX[i], ST_PY)), module, PP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX[i], ST_PCV)), module, PI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(ST_PX[i], ST_PCV)), module, PI[i]));
 			lbl->pairDown(ST_PX[i], ST_PY, ST_PCV, PN[i]);
 		}
 		// row 2: the read corrupted (RATE, START, CRUSH, SHUFFLE) under the shape
@@ -1936,7 +1936,7 @@ struct StrataWidget : ModuleWidget {
 		                           Strata::ROTX_INPUT, Strata::ROTY_INPUT, Strata::ROTZ_INPUT};
 		for (int i = 0; i < 7; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(ST_PX2[i], ST_PY2)), module, PP2[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX2[i], ST_PCV2)), module, PI2[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(ST_PX2[i], ST_PCV2)), module, PI2[i]));
 			lbl->pairDown(ST_PX2[i], ST_PY2, ST_PCV2, PN2[i]);
 		}
 		// the rules: one across between the rows, and two verticals running down
@@ -1948,14 +1948,14 @@ struct StrataWidget : ModuleWidget {
 		static const char* FN[3] = {"HARD", "CLOCK", "RESET"};
 		static const int FI[3] = {Strata::HARD_INPUT, Strata::CLOCK_INPUT, Strata::RESET_INPUT};
 		for (int i = 0; i < 3; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(ST_PX[i], ST_FY)), module, FI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(ST_PX[i], ST_FY)), module, FI[i]));
 			lbl->jack(ST_PX[i], ST_FY, FN[i]);
 		}
 		static const char* ON[7] = {"STEP", "X", "Y", "Z", "OUT", "L", "R"};
 		static const int OI[7] = {Strata::STEP_OUTPUT, Strata::X_OUTPUT, Strata::Y_OUTPUT, Strata::Z_OUTPUT, Strata::OUT_OUTPUT,
 		                          Strata::LEFT_OUTPUT, Strata::RIGHT_OUTPUT};
 		for (int i = 0; i < 7; i++) {
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(ST_OX[i], ST_FY)), module, OI[i]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(ST_OX[i], ST_FY)), module, OI[i]));
 			lbl->jackOnPlate(ST_OX[i], ST_FY, ON[i]);
 		}
 	}

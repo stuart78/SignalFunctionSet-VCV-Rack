@@ -231,10 +231,238 @@ columns of the three groups above, headed DROPS, LEAVES and DRUM.
 - Drag an end (dots appear on hover): steers it. Its size stays the same.
 - Drag empty space: orbits the camera.
 
-## Not done
+## The zither
+
+TYPE, the trimpot at the end of the INSTRUMENT row (with a CV, 1 V per
+instrument), swaps the tongue drum for a zither. A change fades the output out
+over 5 ms, switches, and fades back in, so a CV can change it without a click. Everything
+above the instrument stays as it was: the drops, the leaves, the draught.
+
+- **The board.** Strings run toward the viewer, as many as the drum would have
+  tongues and 0.1 drum radii apart, the low ones at the left and the longest.
+  The board leans toward the viewer (0.12 per unit), so whatever settles on it
+  rolls off the front.
+- **The strings** are modal: twelve harmonics, stretched a little by stiffness
+  (`B` = 0.00015), the higher ones dying sooner. A hit excites harmonic n by
+  sin(n pi xi) at the point it lands, so where along a string a drop lands sets
+  its tone, as the pluck position does on a real one. TONE leans the harmonics
+  from their natural 1/n, DECAY sets the ring time.
+- **Rolling.** A drop wider than the spacing rests on two strings like a ball on
+  rails and rolls down them. While it touches a string it damps the harmonics
+  that move most where it sits, as a finger does, and sustains the others: each
+  harmonic is pushed along in step with its own motion, the way an EBow
+  sustains a string, so the drop makes the string sing quietly and the
+  harmonics it favours move as it rolls. Rubbing the string with noise was the
+  first version; it was accurate, and it hissed.
+- **The draught** acts only on drops in the air. Acting on drops rolling down
+  the strings, it pulled them back up near the front, and they swung to and
+  fro on two strings until they were released at 15 s: about 8 s of rolling per
+  drop. Now it is 0.1 to 0.3 s (the drum's is 1.4 to 2 s), with about 8 hits a
+  drop without leaves (the drum's is 10 to 15).
+- **Measured:** one large glass drop set on two strings rests on them for 1.3 s
+  and rolls 1.5 drum radii; its sustain alone is 0.18 V rms; a drop resting at a
+  string's middle takes the fundamental down 13 dB in half a second.
+- **Between the strings.** A drop that falls through knocks the board, and the
+  nearest strings ring faintly through it.
+- **The column** is scaled onto the string bed, which is narrower than the drum.
+  Laid out on the drum, 3 of 27 drops at the default settings struck a string;
+  scaled, 12 of 15.
+- **GATE** plucks a string near its front end.
+
+The drum is unchanged: its voices use the first six of the twelve mode slots,
+and every drum render is bit-identical to before.
+
+## The steel pan
+
+The third TYPE. A low-C tenor pan, C4 to E6, chosen as the most recognisable pan.
+
+- **The layout is the real one.** The lowest octave is the outer ring, the next
+  the middle ring, the last five notes sit in the centre. Round each ring the
+  notes go in fifths, so every note's neighbours are a fifth and a fourth from it,
+  and each note's octave lies straight inward from it.
+- **The pads** are tuned so their first three partials are the fundamental, the
+  octave and the twelfth; the partials above are not tuned. A hit at a pad's
+  middle is mostly fundamental, one near its edge brings the upper partials out:
+  measured, the octave is 0.17 of the fundamental at the middle and 0.98 near the
+  edge. Pads whose partials meet a struck one (a fifth, an octave, a twelfth away)
+  ring with it, which is the pan's shimmer. Ratios, levels and ring times are
+  estimates, not measurements of one instrument.
+- **Sticks.** A pan stick is light, rubber-tipped and bounces straight off, so
+  contact on the pan is 0.3 of the table's. At the drum's contact times rubber
+  lost every pad's octave. Rubber is the authentic material.
+- **Rolling sounds the pads.** Every pad is a separately tuned patch with a
+  groove round it, so a drop rolling over a groove knocks the pad it enters or
+  leaves, and the hammered steel of a pad is a run of small bumps, each a soft
+  tap of that pad (on average one every 0.015 radii). A rolling contact lasts
+  half a cycle of the pad it is on, so it passes the note and rounds off what is
+  above it: with a strike's short contact every bump was a tick, and the roll
+  sounded like a mechanism. Measured on a glass drop set down on the outer ring:
+  8 pads sound at 0.2 V rms as it rolls down, against 0.05 V without it.
+- **The skirt hides the near part of the bowl.** It is drawn after the pads and
+  the drops in the bowl, so from a low camera the front of the bowl and anything
+  in it is behind the drum's wall.
+- **The bowl** is concave and hung tilted toward the player, so drops roll down
+  across the pads to the low point. A drop that settles there fades out over
+  0.4 s instead of piling up: measured, a glass drop reaches the low point and is
+  gone after 1.7 s.
+- **Tuning** (menu): Chromatic; Tuned to the scale, where each ring holds the
+  scale's notes in order (12 pads for Pentatonic Minor over the same range); or
+  Chromatic with the notes outside the scale damped, the default, where a damped
+  pad thuds and is gone. A real pan is chromatic; the third keeps the real layout
+  and still answers ROOT and SCALE.
+- **29 notes** is more than POLY's 16 channels, so it carries the 16 loudest,
+  each keeping its channel while it stays among them.
+
+## The singing bowls
+
+The fourth TYPE. Tuned bowls on cushions on a low table under the leaves.
+
+- **One bowl per note of the scale**, over one octave from "Lowest note": five
+  for a pentatonic, seven for a major scale, at least three and at most eight
+  (a longer scale is thinned evenly to eight). The lowest bowl is the largest
+  and sits in the middle; the others go round it, smaller as they rise, since a
+  bowl's note falls as its mouth widens. Their cushions are different thicknesses.
+- **Each drop picks a bowl with equal chance** and appears over it, so the
+  largest bowl does not get most of the hits because it is the largest target.
+  Measured over 2000 drops: 281 to 320 per bowl, with the rest landing on rims or
+  between bowls.
+- **The partials** are a bowl's: 1, 2.72, 5.12, 8.21 and 11.92 times the
+  fundamental, ringing from 22 s for the fundamental down to 3 s. Ratios, levels
+  and ring times are estimates. Each partial is a **pair** a fraction of a
+  percent apart, because a real bowl is never perfectly round, and the pair is
+  what makes a bowl beat. A hit on the line the pair is split along rings one of
+  them and holds steady; a hit between rings both and beats. Measured on the
+  fundamental over 12 s, the quietest point against the loudest is 0.99 struck
+  on the line and 0.06 struck between. Every bowl has its line at a different
+  angle.
+- **The shape is a hammered Himalayan bowl** (`cpBowlOuter`): a flat foot, a
+  wall that swells to its widest (1.1 of the mouth) a little over half way up,
+  and a mouth that turns back in, with a rounded lip. Height 0.95 of the mouth
+  radius. The physics and the drawing read the same profile. A drop meets the
+  wall's real cross-section (`cpBowlSection`, a polygon swept round the axis),
+  so it can strike the outside of the belly, the lip, or the inside, and run
+  round inside.
+- **Nothing holds a drop on the lip.** The lip is round and frictionless, and a
+  drop on top of it is pushed off whichever side it is on: one set down on it
+  leaves within 0.3 s. The draught that steers thrown drops back acts only in
+  the air above the rims, so it cannot press a drop against one. (The first
+  version had a thin rim ring with friction, and the draught pushing drops into
+  it, which held them there.)
+- **The rim and the inside sound differently.** A hit near the lip brings out
+  the upper partials; a hit low in the bowl is mostly the fundamental.
+- **A drop rolling round inside a bowl sustains it**, as a ball circling a bowl
+  does, using the zither's sustain: what the drop touches is damped a little and
+  the rest is pushed along in step with itself, at a quarter of the zither's
+  strength because a bowl rings so much longer. A glass drop rolls for about 2 s
+  and holds the bowl at about 0.19 V rms.
+- **Water stays in the bowl it lands in.** The level rises with each drop, and a
+  fuller bowl sounds lower and rings shorter: 90% full is 1.9 semitones down.
+  It dries out over three minutes. A drop adds far more than its real volume,
+  or the change would take an hour to hear; 20 s of water rain fills the fullest
+  bowl to about 30%. Water that hits a rim splashes.
+- **Drops do not pile up.** A drop that has settled fades out over 0.4 s.
+  Drops that miss land on the table, which is silent, and water soaks into it.
+- Default settings average 1.1 V rms, about the drum's level.
+
+
 
 - The values above were reached by measurement and a few rounds of listening. The tongue
   modes have not had a dedicated tuning pass by ear.
 - The panel is code-drawn until the Figma pass.
 - Drops pass through each other.
 - Drift does not push a drop, though a leaf bending back up does.
+
+## The wind chimes
+
+The fifth TYPE. Tubes hanging from a ring under the leaves, one per note of the
+scale over one octave (3 to 8), from "Lowest note" an octave up, with a wooden
+clapper on a cord in the middle and a sail under it.
+
+- **Everything is a pendulum** (`CpPend`): a tube on its cord, and the clapper and
+  sail on theirs. A hit anywhere turns into swing through the arm from the pivot,
+  so a drop on the edge of the sail swings the clapper, which strikes the tubes,
+  and the tubes strike each other. Measured: one glass drop on the edge of the sail
+  sounds 8 notes; the longest tube swings once every 1.92 s, the period of a rod
+  on its cord.
+- **A tube is a free-free beam**: partials 1 : 2.757 : 5.404 : 8.933 : 13.34, each
+  struck by its own mode shape where the hit lands. Ring times are estimates for
+  aluminium. A note goes as 1/length², so an octave is a tube 0.71 as long.
+- **The clapper is the chimes' own voice**: a heavy wooden puck close to the tubes,
+  so a swing of 0.2 rad reaches one.
+- **A pendulum at the end of its travel stops dead.** Holding the angle at its
+  limit while keeping its speed reported a velocity it did not have, and flung
+  whatever touched it.
+- **The draught** over the chimes checks a drop flying outward and draws one beyond
+  the ring back in, but only in flight (`CanopyDrop::air`, the time since it last
+  touched a leaf): acting on a drop lying on a leaf, it held it there, and a
+  hundred piled up.
+
+## The handpan
+
+The sixth TYPE. A convex steel shell: a raised ding in the middle and eight tone
+fields round it, each a shallow dent, so drops run across the fields and off the
+edge rather than collecting. The fields rise in a zigzag, alternating left and
+right from the one nearest the player, as most makers lay them out; the first is
+the first scale note at least a fifth above the ding, so D Minor gives a D Kurd
+(D3 | A3 Bb3 C4 D4 E4 F4 G4 A4). The notes use the steel pan's machinery
+(fundamental, octave and the fifth above that, fields whose partials meet ringing
+with each other, rolling sounding the fields) with a ring 2.6 times as long.
+
+## The bonang
+
+The seventh TYPE. Javanese kettle gongs in two rows on cords across a low wooden
+frame, following SCALE: Slendro gives 10 kettles and Pelog 14, the far row an
+octave over the near one, both rising left to right. On a real bonang the kettles
+are arranged by player and piece, so this is one arrangement of several. A kettle
+has a raised boss, a flat top and a rounded shoulder: the boss gives the note,
+the flat top a muted, brighter knock (measured, the fundamental is 0.96 of the
+sound struck on the boss and 0.73 on the top). No measured partial ratios for
+bonang kettles have been published, so the partials are estimates for a small
+tuned kettle gong, with the fundamental a near pair. Drops fall over a kettle,
+each as likely as any other, and the draught follows the frame's long oval.
+
+## The marimba and the balafon
+
+The eighth and ninth TYPEs, one bar engine.
+
+- **Marimba**: a chromatic keyboard over two octaves from "Lowest note", laid in
+  a circle so it fills the round view: the naturals as spokes round an outer ring
+  rising clockwise from the front, one place left empty between the highest and
+  the lowest, and the sharps raised on an inner ring between the naturals they lie
+  between. A straight keyboard was twice as wide as deep and left most of the view
+  empty. Each bar is undercut so its overtones are 1 : 4 : 9.9 (measured 3.99 and
+  9.90). Notes outside SCALE are damped, as the steel pan's are by default. A
+  resonator tube a quarter wavelength long hangs under each bar's outer half.
+- **Balafon**: one row of the scale's own notes on gourds. When the bar moves
+  past a threshold, the gourd's membrane slaps the rim of its hole on the outward
+  half of each cycle, which flattens that half of the note: a buzz made of the
+  note's own harmonics, as a kazoo's is, with only a trace of rattle. (The first
+  version clipped both halves and added band-passed noise, and sounded like
+  noise.) A soft touch stays clean and a hard hit buzzes: the 2nd and 3rd
+  harmonics, which a balafon bar does not otherwise have, come to 0.14 of the note
+  struck hard and 0.01 soft. The threshold reads the bar's motion, not its level
+  in the mix. Its overtones (1 : 2.9 : 6.2) are estimates; balafon bars are tuned
+  less exactly than a marimba's.
+- **Where a drop lands along a bar** sets the partials by the free bar's mode
+  shapes, so the middle has no second mode. Bars are flat, so a drop that
+  settles fades out.
+- **GATE and V/OCT**: every instrument after the zither keeps its notes from C4,
+  and a V/OCT cable picks the bar, kettle or tube by absolute pitch. Looked up as
+  the drum's are, relative to ROOT, a Pelog note landed 60 cents out.
+
+## Levels, and drops that would miss
+
+- **The new instruments ring long and their tails stack**, which drove the output
+  limiter most of the time and was heard as distortion. Measured as the share of
+  time the limiter is past -1 dB over 30 s at the default rate and at 0.75: the
+  balafon went from 30% and 74% to 0% and 10%, the chimes from 7% and 46% to 0% and
+  8%, the handpan from 12% and 46% to 2% and 9%.
+- **The bonang and the bars have gaps a thrown drop falls through**, where the drum
+  is solid. In the last 0.7 of its fall, a drop in flight is drawn sideways toward
+  the nearest kettle or bar (`steer()`), the nearer the stronger. The bonang went
+  from 0.5 to 2.1 notes a second at the default rate. A drop that reaches the
+  bonang's cords fades at once instead of lying there.
+- **The handpan is drawn as a convex shell is seen**: the dome as one outline (the
+  hull of its projected surface), each note only where its surface faces the
+  camera, and the bottom shell down to where it turns away. From a low camera the
+  notes on the far slope used to show through the dome.

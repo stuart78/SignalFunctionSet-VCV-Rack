@@ -4,6 +4,7 @@
 #include "scales.hpp"
 #include "pulse-width.hpp"
 #include "harmonic-tiers.hpp"   // the tier tables and consonance score, shared with Canon
+#include "panel-style.hpp"
 
 // ─── Scale Tables ────────────────────────────────────────────────────────────
 // Scales come from the shared canonical list (src/scales.hpp) so SCALE CV values
@@ -689,7 +690,14 @@ struct WanderSlider : app::SvgSlider {
 struct FugueWidget : ModuleWidget {
 	FugueWidget(Fugue* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/fugue.svg")));
+		// Redrawn 2026-11 in the code-drawn house style, so it follows "Use dark
+		// panels if available". Every control is where it was; the art keeps
+		// only the fader scale and the WANDER ticks.
+		setPanel(sfs::themedPanel("fugue"));
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->title("FUGUE");
 
 		// ══════════════════════════════════════════════════════════════════════
 		// LAYOUT CONSTANTS (mm)
@@ -740,20 +748,25 @@ struct FugueWidget : ModuleWidget {
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow1Y)), module, Fugue::SCALE_PARAM));
 
 		// ── CV row 1: Root CV, Scale CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow1Y)), module, Fugue::ROOT_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow1Y)), module, Fugue::SCALE_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, cvRow1Y)), module, Fugue::ROOT_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol2X, cvRow1Y)), module, Fugue::SCALE_CV_INPUT));
 
 		// ── Knob row 2: Steps, Slew ──
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol1X, knobRow2Y)), module, Fugue::STEPS_PARAM));
 		addParam(createParamCentered<Rogan1PWhite>(mm2px(Vec(knobCol2X, knobRow2Y)), module, Fugue::SLEW_PARAM));
 
 		// ── CV row 2: Steps CV, Slew CV ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, cvRow2Y)), module, Fugue::STEPS_CV_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol2X, cvRow2Y)), module, Fugue::SLEW_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, cvRow2Y)), module, Fugue::STEPS_CV_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol2X, cvRow2Y)), module, Fugue::SLEW_CV_INPUT));
 
 		// ── Reset: jack + momentary button ──
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(knobCol1X, resetY)), module, Fugue::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(knobCol1X, resetY)), module, Fugue::RESET_INPUT));
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(knobCol2X, resetY)), module, Fugue::RESET_BUTTON_PARAM));
+		lbl->rogan(knobCol1X, knobRow1Y, "ROOT");
+		lbl->rogan(knobCol2X, knobRow1Y, "SCALE");
+		lbl->rogan(knobCol1X, knobRow2Y, "STEPS");
+		lbl->rogan(knobCol2X, knobRow2Y, "SLEW");
+		lbl->jack(knobCol1X, resetY, "RESET");
 
 		// ══════════════════════════════════════════════════════════════════════
 		// SEQUENCER AREA (top-right)
@@ -799,23 +812,33 @@ struct FugueWidget : ModuleWidget {
 		const int gateOutputs[] = {Fugue::GATE_A_OUTPUT, Fugue::GATE_B_OUTPUT, Fugue::GATE_C_OUTPUT};
 		const int cvOutputs[] = {Fugue::CV_A_OUTPUT, Fugue::CV_B_OUTPUT, Fugue::CV_C_OUTPUT};
 
+		lbl->jack(clockX, voiceA_Y, "CLOCK");
+		lbl->add(wanderSliderX, voiceA_Y - sfs::LABEL_GAP_JACK, "WANDER");
+		lbl->jackOnPlate(gateOutX, voiceA_Y, "GATE");
+		lbl->jackOnPlate(cvOutX, voiceA_Y, "CV");
+		static const char* const voiceNames[] = {"A", "B", "C"};
+
 		for (int v = 0; v < NUM_VOICES; v++) {
 			float y = voiceYs[v];
+			// the voice's letter at the left edge, its cap height centred on the row
+			lbl->add(2.83f, y + 0.83f, voiceNames[v]);
+			// the WANDER CV jack tied to its slider
+			lbl->link(wanderCvX, y, 33.57f, y);
 
 			// Clock input
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(clockX, y)), module, clockInputs[v]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(clockX, y)), module, clockInputs[v]));
 
 			// Wander CV input (next to clock)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(wanderCvX, y)), module, wanderInputs[v]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(wanderCvX, y)), module, wanderInputs[v]));
 
 			// Wander horizontal slider
 			addParam(createParamCentered<WanderSlider>(mm2px(Vec(wanderSliderX, y)), module, wanderParams[v]));
 
 			// Gate output
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(gateOutX, y)), module, gateOutputs[v]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(gateOutX, y)), module, gateOutputs[v]));
 
 			// CV output
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(cvOutX, y)), module, cvOutputs[v]));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(cvOutX, y)), module, cvOutputs[v]));
 		}
 	}
 

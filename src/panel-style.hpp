@@ -31,16 +31,67 @@ static const NVGcolor HAIRLINE   = nvgRGB(0xB2, 0xB2, 0xB2);  // reticules
 static const NVGcolor RULE       = nvgRGB(0xA8, 0xA8, 0xB6);  // pot-to-jack connectors AND section dividers
 static const float RULE_W        = 0.169f;                    // mm: both, as the designer strokes them
 
-// display palette — what the screens clear to and draw with
-static const NVGcolor SCREEN_BG   = nvgRGB(0x1A, 0x1A, 0x32);
+// ── themes ──────────────────────────────────────────────────────────────────
+// Rack's View menu has "Use dark panels if available" (settings::
+// preferDarkPanels). Every colour that differs between the two modes is in
+// Theme; the panel art comes in two files, res/<name>.svg and res/dark/<name>.svg,
+// the dark one GENERATED from the light one by tools/panel_dark.py.
+//
+// The dark style is our own rather than Fundamental's, which turns the output
+// plate light: a medium-dark faceplate, plates that stay black with white
+// labels, and screens with less blue in them. Taking the blue out of a screen
+// also takes away most of what separated its dim tones (cells, grid lines,
+// inactive tabs) from its background, so those are lighter in the dark theme.
+struct Theme {
+	NVGcolor panel, ink, inkSoft, plate, plateInk, rule, plateRule;
+	NVGcolor screenBg, screenPurp, screenPmid, screenDim, screenText;
+};
+static inline Theme themeLight() {
+	return {nvgRGB(0xF0, 0xF0, 0xF0), nvgRGB(0x23, 0x1F, 0x20), nvgRGB(0x6A, 0x6A, 0x78),
+	        nvgRGB(0x1A, 0x1A, 0x1A), nvgRGB(0xFF, 0xFF, 0xFF), nvgRGB(0xA8, 0xA8, 0xB6),
+	        nvgRGB(0x4A, 0x4A, 0x52),
+	        nvgRGB(0x1A, 0x1A, 0x32), nvgRGB(0x35, 0x35, 0x4D), nvgRGB(0x4A, 0x4A, 0x66),
+	        nvgRGB(0x8A, 0x8A, 0xA5), nvgRGB(0xE8, 0xE8, 0xF0)};
+}
+static inline Theme themeDark() {
+	return {nvgRGB(0x3A, 0x3A, 0x3E), nvgRGB(0xE6, 0xE6, 0xE8), nvgRGB(0x9A, 0x9A, 0xA2),
+	        nvgRGB(0x0D, 0x0D, 0x0E), nvgRGB(0xFF, 0xFF, 0xFF), nvgRGB(0x62, 0x62, 0x6A),
+	        nvgRGB(0x3A, 0x3A, 0x40),
+	        nvgRGB(0x1C, 0x1C, 0x22), nvgRGB(0x3A, 0x3A, 0x42), nvgRGB(0x52, 0x52, 0x5C),
+	        nvgRGB(0x8E, 0x8E, 0x98), nvgRGB(0xE8, 0xE8, 0xEC)};
+}
+static inline bool dark() { return settings::preferDarkPanels; }
+static inline const Theme& theme() {
+	static const Theme L = themeLight(), D = themeDark();
+	return dark() ? D : L;
+}
+// The palette screens draw with. A function-local static, so every file that
+// includes this header shares ONE copy; syncTheme() copies the theme in force
+// into it, once a frame, from each themed panel's step() -- every step runs
+// before any draw, so a screen always draws in the mode the panel is in.
+// A screen's own dark greys and purples, with the blue taken out in dark mode
+// as SCREEN_BG's is, so cells, outlines and dividers drawn with literal colours
+// match the rest of the screen. Light mode returns the colour unchanged. Not for
+// accents: a blue that means something (a selection, a sampled key) stays blue.
+static inline NVGcolor screenTone(NVGcolor c) {
+	if (!dark()) return c;
+	float g = (c.r + c.g + c.b) / 3.f, k = 0.3f;
+	return nvgRGBAf(g + (c.r - g) * k, g + (c.g - g) * k, g + (c.b - g) * k, c.a);
+}
+static inline Theme& liveTheme() { static Theme t = themeLight(); return t; }
+static inline void syncTheme() { liveTheme() = theme(); }
+
+// display palette — what the screens clear to and draw with. The five that
+// change with the theme are references into liveTheme(); the accents do not.
+static NVGcolor& SCREEN_BG   __attribute__((unused)) = liveTheme().screenBg;
+static NVGcolor& SCREEN_PURP __attribute__((unused)) = liveTheme().screenPurp;
+static NVGcolor& SCREEN_PMID __attribute__((unused)) = liveTheme().screenPmid;
+static NVGcolor& SCREEN_TEXT __attribute__((unused)) = liveTheme().screenText;
+static NVGcolor& SCREEN_DIM  __attribute__((unused)) = liveTheme().screenDim;
 static const NVGcolor SCREEN_BLUE = nvgRGB(0x00, 0x97, 0xDE);
 static const NVGcolor SCREEN_DEEP = nvgRGB(0x0D, 0x59, 0x86);
 static const NVGcolor SCREEN_LINE = nvgRGB(0x0D, 0x59, 0x88);
-static const NVGcolor SCREEN_PURP = nvgRGB(0x35, 0x35, 0x4D);
-static const NVGcolor SCREEN_PMID = nvgRGB(0x4A, 0x4A, 0x66);
 static const NVGcolor SCREEN_HOT  = nvgRGB(0xEC, 0x65, 0x2E);
-static const NVGcolor SCREEN_TEXT = nvgRGB(0xE8, 0xE8, 0xF0);
-static const NVGcolor SCREEN_DIM  = nvgRGB(0x8A, 0x8A, 0xA5);
 
 // ── grid ────────────────────────────────────────────────────────────────────
 // One grid, one unit: 1HP, in BOTH axes. Controls sit on intersections, so a
@@ -220,7 +271,7 @@ struct PanelLabels : Widget {
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, mm2px(l.a.x), mm2px(l.a.y));
 			nvgLineTo(vg, mm2px(l.b.x), mm2px(l.b.y));
-			nvgStrokeColor(vg, l.onPlate ? nvgRGB(0x4A, 0x4A, 0x52) : RULE);
+			nvgStrokeColor(vg, l.onPlate ? theme().plateRule : theme().rule);
 			nvgStrokeWidth(vg, mm2px(RULE_W));
 			nvgStroke(vg);
 		}
@@ -230,8 +281,8 @@ struct PanelLabels : Widget {
 			nvgFontSize(vg, mm2px(NVG_EM * (it.kind == NOTE ? TYPE_NOTE
 			                              : isTitle         ? TYPE_TITLE : TYPE_LABEL)));
 			nvgTextLetterSpacing(vg, 0.f);
-			nvgFillColor(vg, it.kind == ON_PLATE ? PLATE_INK
-			               : it.kind == NOTE     ? INK_SOFT : INK);
+			nvgFillColor(vg, it.kind == ON_PLATE ? theme().plateInk
+			               : it.kind == NOTE     ? theme().inkSoft : theme().ink);
 			// every position is a BASELINE, as the designer's labels sit on one
 			nvgTextAlign(vg, it.align | NVG_ALIGN_BASELINE);
 			nvgText(vg, mm2px(it.pos.x), mm2px(it.pos.y), it.text.c_str(), NULL);
@@ -239,5 +290,30 @@ struct PanelLabels : Widget {
 		Widget::draw(args);
 	}
 };
+
+// ── themed panel and jack ───────────────────────────────────────────────────
+// A panel that follows "Use dark panels if available", and keeps the screens'
+// palette in step with it. `name` is the art's file name without extension:
+// res/<name>.svg, and res/dark/<name>.svg made from it by tools/panel_dark.py.
+struct Panel : app::ThemedSvgPanel {
+	void step() override {
+		syncTheme();
+		ThemedSvgPanel::step();
+	}
+};
+static inline Panel* themedPanel(const std::string& name) {
+	// Rack's screenshot mode (`Rack -t`) draws light panels whatever the setting
+	// says -- Fundamental's come out light too -- so dark renders for review are
+	// made with SFS_PREFER_DARK=1 in the environment, which turns the setting on
+	// as each panel is built, before its jacks are.
+	static const bool forceDark = getenv("SFS_PREFER_DARK") != nullptr;
+	if (forceDark) settings::preferDarkPanels = true;
+	// and here as well as in step(): a screenshot draws a panel without stepping it
+	syncTheme();
+	return createPanel<Panel>(asset::plugin(pluginInstance, "res/" + name + ".svg"),
+	                          asset::plugin(pluginInstance, "res/dark/" + name + ".svg"));
+}
+// Rack's own themed jack: silver in light mode, dark in dark mode.
+using Jack = ThemedPJ301MPort;
 
 }  // namespace sfs

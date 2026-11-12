@@ -18,6 +18,7 @@
 // =============================================================================
 
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "fastmath.hpp"
 #include <algorithm>
 #include <atomic>
@@ -1193,19 +1194,22 @@ struct Crystal : Module {
 };
 
 // ── display: wireframe crystal, drag to rotate, drag the emitter ────────────
-static const NVGcolor XBG     = nvgRGB(0x1A, 0x1A, 0x32);
+#define XBG (sfs::SCREEN_BG)
 static const NVGcolor XBLUE   = nvgRGB(0x00, 0x97, 0xDE);
-static const NVGcolor XPURPLE = nvgRGB(0x35, 0x35, 0x4D);
+#define XPURPLE (sfs::SCREEN_PURP)
 static const NVGcolor XORANGE = nvgRGB(0xEC, 0x65, 0x2E);
-static const NVGcolor XTEXT   = nvgRGB(0xE8, 0xE8, 0xF0);
-static const NVGcolor XDIM    = nvgRGB(0x8A, 0x8A, 0xA5);
+#define XTEXT (sfs::SCREEN_TEXT)
+#define XDIM (sfs::SCREEN_DIM)
 
 struct CrystalDisplay : Widget {
 	Crystal* module = nullptr;
 	std::shared_ptr<Font> font;
 	// Two palettes. On the faceplate everything has to be dark ink on light, and
 	// the faint alphas that read on a dark screen vanish, so they are lifted too.
-	bool lite = true;
+	bool lite = true;      // dark ink: drawn on the faceplate in light mode
+	bool onPanel = false;  // drawn on the faceplate (no screen), in either mode
+	// the faceplate behind a drawing made on it
+	NVGcolor face() const { return lite ? nvgRGB(0xF0, 0xF0, 0xF0) : sfs::theme().panel; }
 	NVGcolor cText() const { return lite ? nvgRGB(0x2E, 0x2C, 0x2C) : XTEXT; }
 	NVGcolor cDim()  const { return lite ? nvgRGB(0x62, 0x62, 0x70) : XDIM; }
 	NVGcolor cWire(float a) const {
@@ -1636,7 +1640,7 @@ struct CrystalDisplay : Widget {
 			}
 			std::sort(order.begin(), order.end(),
 			          [&](size_t a, size_t b) { return zc[a] > zc[b]; });   // far first
-			NVGcolor bg = lite ? nvgRGB(0xF0, 0xF0, 0xF0) : XBG;
+			NVGcolor bg = onPanel ? face() : XBG;
 			for (size_t i : order) {
 				nvgBeginPath(vg);
 				for (size_t k = 0; k < pts[i].size(); k++)
@@ -1849,11 +1853,14 @@ struct CrystalDisplay : Widget {
 	void draw(const DrawArgs& args) override {
 		if (!font) font = APP->window->loadFont(asset::system("res/fonts/ShareTechMono-Regular.ttf"));
 		NVGcontext* vg = args.vg;
-		lite = module && module->panelDraw;
-		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, lite ? 0.f : 3.f);
+		// On the faceplate the drawing is dark ink in light mode and the screen's
+		// light ink in dark mode, which is drawn for a dark ground already.
+		onPanel = module && module->panelDraw;
+		lite = onPanel && !sfs::dark();
+		nvgBeginPath(vg); nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, onPanel ? 0.f : 3.f);
 		// the faceplate colour, so the generated screen rect in the SVG is covered
 		// and the drawing reads as sitting directly on the panel
-		nvgFillColor(vg, lite ? nvgRGB(0xF0, 0xF0, 0xF0) : XBG); nvgFill(vg);
+		nvgFillColor(vg, onPanel ? face() : XBG); nvgFill(vg);
 
 		// Everything below is bound to the screen. The room is wider than the
 		// crystal, so the plane's rim and the speaker labels reach past the edge.
@@ -2000,7 +2007,7 @@ struct CrystalToggle : app::Switch {
 		// dirty framebuffer.
 		std::shared_ptr<Image> img = APP->window->loadImage(
 			asset::plugin(pluginInstance, on ? "res/toggle-on.png"
-			                                 : "res/toggle-off.png"));
+			              : sfs::dark() ? "res/dark/toggle-off.png" : "res/toggle-off.png"));
 		if (!img || img->handle < 0) return;
 		NVGpaint paint = nvgImagePattern(args.vg, 0.f, 0.f, box.size.x, box.size.y,
 		                                 0.f, img->handle, 1.f);
@@ -2014,7 +2021,7 @@ struct CrystalToggle : app::Switch {
 struct CrystalWidget : ModuleWidget {
 	CrystalWidget(Crystal* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/crystal.svg")));
+		setPanel(sfs::themedPanel("crystal"));
 
 		// Positions read straight off the panel artwork (25HP, 1500 x 1518 units
 		// at 127 x 128.5mm). The panel carries its own labels, so there is no
@@ -2036,7 +2043,7 @@ struct CrystalWidget : ModuleWidget {
 		                   Crystal::MIX_INPUT};
 		for (int i = 0; i < 7; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(kx[i], yK)), module, kp[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(kx[i], yC)), module, ki[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(kx[i], yC)), module, ki[i]));
 		}
 		addParam(createParamCentered<CrystalToggle>(mm2px(Vec(116.84f, 82.67f)), module, Crystal::MODE_PARAM));
 
@@ -2044,9 +2051,9 @@ struct CrystalWidget : ModuleWidget {
 		const float yB = 104.08f;
 		addParam(createLightParamCentered<VCVLightBezel<GreenLight>>(mm2px(Vec(10.16f, yB)), module,
 			Crystal::PING_PARAM, Crystal::PING_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, yB)), module, Crystal::PING_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, yB)), module, Crystal::PING_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(40.73f, yB)), module, Crystal::DECAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(55.95f, yB)), module, Crystal::VOCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(55.95f, yB)), module, Crystal::VOCT_INPUT));
 
 		// SPIN x/y/z and the EMITTER axis x/y/z, stacked
 		const float ySpin[3] = {104.08f, 112.97f, 121.85f};
@@ -2057,14 +2064,14 @@ struct CrystalWidget : ModuleWidget {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(86.28f, ySpin[i])), module, em[i]));
 		}
 
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(10.16f, 121.85f)), module, Crystal::AUDIO_INPUT));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(25.40f, 121.85f)), module, Crystal::AUDIO_B_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(10.16f, 121.85f)), module, Crystal::AUDIO_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(25.40f, 121.85f)), module, Crystal::AUDIO_B_INPUT));
 
 		// quad outs on the diamond: A top, B right, C bottom, D left
 		const Vec quad[4] = {Vec(109.37f, 104.76f), Vec(116.91f, 112.37f),
 		                     Vec(109.29f, 120.08f), Vec(101.67f, 112.37f)};
 		for (int i = 0; i < CR_NL; i++)
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(quad[i]), module, Crystal::QUAD_OUTPUT + i));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(quad[i]), module, Crystal::QUAD_OUTPUT + i));
 	}
 
 	void appendContextMenu(Menu* menu) override {

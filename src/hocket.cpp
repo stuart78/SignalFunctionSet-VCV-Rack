@@ -482,7 +482,7 @@ static const float HK_HEAD_Y = 17.06f;
 struct HocketWidget : ModuleWidget {
 	HocketWidget(Hocket* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/hocket.svg")));
+		setPanel(sfs::themedPanel("hocket"));
 		sfs::PanelLabels* lbl = new sfs::PanelLabels();
 		lbl->box.size = box.size;
 		addChild(lbl);
@@ -496,23 +496,23 @@ struct HocketWidget : ModuleWidget {
 
 		// pot and CV pairs, written out so tools/panel_reticules.py can read them
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(HK_LX[0], HK_Y_P1)), module, Hocket::PATTERN_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[1], HK_Y_P1)), module, Hocket::PATTERN_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[1], HK_Y_P1)), module, Hocket::PATTERN_INPUT));
 		lbl->pair(HK_LX[0], HK_Y_P1, "PATTERN");
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(HK_LX[2], HK_Y_P1)), module, Hocket::COUNT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[3], HK_Y_P1)), module, Hocket::COUNT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[3], HK_Y_P1)), module, Hocket::COUNT_INPUT));
 		lbl->pair(HK_LX[2], HK_Y_P1, "COUNT");
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(HK_LX[0], HK_Y_P2)), module, Hocket::GROUP_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[1], HK_Y_P2)), module, Hocket::GROUP_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[1], HK_Y_P2)), module, Hocket::GROUP_INPUT));
 		lbl->pair(HK_LX[0], HK_Y_P2, "GROUP");
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(HK_LX[2], HK_Y_P2)), module, Hocket::STAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[3], HK_Y_P2)), module, Hocket::STAY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[3], HK_Y_P2)), module, Hocket::STAY_INPUT));
 		lbl->pair(HK_LX[2], HK_Y_P2, "STAY");
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(HK_LX[0], HK_Y_P3)), module, Hocket::FADE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[1], HK_Y_P3)), module, Hocket::FADE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[1], HK_Y_P3)), module, Hocket::FADE_INPUT));
 		lbl->pair(HK_LX[0], HK_Y_P3, "FADE");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[2], HK_Y_P3)), module, Hocket::TRIG_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[2], HK_Y_P3)), module, Hocket::TRIG_INPUT));
 		lbl->jack(HK_LX[2], HK_Y_P3, "TRIG");
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[3], HK_Y_P3)), module, Hocket::RESET_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[3], HK_Y_P3)), module, Hocket::RESET_INPUT));
 		lbl->jack(HK_LX[3], HK_Y_P3, "RESET");
 		lbl->divider(HK_SX, HK_RULE_Y, HK_SX + HK_SW, HK_RULE_Y);
 
@@ -520,7 +520,7 @@ struct HocketWidget : ModuleWidget {
 		const int ins[4] = {Hocket::CV_INPUT, Hocket::GATE_INPUT, Hocket::AUDIO_L_INPUT, Hocket::AUDIO_R_INPUT};
 		const char* inName[4] = {"CV", "GATE", "IN L", "IN R"};
 		for (int i = 0; i < 4; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(HK_LX[i], HK_Y_IN)), module, ins[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(HK_LX[i], HK_Y_IN)), module, ins[i]));
 			lbl->jack(HK_LX[i], HK_Y_IN, inName[i]);
 		}
 
@@ -535,10 +535,10 @@ struct HocketWidget : ModuleWidget {
 			lbl->add(HK_X_NUM, y + 0.83f, string::f("%d", c + 1));
 			addParam(createLightParamCentered<VCVLightLatch<MediumSimpleLight<RedGreenBlueLight>>>(
 				mm2px(Vec(HK_X_ON, y)), module, Hocket::ON_PARAM + c, Hocket::ON_LIGHT + 3 * c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HK_X_CV, y)), module, Hocket::CV_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HK_X_GATE, y)), module, Hocket::GATE_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HK_X_L, y)), module, Hocket::AUDIO_L_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(HK_X_R, y)), module, Hocket::AUDIO_R_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HK_X_CV, y)), module, Hocket::CV_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HK_X_GATE, y)), module, Hocket::GATE_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HK_X_L, y)), module, Hocket::AUDIO_L_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(HK_X_R, y)), module, Hocket::AUDIO_R_OUTPUT + c));
 		}
 	}
 

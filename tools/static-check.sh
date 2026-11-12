@@ -120,7 +120,25 @@ fi
 "$ROOT/tools/check-manifest.sh"
 mn=$?
 
-total=$((n + tn + mn))
+# Dark panels: every panel loads through sfs::themedPanel(), and its dark art in
+# res/dark/ is what tools/panel_dark.py makes from the light art today. Wave and
+# Ratio are hidden placeholders and are converted when they are finished.
+dn=0
+light="$(grep -l 'setPanel(createPanel' "$ROOT"/src/*.cpp | grep -v -E '/(wave|ratio)\.cpp$' || true)"
+if [ -n "$light" ]; then
+    echo
+    echo "── panels with no dark version (use sfs::themedPanel) ──"
+    printf '%s\n' "$light" | sed "s|^$ROOT/||"
+    dn=$(printf '%s\n' "$light" | wc -l | tr -d ' ')
+fi
+if ! out="$(python3 "$ROOT/tools/panel_dark.py" --check 2>&1)"; then
+    echo
+    echo "── dark panel art missing or out of date (python3 tools/panel_dark.py) ──"
+    printf '%s\n' "$out"
+    dn=$((dn + $(printf '%s\n' "$out" | grep -c .)))
+fi
+
+total=$((n + tn + mn + dn))
 echo
-echo "$n cppcheck + $tn clang-tidy + $mn manifest = $total finding(s) in our own sources."
+echo "$n cppcheck + $tn clang-tidy + $mn manifest + $dn dark panels = $total finding(s) in our own sources."
 exit "$total"

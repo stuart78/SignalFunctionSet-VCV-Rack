@@ -895,9 +895,20 @@ static Carillon* carillonPreview() {
 	return m;
 }
 
-static const NVGcolor PL_INK  = nvgRGB(0x23, 0x1F, 0x20);
-static const NVGcolor PL_SOFT = nvgRGB(0x8A, 0x8A, 0x96);
-static const NVGcolor PL_LINE = nvgRGB(0xB2, 0xB2, 0xBC);
+// Drawn on the faceplate, so it has a dark-panel palette too: bells in light
+// ink on the dark faceplate. The light values are unchanged.
+struct ClPal { NVGcolor ink, soft, line, face; };
+static inline const ClPal& clPal() {
+	static const ClPal L = {nvgRGB(0x23, 0x1F, 0x20), nvgRGB(0x8A, 0x8A, 0x96), nvgRGB(0xB2, 0xB2, 0xBC),
+	                        nvgRGB(0xF0, 0xF0, 0xF0)};
+	static const ClPal D = {nvgRGB(0xE6, 0xE6, 0xE8), nvgRGB(0x9A, 0x9A, 0xA2), nvgRGB(0x66, 0x66, 0x6E),
+	                        nvgRGB(0x3A, 0x3A, 0x3E)};
+	return sfs::dark() ? D : L;
+}
+#define PL_INK  (clPal().ink)
+#define PL_SOFT (clPal().soft)
+#define PL_LINE (clPal().line)
+#define PL_FACE (clPal().face)   // the faceplate, painted over what is behind
 static const NVGcolor PL_HOT  = nvgRGB(0xEC, 0x65, 0x2E);
 
 struct CarillonDisplay : OpaqueWidget {
@@ -1067,7 +1078,7 @@ struct CarillonDisplay : OpaqueWidget {
 			}
 			nvgBeginPath(vg); nvgCircle(vg, x, y, r);
 			if (b.masked) {
-				nvgFillColor(vg, nvgRGB(0xF0, 0xF0, 0xF0)); nvgFill(vg);
+				nvgFillColor(vg, PL_FACE); nvgFill(vg);
 				nvgStrokeColor(vg, PL_SOFT); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 			} else {
 				float g = clamp(b.glow, 0.f, 1.f);
@@ -1095,7 +1106,7 @@ struct CarillonDisplay : OpaqueWidget {
 			float ty = y - r - mm2px(1.2f);
 			if (ty - mm2px(3.4f) < 0.f) ty = y + r + mm2px(4.4f);
 			nvgBeginPath(vg); nvgRoundedRect(vg, x - tw * 0.5f - mm2px(1.f), ty - mm2px(3.2f), tw + mm2px(2.f), mm2px(3.8f), mm2px(0.6f));
-			nvgFillColor(vg, nvgRGBA(0xF0, 0xF0, 0xF0, 0xE8)); nvgFill(vg);
+			nvgFillColor(vg, nvgTransRGBA(PL_FACE, 0xE8)); nvgFill(vg);
 			nvgStrokeColor(vg, PL_SOFT); nvgStrokeWidth(vg, 0.6f); nvgStroke(vg);
 			nvgFillColor(vg, PL_INK); nvgText(vg, x, ty, name.c_str(), NULL);
 		}
@@ -1106,7 +1117,7 @@ struct CarillonDisplay : OpaqueWidget {
 				float x, y; V.project(module->micU[k], module->micV[k], x, y);
 				float rr = mm2px(1.6f);
 				nvgBeginPath(vg); nvgCircle(vg, x, y, rr);
-				nvgFillColor(vg, nvgRGB(0xF0, 0xF0, 0xF0)); nvgFill(vg);
+				nvgFillColor(vg, PL_FACE); nvgFill(vg);
 				nvgStrokeColor(vg, PL_INK); nvgStrokeWidth(vg, 1.f); nvgStroke(vg);
 				nvgFontFaceId(vg, font->handle); nvgFontSize(vg, rr * 1.5f);
 				nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE); nvgFillColor(vg, PL_INK);
@@ -1134,7 +1145,7 @@ static const float PL_FY = 121.01f;
 struct CarillonWidget : ModuleWidget {
 	CarillonWidget(Carillon* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/carillon.svg")));
+		setPanel(sfs::themedPanel("carillon"));
 
 		CarillonDisplay* disp = new CarillonDisplay();
 		disp->module = module;
@@ -1146,14 +1157,14 @@ struct CarillonWidget : ModuleWidget {
 		static const int PI[8] = {Carillon::SIZE_INPUT, Carillon::SHAPE_INPUT, Carillon::BRIGHT_INPUT, Carillon::DAMP_INPUT, Carillon::REACH_INPUT, Carillon::SPEED_INPUT, Carillon::ROOT_INPUT, Carillon::SCALE_INPUT};
 		for (int i = 0; i < 8; i++) {
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(PL_PX[i], PL_PY)), module, PP[i]));
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PL_CVX[i], PL_PCV)), module, PI[i]));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(PL_CVX[i], PL_PCV)), module, PI[i]));
 		}
 		static const int FI[4] = {Carillon::GATE_INPUT, Carillon::VOCT_INPUT, Carillon::VEL_INPUT, Carillon::CLOCK_INPUT};
 		for (int i = 0; i < 4; i++)
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PL_FX[i], PL_FY)), module, FI[i]));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[4], PL_FY)), module, Carillon::POLY_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[5], PL_FY)), module, Carillon::L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(PL_FX[6], PL_FY)), module, Carillon::R_OUTPUT));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(PL_FX[i], PL_FY)), module, FI[i]));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(PL_FX[4], PL_FY)), module, Carillon::POLY_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(PL_FX[5], PL_FY)), module, Carillon::L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(PL_FX[6], PL_FY)), module, Carillon::R_OUTPUT));
 	}
 
 	void appendContextMenu(Menu* menu) override {

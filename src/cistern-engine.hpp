@@ -672,7 +672,7 @@ inline Space makeBasilica() {
 // ── the program the audio thread plays: built on the worker ────────────────
 static const int RB = 3;                                   // render bands: low, mid, high
 static const int NSRC = 2;                                 // sources: one per input channel
-struct Tap { int delay; int in; float g[2][RB]; };        // which input, per ear, per render band
+struct Tap { int delay; int in; float g[2][RB]; bool direct = false; };   // which input, per ear, per render band; the direct path's own tap
 // A tap as the audio thread reads it: both ears' three band gains padded to
 // four, so one tap is two four-wide multiply-adds against the four floats a
 // history sample occupies (the fourth is zero on both sides). Built by
@@ -683,6 +683,7 @@ struct PackedTap { float gL[4], gR[4]; int delay; };
 struct Program {
 	std::vector<Tap> taps;
 	std::vector<PackedTap> packed[NSRC];                   // the taps by source, for the audio thread
+	std::vector<PackedTap> packedDirect[NSRC];             // the direct path's tap by source, kept apart so MIX can weigh it
 	int maxDelay = 1;
 	double t60[NB] = {};                                   // the room's decay per band
 	double t60x8k = 1;                                     // and at 8 kHz, for the tail's filter
@@ -849,6 +850,7 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 	int nbins = (int)(P->tMix / binSec) + 1;
 	std::vector<double> E[NSRC][2][RB];
 	std::vector<int> sign[NSRC];
+	int directBin[NSRC] = {-1, -1};
 	for (int k = 0; k < nsrc; k++) {
 		for (int e = 0; e < 2; e++) for (int r = 0; r < RB; r++) E[k][e][r].assign(nbins, 0.0);
 		sign[k].assign(nbins, 0);
@@ -882,6 +884,7 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 				toRender(eb, er);
 				for (int e = 0; e < 2; e++) for (int r = 0; r < RB; r++) E[k][e][r][bin] += er[r] * g[e] * g[e] * srcW;
 				sign[k][bin] += 4;
+				directBin[k] = bin;
 			}
 		}
 		// the rays
@@ -945,7 +948,7 @@ inline std::unique_ptr<Program> trace(const Space& s, const BuildParams& bp, dou
 		for (int i = 0; i < nbins; i++) {
 			double tot = 0; for (int e = 0; e < 2; e++) for (int r = 0; r < RB; r++) tot += E[k][e][r][i];
 			if (tot < peak * 1e-6) continue;
-			Tap tp; tp.delay = (int)std::lround((i + 0.5) * binSec * sr); tp.in = k;
+			Tap tp; tp.delay = (int)std::lround((i + 0.5) * binSec * sr); tp.in = k; tp.direct = i == directBin[k];
 			float sg = sign[k][i] >= 0 ? 1.f : -1.f;
 			for (int e = 0; e < 2; e++) for (int r = 0; r < RB; r++) tp.g[e][r] = sg * (float)std::sqrt(E[k][e][r][i]);
 			P->taps.push_back(tp);
@@ -973,21 +976,37 @@ inline void calibrate(Program& P, double modAmt, uint64_t seed);
 // it, the early taps faded where the tail comes in, and the wet level set.
 // the taps split by source and padded to four bands: what Reverb::early reads
 inline void pack(Program& P) {
-	for (int k = 0; k < NSRC; k++) P.packed[k].clear();
+	for (int k = 0; k < NSRC; k++) { P.packed[k].clear(); P.packedDirect[k].clear(); }
 	for (const Tap& t : P.taps) {
 		PackedTap q;
 		for (int r = 0; r < 4; r++) { q.gL[r] = r < RB ? t.g[0][r] : 0.f; q.gR[r] = r < RB ? t.g[1][r] : 0.f; }
 		q.delay = t.delay;
-		P.packed[t.in].push_back(q);
+		(t.direct ? P.packedDirect : P.packed)[t.in].push_back(q);
 	}
 }
 
-inline std::unique_ptr<Program> assemble(const Program& traced, double decay, double modAmt = 1.0, uint64_t seed = 7) {
+// `levelFrom`, when given, is the same room traced at its default positions:
+// the wet level is then set there rather than here, so what was a level held
+// constant wherever anything stands becomes a level that follows distance. A
+// source brought closer than its default position comes up, by at most
+// LEVEL_RISE_DB (or one dragged to the listener's ear would be 20 dB over
+// everything else); one taken further off gets quieter and wetter, with the
+// reverberation the floor under it, as in a real room.
+static const double LEVEL_RISE_DB = 6.0;
+inline std::unique_ptr<Program> assemble(const Program& traced, double decay, double modAmt = 1.0, uint64_t seed = 7,
+                                         const Program* levelFrom = nullptr) {
 	std::unique_ptr<Program> P(new Program(traced));
 	P->decay = decay;
 	for (int b = 0; b < NB; b++) P->t60[b] *= decay;
 	P->t60x8k *= decay;
 	calibrate(*P, modAmt, seed);
+	if (levelFrom) {
+		Program R(*levelFrom);
+		for (int b = 0; b < NB; b++) R.t60[b] *= decay;
+		R.t60x8k *= decay;
+		calibrate(R, modAmt, seed);
+		P->wetNorm = std::min(R.wetNorm, P->wetNorm * std::pow(10.0, LEVEL_RISE_DB / 20.0));
+	}
 	pack(*P);
 	return P;
 }
@@ -1330,9 +1349,11 @@ struct Reverb {
 	// The early taps: per source, each tap's three bands for both ears as two
 	// four-wide multiply-adds (the history's pad and the gains' pad are both
 	// zero). Skipped outright once every sample a tap could read is zero.
-	inline void early(const Program* P, float g, float& l, float& r) {
+	// The direct path's taps are summed apart (into dl/dr) so the caller can
+	// weigh the direct sound against the rest.
+	inline void early(const Program* P, float g, float& l, float& r, float& dl, float& dr) {
 		if (quietFor >= P->maxDelay) return;
-		cs4 accL = {0.f, 0.f, 0.f, 0.f}, accR = accL;
+		cs4 accL = {0.f, 0.f, 0.f, 0.f}, accR = accL, dirL = accL, dirR = accL;
 		for (int k = 0; k < NSRC; k++) {
 			const float* h = hist[k].data();
 			for (const PackedTap& t : P->packed[k]) {
@@ -1340,10 +1361,19 @@ struct Reverb {
 				accL += b * cs4load(t.gL);
 				accR += b * cs4load(t.gR);
 			}
+			for (const PackedTap& t : P->packedDirect[k]) {
+				cs4 b = cs4load(h + (size_t)((w - t.delay) & hmask) * 4);
+				dirL += b * cs4load(t.gL);
+				dirR += b * cs4load(t.gR);
+			}
 		}
 		l += g * (accL[0] + accL[1] + accL[2] + accL[3]);
 		r += g * (accR[0] + accR[1] + accR[2] + accR[3]);
+		dl += g * (dirL[0] + dirL[1] + dirL[2] + dirL[3]);
+		dr += g * (dirR[0] + dirR[1] + dirR[2] + dirR[3]);
 	}
+	// out = the whole wet signal; dir = the part of it that is the direct sound
+	float dirL = 0.f, dirR = 0.f;
 	void process(float inL, float inR, float& outL, float& outR) {
 		// FREEZE: the loop goes lossless and the input is shut out of it
 		tail.freeze = freeze;
@@ -1365,25 +1395,26 @@ struct Reverb {
 		}
 		quietFor = wrote ? 0 : std::min(quietFor + 1, 1 << 30);
 		tbuf[w] = 0.5f * (in[0] + in[1]);
-		float l = 0, r = 0;
+		float l = 0, r = 0, dl = 0, dr = 0;
 		float td;
 		if (prev) {
 			// two traces' taps are unrelated, so they cross at equal power; a
 			// decay change keeps the same taps, which cross linearly
 			float gc = fade, gp = 1.f - fade;
 			if (prev->traceId != cur->traceId) { gc = std::sin(fade * 1.5707963f); gp = std::cos(fade * 1.5707963f); }
-			early(cur, gc, l, r); early(prev, gp, l, r);
+			early(cur, gc, l, r, dl, dr); early(prev, gp, l, r, dl, dr);
 			td = fade * tbuf[(w - cur->tailDelay) & hmask] + (1.f - fade) * tbuf[(w - prev->tailDelay) & hmask];
 		} else {
-			early(cur, 1.f, l, r);
+			early(cur, 1.f, l, r, dl, dr);
 			td = tbuf[(w - cur->tailDelay) & hmask];
 		}
 		w = (w + 1) & hmask;
 		// the tail, fed late so it takes over at the mixing time
 		float tg = prev ? (float)(prev->tailGain + (cur->tailGain - prev->tailGain) * fade) : (float)cur->tailGain;
 		tail.process(td * tg);
-		outL = l + tail.out[0];
-		outR = r + tail.out[1];
+		dirL = dl; dirR = dr;
+		outL = l + dl + tail.out[0];
+		outR = r + dr + tail.out[1];
 		if (prev && fade < 1.f) fade = std::min(1.f, fade + fadeInc);
 	}
 };

@@ -1778,7 +1778,7 @@ struct KitWidget : ModuleWidget {
 
 	KitWidget(Kit* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/kit.svg")));
+		setPanel(sfs::themedPanel("kit"));
 		using sfs::hp;
 
 		// NO PanelLabels, and no title. This panel's artwork carries its own text
@@ -1837,7 +1837,7 @@ struct KitWidget : ModuleWidget {
 			{Kit::DECAY_INPUT, "DECAY"}, {Kit::TONE_INPUT, "TONE"},
 			{Kit::EXCITE_INPUT, "EXCITER"}, {Kit::MUFFLE_INPUT, "MUFFLE"}};
 		for (int i = 0; i < 8; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(KX[i], Y_CV)), module, cv[i].id));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(KX[i], Y_CV)), module, cv[i].id));
 		}
 
 		// ── THE TRANSPORT ROW (house style) ────────────────────────────────
@@ -1850,14 +1850,14 @@ struct KitWidget : ModuleWidget {
 		                   {Kit::VEL_INPUT, "VEL"},   {Kit::STRIKEX_INPUT, "X"},
 		                   {Kit::STRIKEY_INPUT, "Y"}};
 		for (int i = 0; i < 5; i++) {
-			addInput(createInputCentered<PJ301MPort>(mm2px(Vec(KX[i], Y_PERF)), module, perf[i].id));
+			addInput(createInputCentered<sfs::Jack>(mm2px(Vec(KX[i], Y_PERF)), module, perf[i].id));
 		}
 		// POLY, MIX L, MIX R. The ids are the old HEAD/WIRES/MIX slots (outputs
 		// serialise by index); the art's labels need redrawing to match.
 		const J outs[3] = {{Kit::OUT_OUTPUT, "POLY"}, {Kit::HEAD_OUTPUT, "MIX L"},
 		                   {Kit::SNARE_OUTPUT, "MIX R"}};
 		for (int i = 0; i < 3; i++) {
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(KX[5 + i], Y_PERF)),
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(KX[5 + i], Y_PERF)),
 			                                           module, outs[i].id));
 		}
 	}

@@ -1,4 +1,5 @@
 #include "plugin.hpp"
+#include "panel-style.hpp"
 #include "polykit-messages.hpp"
 
 // ─── PolyKit In — per-instrument inputs for Kit, as a matrix of jacks ────────
@@ -59,12 +60,12 @@ static const float PKI_ROWY[PK_NCH]  = {20.36f, 33.90f, 47.45f, 60.99f, 74.54f, 
 struct PolyKitInWidget : ModuleWidget {
 	PolyKitInWidget(PolyKitIn* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/polykit-in.svg")));
+		setPanel(sfs::themedPanel("polykit-in"));
 		// NO PanelLabels: the art carries its own outlined text, which Rack
 		// renders, and the runtime labels would print every one of them twice.
 		for (int col = 0; col < PK_NCOL; col++)
 			for (int ch = 0; ch < PK_NCH; ch++)
-				addInput(createInputCentered<PJ301MPort>(mm2px(Vec(PKI_COLX[col], PKI_ROWY[ch])),
+				addInput(createInputCentered<sfs::Jack>(mm2px(Vec(PKI_COLX[col], PKI_ROWY[ch])),
 				                                         module, PolyKitIn::IN_INPUT + col * PK_NCH + ch));
 	}
 };

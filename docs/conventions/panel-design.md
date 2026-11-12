@@ -64,6 +64,36 @@ plugin's density suits trimpots, and the grid assumes them.
 The screen palette (`SCREEN_BLUE`, `SCREEN_HOT`, …) is shared by every display
 widget so the modules read as one instrument.
 
+## Dark panels
+
+Every panel follows Rack's "Use dark panels if available" (View menu,
+`settings::preferDarkPanels`). The dark style is our own, not Fundamental's
+inverted plate: a medium-dark faceplate (`#3a3a3e`), plates that stay black
+(`#0d0d0e`) with white labels, and screens with less blue in them (`#1c1c22`),
+whose dim tones are lighter so cells, grids and inactive tabs keep their
+contrast. Both palettes are `sfs::Theme` in `src/panel-style.hpp`.
+
+What a module needs:
+
+- `setPanel(sfs::themedPanel("<name>"))`, which loads `res/<name>.svg` and
+  `res/dark/<name>.svg`. Never edit the dark file: `python3 tools/panel_dark.py`
+  makes it from the light one, mapping each colour by its role. It refuses a
+  colour it does not know; give the colour a role there, or list it under
+  `"keep"` in `tools/panel-layout/<key>.json` if it is the same in both modes.
+- `sfs::Jack` (Rack's `ThemedPJ301MPort`) for every jack.
+- `sfs::PanelLabels`, which draws in the theme's colours.
+- Screens draw with `sfs::SCREEN_BG / PURP / PMID / DIM / TEXT`, which follow
+  the theme. A namespace-scope `static const NVGcolor` copy of one of them
+  freezes the light value; make it a `#define` instead.
+- Anything drawn on the faceplate in code (Wheel, Flock, Carillon, Canopy,
+  Drift's scope) takes its colours from a light and a dark palette, with the
+  light values unchanged. A literal `#f0f0f0` fill that hides something is the
+  faceplate and must follow the theme.
+
+`./tools/static-check.sh` fails on a panel that is not themed and on dark art
+that is missing or out of date. `Rack -t` screenshots are always light whatever
+the setting; render dark ones with `SFS_PREFER_DARK=1` in the environment.
+
 ## Type
 
 **Figtree**, bundled in `res/fonts/` under the SIL Open Font License (licence

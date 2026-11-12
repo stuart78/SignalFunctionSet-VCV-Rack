@@ -398,13 +398,13 @@ struct Chime : Module {
 // the side: a line rocking about a center pivot, glowing as it passes through
 // horizontal (max resonance). Drag a column vertically to change its degree.
 
-static const NVGcolor CHBG        = nvgRGB(0x1A, 0x1A, 0x32);
+#define CHBG (sfs::SCREEN_BG)
 static const NVGcolor CHBLUE      = nvgRGB(0x00, 0x97, 0xDE);
-static const NVGcolor CHPURPLE    = nvgRGB(0x35, 0x35, 0x4D);
-static const NVGcolor CHPURPLE_MID= nvgRGB(0x4A, 0x4A, 0x66);
+#define CHPURPLE (sfs::SCREEN_PURP)
+#define CHPURPLE_MID (sfs::SCREEN_PMID)
 static const NVGcolor CHORANGE    = nvgRGB(0xEC, 0x65, 0x2E);
-static const NVGcolor CHTEXT      = nvgRGB(0xE8, 0xE8, 0xF0);
-static const NVGcolor CHTEXT_DIM  = nvgRGB(0x8A, 0x8A, 0xA5);
+#define CHTEXT (sfs::SCREEN_TEXT)
+#define CHTEXT_DIM (sfs::SCREEN_DIM)
 
 // The browser thumbnail is a Chime that has been RUNNING: two and a half
 // seconds of the default patch, every tube swinging and one or two blooming,
@@ -618,7 +618,7 @@ struct ChimeKeyReadout : Widget {
 		}
 		nvgFontFaceId(args.vg, font->handle);
 		nvgFontSize(args.vg, 9.f);
-		nvgFillColor(args.vg, nvgRGB(0x40, 0x40, 0x40));
+		nvgFillColor(args.vg, sfs::dark() ? sfs::theme().ink : nvgRGB(0x40, 0x40, 0x40));
 		nvgTextAlign(args.vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		nvgText(args.vg, 0, box.size.y / 2, txt.c_str(), NULL);
 	}
@@ -656,7 +656,7 @@ struct ChimeExciteSlider : app::SliderKnob {
 		float w = box.size.x, h = box.size.y;
 		float v = 0.f;
 		if (ParamQuantity* pq = getParamQuantity()) v = clamp(pq->getScaledValue(), 0.f, 1.f);
-		blit(vg, "res/chime-slider.png", 0.f, 0.f, w, h);
+		blit(vg, sfs::dark() ? "res/dark/chime-slider.png" : "res/chime-slider.png", 0.f, 0.f, w, h);
 		float pw = 85.f / 8.f, ph = 116.f / 8.f;     // the PNGs, back at 1×
 		float inset = mm2px(0.36f);                  // the margin the design leaves
 		blit(vg, "res/chime-slider-knob.png", inset + (w - pw - 2.f * inset) * v,
@@ -667,7 +667,7 @@ struct ChimeExciteSlider : app::SliderKnob {
 struct ChimeWidget : ModuleWidget {
 	ChimeWidget(Chime* module) {
 		setModule(module);
-		setPanel(createPanel(asset::plugin(pluginInstance, "res/chime.svg")));
+		setPanel(sfs::themedPanel("chime"));
 		using sfs::hp;
 
 		// NO sfs::PanelLabels HERE, DELIBERATELY. res/chime.svg is the designer's
@@ -703,46 +703,46 @@ struct ChimeWidget : ModuleWidget {
 		// but not a struct member.
 		const float rowA = hp(4), rowAj = hp(6);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowA)), module, Chime::RATE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowAj)), module, Chime::RATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowAj)), module, Chime::RATE_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowA)), module, Chime::SPREAD_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowAj)), module, Chime::SPREAD_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowAj)), module, Chime::SPREAD_INPUT));
 
 		const float rowB = hp(9), rowBj = hp(11);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowB)), module, Chime::RELATE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowBj)), module, Chime::RELATE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowBj)), module, Chime::RELATE_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowB)), module, Chime::SHAPE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowBj)), module, Chime::SHAPE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowBj)), module, Chime::SHAPE_INPUT));
 
 		const float rowC = hp(14), rowCj = hp(16);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowC)), module, Chime::DECAY_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowCj)), module, Chime::DECAY_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowCj)), module, Chime::DECAY_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowC)), module, Chime::DRIFT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowCj)), module, Chime::DRIFT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowCj)), module, Chime::DRIFT_INPUT));
 
 		const float rowD = hp(19), rowDj = hp(21);
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colA, rowD)), module, Chime::ROOT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, rowDj)), module, Chime::ROOT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, rowDj)), module, Chime::ROOT_INPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(colB, rowD)), module, Chime::SCALE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colB, rowDj)), module, Chime::SCALE_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colB, rowDj)), module, Chime::SCALE_INPUT));
 
 		// ── the eight notes ─────────────────────────────────────────────────────
 		for (int c = 0; c < CHIME_NCH; c++) {
 			float x = note0 + noteStep * c;
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(x, freqY)), module, Chime::ATTEN_PARAM + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, lfoY)), module, Chime::LFO_OUTPUT + c));
-			addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(x, audioY)), module, Chime::AUDIO_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, lfoY)), module, Chime::LFO_OUTPUT + c));
+			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(x, audioY)), module, Chime::AUDIO_OUTPUT + c));
 		}
 
 		// ── bottom row ──────────────────────────────────────────────────────────
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(colA, botY)), module, Chime::CLOCK_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colB, botY)), module, Chime::GATE_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(colC, botY)), module, Chime::VOCT_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(colA, botY)), module, Chime::CLOCK_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(colB, botY)), module, Chime::GATE_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(colC, botY)), module, Chime::VOCT_OUTPUT));
 		addParam(createParamCentered<Trimpot>(mm2px(Vec(hp(9.5f), botY)), module, Chime::OCT_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(11.75f), botY)), module, Chime::OCT_INPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(11.75f), botY)), module, Chime::OCT_INPUT));
 		addParam(createParamCentered<ChimeExciteSlider>(mm2px(Vec(hp(16), botY)), module, Chime::EXCITE_PARAM));
-		addInput(createInputCentered<PJ301MPort>(mm2px(Vec(hp(21), botY)), module, Chime::EXCITE_INPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(23.5f), botY)), module, Chime::MIX_L_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(mm2px(Vec(hp(26), botY)), module, Chime::MIX_R_OUTPUT));
+		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(hp(21), botY)), module, Chime::EXCITE_INPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(23.5f), botY)), module, Chime::MIX_L_OUTPUT));
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(hp(26), botY)), module, Chime::MIX_R_OUTPUT));
 	}
 
 	// RESEED lost both its button and its jack in the panel redesign, and without
