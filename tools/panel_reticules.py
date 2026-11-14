@@ -497,7 +497,7 @@ PLATES = {
     "concrete": [(89.92, 95.25, 51.31, 30.73), (144.53, 95.25, 13.21, 30.73)],
     "concretein": [],
     # the three outputs at the foot
-    "canopy": [(105.41, 110.49, 34.93, 16.51)],
+    "canopy": [(82.55, 110.49, 57.79, 16.51)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so

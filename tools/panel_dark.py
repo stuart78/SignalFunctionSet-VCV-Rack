@@ -136,15 +136,32 @@ def panel_keep(key):
     return {c.lower() for c in json.load(open(p)).get("keep", [])} if os.path.exists(p) else set()
 
 
+def panel_roles(key):
+    """Colours a panel uses for a different role than LIGHT says, from
+    tools/panel-layout/<key>.json: {"roles": {"black": "ink"}} for every use, or
+    "fill:black" / "stroke:black" for one property. Crystal's designer art draws its
+    labels and title in black fill and its connectors in black stroke, where every
+    other panel uses black only for plates."""
+    import json
+    p = os.path.join(ROOT, "tools", "panel-layout", key + ".json")
+    r = json.load(open(p)).get("roles", {}) if os.path.exists(p) else {}
+    for c, role in r.items():
+        if role not in DARK_ROLE:
+            raise SystemExit(f"{key}: role {role!r} for {c} is not in DARK_ROLE")
+    return {c.lower(): role for c, role in r.items()}
+
+
 def convert(text, name):
     unknown = set()
     keep = KEEP | panel_keep(name)
+    roles = panel_roles(name)
 
     def sub(m):
         c = m.group(2).lower()
         if c in keep or c in ("transparent", "currentcolor", "url"):
             return m.group(0)
-        role = LIGHT.get(c)
+        prop = m.group(1).split(":")[0].split("=")[0].strip().lower()
+        role = roles.get(prop + ":" + c) or roles.get(c) or LIGHT.get(c)
         if role is None:
             unknown.add(c)
             return m.group(0)

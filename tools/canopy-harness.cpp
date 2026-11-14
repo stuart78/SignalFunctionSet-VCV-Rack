@@ -1609,6 +1609,99 @@ int main(int argc, char** argv) {
 		check(finite && pk2 <= 10.f, string::f("in heavy steel rain: peak %.2f V, %.2f%% of a core", pk2, 100.0 * sec / 20.0));
 	}
 
+	printf("RATE fully left\n");
+	{
+		Run r(false);
+		r.m->params[Canopy::RATE_PARAM].setValue(0.f);
+		long sp0 = r.m->spawned;     // Run() has already run 5 ms at the default RATE
+		r.run(20.f);
+		check(r.m->spawned == sp0, string::f("no drops in 20 s: %ld", r.m->spawned - sp0));
+		r.m->inputs[Canopy::GATE_INPUT].channels = 1;
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f);
+		float pk = peak(r.record(0.3f));
+		check(pk > 0.1f, string::f("and GATE still plays: %.2f V", pk));
+		r.m->inputs[Canopy::RATE_INPUT].channels = 1;
+		r.m->inputs[Canopy::RATE_INPUT].setVoltage(4.f);
+		r.run(20.f);
+		check(r.m->spawned - sp0 > 5, string::f("with +4 V on RATE CV it opens: %ld drops in 20 s", r.m->spawned - sp0));
+		check(std::fabs(cpRate(0.5f) - 0.05f * std::pow(240.f, 0.5f)) < 1e-3f && std::fabs(cpRate(1.f) - 12.f) < 0.01f,
+		      string::f("above the ramp the curve is unchanged: %.3f at the middle, %.2f at the top", cpRate(0.5f), cpRate(1.f)));
+		// (the tooltip itself reads through Rack's engine, which the harness does not run)
+		check(cpRate(0.f) == 0.f && cpRate(0.02f) > 0.f && cpRate(0.02f) < cpRate(CP_RATE_OFF), "zero at the bottom, rising through the ramp");
+	}
+
+	printf("CV and TRIG out\n");
+	{
+		// GATE channel c, V/OCT unpatched, strikes tongue c: its note comes out
+		Run r;
+		auto strike = [&](int c) {
+			r.m->inputs[Canopy::GATE_INPUT].channels = 16;
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, c);
+			r.tick();
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, c);
+			r.run(0.01f);
+		};
+		auto trigs = [&](int ch) { return r.m->outputs[Canopy::TRIG_OUTPUT].getVoltage(ch) > 5.f; };
+		r.m->inputs[Canopy::GATE_INPUT].channels = 16; r.run(0.01f);
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, 3); r.tick();
+		bool fired = trigs(0);
+		float cv = r.m->outputs[Canopy::CV_OUTPUT].getVoltage(0);
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 3); r.run(0.002f);
+		check(fired && !trigs(0), "a struck tongue fires TRIG, for 1 ms");
+		check(std::fabs(cv - r.m->noteVolts(3)) < 1e-6f && std::fabs(cv - (-1.f + r.m->tv[3].semis / 12.f)) < 1e-6f,
+		      string::f("and CV is its note: %.4f V (C3 is -1 V)", cv));
+		check(r.m->outputs[Canopy::CV_OUTPUT].channels == 1, "mono by default");
+		// Rotate over four channels
+		r.m->noteChans = 4; r.m->noteNext = 0;
+		int order[4] = {-1, -1, -1, -1};
+		for (int k = 0; k < 4; k++) {
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, k); r.tick();
+			for (int c = 0; c < 4; c++) if (trigs(c)) order[k] = c;
+			r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, k); r.run(0.01f);
+		}
+		check(order[0] == 0 && order[1] == 1 && order[2] == 2 && order[3] == 3, "Rotate: four notes go to channels 1 2 3 4");
+		bool held = true;
+		for (int c = 0; c < 4; c++) held = held && std::fabs(r.m->outputs[Canopy::CV_OUTPUT].getVoltage(c) - r.m->noteVolts(c)) < 1e-6f;
+		check(held, "and each channel holds its note");
+		// two at once go to two channels
+		r.m->noteNext = 0;
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, 5); r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, 6); r.tick();
+		check(trigs(0) && trigs(1), "two notes struck in the same sample go to two channels");
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 5); r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 6); r.run(0.01f);
+		// Reuse: a note struck again goes back to its own channel
+		r.m->noteMode = 1; r.m->noteNext = 0;
+		for (int c = 0; c < 4; c++) r.m->noteOn[c] = -1;
+		strike(2); strike(7);
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, 2); r.tick();
+		bool own = trigs(0) && !trigs(1) && !trigs(2);
+		r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 2); r.run(0.01f);
+		check(own, "Reuse: tongue 3 struck again goes back to channel 1");
+	}
+	// rain on every instrument: every trigger is a note it can play, and fires with a hit
+	for (int inst = 0; inst <= 8; inst++) {
+		Run r(false);
+		r.m->params[Canopy::INSTRUMENT_PARAM].setValue((float)inst);
+		r.m->noteChans = 16;
+		r.run(0.05f);
+		int n = 0; bool inKey = true;
+		bool prev[16] = {};
+		for (int i = 0; i < (int)(40.f * SR); i++) {
+			r.tick();
+			for (int c = 0; c < 16; c++) {
+				bool on = r.m->outputs[Canopy::TRIG_OUTPUT].getVoltage(c) > 5.f;
+				if (on && !prev[c]) {
+					n++;
+					float v = r.m->outputs[Canopy::CV_OUTPUT].getVoltage(c);
+					bool found = false;
+					for (int t = 0; t < r.m->nT; t++) if (std::fabs(v - r.m->noteVolts(t)) < 1e-5f) found = true;
+					if (!found) inKey = false;
+				}
+				prev[c] = on;
+			}
+		}
+		check(n >= 20 && inKey, string::f("instrument %d: %d triggers in 40 s of rain, every CV a note it plays", inst, n));
+	}
+
 	printf("%d failure(s)\n", fails);
 	return fails ? 1 : 0;
 }

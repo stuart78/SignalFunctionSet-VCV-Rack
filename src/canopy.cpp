@@ -476,6 +476,27 @@ static inline void canopyMakeLeaf(CanopyLeafLive& K, float cx, float cy, float c
 	K.nx = nx; K.ny = ny; K.nz = nz;
 }
 
+// RATE: drops per second for a knob position v (with any CV already added, as
+// knob travel). Exponential, 0.05 to 12 drops/s across the knob, except that the
+// bottom 4% ramps down to none at all, so Canopy can be played from GATE alone.
+// Above that the curve is the one RATE always had, so saved patches fall as before.
+static const float CP_RATE_OFF = 0.04f;
+static float cpRate(float v) {
+	if (v <= 0.f) return 0.f;
+	float r = 0.05f * SFS_POWABS(240.f, v);
+	return v < CP_RATE_OFF ? r * v / CP_RATE_OFF : r;
+}
+struct CanopyRateQ : ParamQuantity {
+	float getDisplayValue() override { return cpRate(getValue()); }
+	void setDisplayValue(float x) override {
+		if (x <= 0.f) { setValue(0.f); return; }
+		float edge = cpRate(CP_RATE_OFF);
+		setValue(x >= edge ? std::log(x / 0.05f) / std::log(240.f) : CP_RATE_OFF * x / edge);
+	}
+	std::string getDisplayValueString() override {
+		return getValue() <= 0.f ? "Off (only CLOCK and GATE play)" : ParamQuantity::getDisplayValueString();
+	}
+};
 struct Canopy : Module {
 	enum ParamId {
 		RATE_PARAM, MATERIAL_PARAM, SIZE_PARAM, SCATTER_PARAM,
@@ -494,7 +515,7 @@ struct Canopy : Module {
 		INSTRUMENT_INPUT,            // appended 2026-11
 		INPUTS_LEN
 	};
-	enum OutputId { POLY_OUTPUT, L_OUTPUT, R_OUTPUT, OUTPUTS_LEN };
+	enum OutputId { POLY_OUTPUT, L_OUTPUT, R_OUTPUT, CV_OUTPUT, TRIG_OUTPUT, OUTPUTS_LEN };
 	enum LightId { LIGHTS_LEN };
 
 	// ── the drops ─────────────────────────────────────────────────────────
@@ -528,6 +549,19 @@ struct Canopy : Module {
 	int   bowlSig = -1;           // what the bowls were laid out for
 	int   polyMap[16] = {};       // which voice each POLY channel carries, when there are more than 16
 	long  strikes = 0, spawned = 0, landed = 0, onTongue = 0, touched = 0;   // counted, for the harness
+
+	// ── CV and TRIG out: every note struck, for driving other voices ──────────
+	// A note is the tongue, string, pad, bowl, tube, kettle or bar a hit lands on,
+	// not the neighbours that ring with it or the shell. Each goes to a channel: in
+	// Rotate the next one round, in Reuse the one that last carried the same note if
+	// there is one (so a re-struck note retriggers its own voice), otherwise the next.
+	// CV is held until that channel's next note.
+	int   noteChans = 1;          // saved
+	int   noteMode = 0;           // saved: 0 rotate, 1 reuse
+	int   noteNext = 0;
+	float noteCv[16] = {};
+	int   noteOn[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+	dsp::PulseGenerator notePulse[16];
 
 	// ── the leaves ───────────────────────────────────────────────────────
 	// The UI thread edits `leaf` and publishes it; the audio thread moves each
@@ -613,7 +647,7 @@ struct Canopy : Module {
 
 	Canopy() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
-		configParam(RATE_PARAM, 0.f, 1.f, 0.5f, "Rate", " drops/s", 240.f, 0.05f);
+		configParam<CanopyRateQ>(RATE_PARAM, 0.f, 1.f, 0.5f, "Rate", " drops/s");
 		std::vector<std::string> mats;
 		for (int i = 0; i < TM_MIX; i++) mats.push_back(CP_MAT[i].name);
 		mats.push_back("Mix (a random material per drop)");
@@ -637,7 +671,7 @@ struct Canopy : Module {
 		// Pentatonic Minor rather than the bottom of the list: a tongue drum a
 		// semitone apart does not sound like the instrument.
 		configSwitch(SCALE_PARAM, 0.f, (float)(sfs::NUM_SCALES - 1), 4.f, "Scale", names);
-		configInput(RATE_INPUT, "Rate CV (each volt doubles the drops per second)");
+		configInput(RATE_INPUT, "Rate CV (each volt doubles the drops per second; with RATE fully left, positive volts open it from none)");
 		configInput(MATERIAL_INPUT, "Drop material CV (1 V per material)");
 		configInput(SIZE_INPUT, "Drop size CV (+-5V = full range)");
 		configInput(SCATTER_INPUT, "Scatter CV (+-5V = full range)");
@@ -661,6 +695,8 @@ struct Canopy : Module {
 		configOutput(POLY_OUTPUT, "Tongues (polyphonic, one channel per tongue, lowest note first)");
 		configOutput(L_OUTPUT, "Mix left");
 		configOutput(R_OUTPUT, "Mix right");
+		configOutput(CV_OUTPUT, "Pitch of each note struck (1V/oct, held until the next; channels set in the menu)");
+		configOutput(TRIG_OUTPUT, "Trigger on each note struck (1 ms)");
 		buildShape();
 		buildForms();
 		rng ^= random::u32() | 1u;
@@ -965,6 +1001,27 @@ struct Canopy : Module {
 		float k = half > 0.f ? clamp((x + half) / (2.f * half), 0.f, 1.f) : 0.f;
 		return CP_Z_FRONT0 + (CP_Z_FRONT1 - CP_Z_FRONT0) * k + CP_Z_EDGE;
 	}
+	// Hits quieter than this send no trigger: a drop that has nearly stopped, or a
+	// tube brushing its neighbour. A water drop of the reference size falling from
+	// the top strikes at A = 1.
+	// the note voice t plays, in volts from C4: the drum and the zither keep their
+	// notes relative to ROOT, the rest from C4 (water in a bowl is not counted)
+	float noteVolts(int t) const {
+		const TongueVoice& T = tv[t];
+		return instNow <= 1 ? (float)regOct + ((float)root + T.semis) / 12.f : T.semis / 12.f;
+	}
+	void noteOut(int t, float A) {
+		const float CP_NOTE_MIN = 0.05f;
+		if (A < CP_NOTE_MIN || t < 0 || t >= nT) return;
+		const int n = clamp(noteChans, 1, 16);
+		int c = -1;
+		if (noteMode == 1)
+			for (int i = 0; i < n; i++) if (noteOn[i] == t) { c = i; break; }
+		if (c < 0) { c = noteNext % n; noteNext = (c + 1) % n; }
+		noteCv[c] = noteVolts(t);
+		noteOn[c] = t;
+		notePulse[c].trigger(1e-3f);
+	}
 	// A string is fixed at both ends, so harmonic n moves as sin(n pi xi) along it:
 	// a hit at the middle gives only the odd harmonics, one near an end all of them.
 	void startContactZ(int t, float A, float n, float xi) {
@@ -989,6 +1046,7 @@ struct Canopy : Module {
 		float A = SFS_POWABS(mass, 0.35f) * (speed / CP_V0);
 		startContactZ(t, A, n, xi);
 		knockBody(A * 0.15f, n);
+		noteOut(t, A);
 		strikes++;
 	}
 	// a drop landing on the board between the strings: a knock, and the nearest
@@ -1153,6 +1211,7 @@ struct Canopy : Module {
 		bowlShape(T, rrel, phi, g);
 		for (int m = 0; m < CP_BMODES; m++) C.g[m] = g[m] * tiltB[m / 2];
 		T.awake = true;
+		noteOut(t, A);
 		strikes++;
 	}
 	// A drop rolling round inside a bowl sustains it, as a ball circling a bowl does,
@@ -1350,6 +1409,7 @@ struct Canopy : Module {
 		C.ph = 0.f; C.dph = 1.f / n; C.amp = A * 2.f / n;
 		for (int m = 0; m < CP_VMODES; m++) C.g[m] = m < CP_CMODES ? cpBeamShape(m, u) * tiltC[m] : 0.f;
 		T.awake = true;
+		noteOut(t, A);
 		strikes++;
 	}
 	// Two pendulums meeting at c, n pointing from B to A. Returns how fast they
@@ -1696,6 +1756,7 @@ struct Canopy : Module {
 		// the bar's modes in order are the free beam's first, second and third
 		for (int m = 0; m < CP_VMODES; m++) C.g[m] = m < CP_XMODES ? cpBeamShape(m, u) * tiltX[m] : 0.f;
 		T.awake = true;
+		noteOut(t, A);
 		strikes++;
 	}
 	// the bar under (x, z), the higher first where two overlap, or -1
@@ -1829,6 +1890,7 @@ struct Canopy : Module {
 		static const float EDGE[CP_BNMODES] = {0.04f, 0.05f, 0.9f, 0.9f, 0.8f, 0.7f};
 		for (int m = 0; m < CP_VMODES; m++) C.g[m] = m < CP_BNMODES ? (BOSS[m] + (EDGE[m] - BOSS[m]) * off) * tiltBn[m] : 0.f;
 		T.awake = true;
+		noteOut(t, A);
 		strikes++;
 	}
 	// One step of a drop against the bonang: the kettles, their sides, and the cords
@@ -2048,6 +2110,7 @@ struct Canopy : Module {
 			}
 			knockBody(A, n);
 		}
+		if (t >= 0 && rho <= 1.f) noteOut(t, A);
 		strikes++;
 	}
 
@@ -2114,6 +2177,7 @@ struct Canopy : Module {
 		Contact& S = shellHit[slot];
 		S.ph = 0.f; S.dph = 1.f / n;
 		S.amp = A * (on >= 0 ? 0.3f : 1.f) * 2.f / n;
+		if (on >= 0) noteOut(on, A);
 		strikes++;
 		wasOnTongue = on >= 0;
 	}
@@ -2568,7 +2632,7 @@ struct Canopy : Module {
 		}
 		if (!inputs[CLOCK_INPUT].isConnected()) {
 			nextDrop -= dt * rateK;
-			if (nextDrop <= 0.f) {
+			if (nextDrop <= 0.f && rateK > 0.f) {   // at RATE zero nothing falls, not even the first
 				spawnNow();
 				nextDrop = evenly ? 1.f : -std::log(std::max(uni(), 1e-4f));
 			}
@@ -2722,8 +2786,13 @@ struct Canopy : Module {
 
 	// ── the knobs and the key, every 32 samples ──────────────────────────────
 	void control(float sr) {
-		rateK = 0.05f * SFS_POWABS(240.f, params[RATE_PARAM].getValue());
-		if (inputs[RATE_INPUT].isConnected()) rateK *= SFS_EXP2(clamp(inputs[RATE_INPUT].getVoltage(), -10.f, 10.f));
+		// CV moves the knob's position, a volt being one doubling, so above the
+		// bottom ramp each volt still doubles the rate, and fully left it can open it
+		{
+			float v = params[RATE_PARAM].getValue();
+			if (inputs[RATE_INPUT].isConnected()) v += clamp(inputs[RATE_INPUT].getVoltage(), -10.f, 10.f) / std::log2(240.f);
+			rateK = cpRate(v);
+		}
 		matK = clamp((int)std::round(params[MATERIAL_PARAM].getValue() + (inputs[MATERIAL_INPUT].isConnected() ? inputs[MATERIAL_INPUT].getVoltage() : 0.f)), 0, TM_COUNT - 1);
 		padK = clamp((int)std::round(params[LEAF_PARAM].getValue() + (inputs[LEAF_INPUT].isConnected() ? inputs[LEAF_INPUT].getVoltage() : 0.f)), 0, TP_COUNT - 1);
 		leavesK = clamp((int)std::round(params[DENSITY_PARAM].getValue() + (inputs[DENSITY_INPUT].isConnected() ? inputs[DENSITY_INPUT].getVoltage() : 0.f)), 0, CP_MAXLEAVES);
@@ -2989,6 +3058,15 @@ struct Canopy : Module {
 		limGain += (want - limGain) * (want < limGain ? limAtk : limRel);
 		outputs[L_OUTPUT].setVoltage(sfs::softClip(dl * limGain));
 		outputs[R_OUTPUT].setVoltage(sfs::softClip(dr * limGain));
+		{
+			const int n = clamp(noteChans, 1, 16);
+			outputs[CV_OUTPUT].setChannels(n);
+			outputs[TRIG_OUTPUT].setChannels(n);
+			for (int c = 0; c < n; c++) {
+				outputs[CV_OUTPUT].setVoltage(noteCv[c], c);
+				outputs[TRIG_OUTPUT].setVoltage(notePulse[c].process(args.sampleTime) ? 10.f : 0.f, c);
+			}
+		}
 		if (nT <= 16) {
 			outputs[POLY_OUTPUT].setChannels(nT);
 			for (int t = 0; t < nT; t++) outputs[POLY_OUTPUT].setVoltage(sfs::softClip(tv[t].out * OUT * 0.6f), t);
@@ -3026,6 +3104,8 @@ struct Canopy : Module {
 		json_object_set_new(r, "regOct", json_integer(regOct));
 		json_object_set_new(r, "camYaw", json_real(camYaw));
 		json_object_set_new(r, "camTilt", json_real(camTilt));
+		json_object_set_new(r, "noteChans", json_integer(noteChans));
+		json_object_set_new(r, "noteMode", json_integer(noteMode));
 		json_t* a = json_array();
 		for (int i = 0; i < CP_MAXLEAVES; i++) {
 			const CanopyLeaf& P = leaf[i];
@@ -3045,6 +3125,8 @@ struct Canopy : Module {
 		if (json_t* j = json_object_get(r, "regOct")) regOct = clamp((int)json_integer_value(j), -2, 0);
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_real_value(j);
 		if (json_t* j = json_object_get(r, "camTilt")) camTilt = clamp((float)json_real_value(j), 0.15f, 1.4f);
+		if (json_t* j = json_object_get(r, "noteChans")) noteChans = clamp((int)json_integer_value(j), 1, 16);
+		if (json_t* j = json_object_get(r, "noteMode")) noteMode = clamp((int)json_integer_value(j), 0, 1);
 		if (json_t* a = json_object_get(r, "leaves")) {
 			int n = std::min((int)json_array_size(a), CP_MAXLEAVES);
 			for (int i = 0; i < n; i++) {
@@ -4392,9 +4474,10 @@ struct CanopyDisplay : OpaqueWidget {
 };
 
 // A tight grid, so the screen gets the room. The foot is one row of jacks, inputs at the
-// left as on the other modules, a gap, then the outputs under the last three columns
-// of the controls. The screen fills everything left of the controls.
+// left as on the other modules, a gap, then the outputs under the five columns of the
+// controls: CV and TRIG, then POLY and the mix. The screen fills everything left of the controls.
 static const float CP_FX[9] = {7.62f, 19.05f, 30.48f, 41.91f, 53.34f, 64.77f, 111.76f, 123.19f, 134.62f};
+static const float CP_OX[2] = {88.9f, 100.33f};   // CV and TRIG, at the left of the output plate
 static const float CP_PX[5] = {88.9f, 100.33f, 111.76f, 123.19f, 134.62f};
 static const float CP_PY[3] = {24.13f, 55.88f, 87.63f};
 static const float CP_CV = 10.16f;        // from a pot down to its jack
@@ -4483,6 +4566,10 @@ struct CanopyWidget : ModuleWidget {
 		addInput(createInputCentered<sfs::Jack>(mm2px(Vec(CP_FX[5], CP_Y_FOOT)), module, Canopy::Z_INPUT));
 		lbl->jack(CP_FX[5], CP_Y_FOOT, "Z");
 
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CP_OX[0], CP_Y_FOOT)), module, Canopy::CV_OUTPUT));
+		lbl->jackOnPlate(CP_OX[0], CP_Y_FOOT, "CV");
+		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CP_OX[1], CP_Y_FOOT)), module, Canopy::TRIG_OUTPUT));
+		lbl->jackOnPlate(CP_OX[1], CP_Y_FOOT, "TRIG");
 		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CP_FX[6], CP_Y_FOOT)), module, Canopy::POLY_OUTPUT));
 		lbl->jackOnPlate(CP_FX[6], CP_Y_FOOT, "POLY");
 		addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CP_FX[7], CP_Y_FOOT)), module, Canopy::L_OUTPUT));
@@ -4506,6 +4593,15 @@ struct CanopyWidget : ModuleWidget {
 			menu->addChild(createIndexPtrSubmenuItem("Leaf form", forms, &m->leafForm));
 		}
 		menu->addChild(createBoolPtrMenuItem("Evenly spaced drops (off: random spacing)", "", &m->evenly));
+		{
+			std::vector<std::string> ch;
+			for (int i = 1; i <= 16; i++) ch.push_back(i == 1 ? "1 (mono)" : std::to_string(i));
+			menu->addChild(createIndexSubmenuItem("CV/TRIG channels", ch,
+				[=]() { return (size_t)(m->noteChans - 1); },
+				[=](size_t v) { m->noteChans = (int)v + 1; m->noteNext = 0; }));
+		}
+		menu->addChild(createIndexPtrSubmenuItem("CV/TRIG note to channel",
+			{"Rotate: each note to the next channel", "Reuse: a note struck again goes to its own channel"}, &m->noteMode));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Drag a leaf to move it. Shift-drag to change its height. Drag an end to tilt it."));
 		menu->addChild(createMenuLabel("Drag empty space to turn the view."));

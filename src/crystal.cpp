@@ -1998,6 +1998,7 @@ struct CrystalToggle : app::Switch {
 	void draw(const DrawArgs& args) override {
 		ParamQuantity* pq = getParamQuantity();
 		bool on = pq && pq->getValue() > 0.5f;
+		if (sfs::dark()) { drawDark(args.vg, on); return; }
 		// Loaded per frame, and NOT held as a member. Window::loadImage's own
 		// header says not to store the reference across frames, and the reason
 		// bites at shutdown: Rack destroys the Window before the Scene, so a
@@ -2006,8 +2007,7 @@ struct CrystalToggle : app::Switch {
 		// The Window's cache is the owner; this is a map lookup, drawn once per
 		// dirty framebuffer.
 		std::shared_ptr<Image> img = APP->window->loadImage(
-			asset::plugin(pluginInstance, on ? "res/toggle-on.png"
-			              : sfs::dark() ? "res/dark/toggle-off.png" : "res/toggle-off.png"));
+			asset::plugin(pluginInstance, on ? "res/toggle-on.png" : "res/toggle-off.png"));
 		if (!img || img->handle < 0) return;
 		NVGpaint paint = nvgImagePattern(args.vg, 0.f, 0.f, box.size.x, box.size.y,
 		                                 0.f, img->handle, 1.f);
@@ -2015,6 +2015,37 @@ struct CrystalToggle : app::Switch {
 		nvgRect(args.vg, 0.f, 0.f, box.size.x, box.size.y);
 		nvgFillPaint(args.vg, paint);
 		nvgFill(args.vg);
+	}
+
+	// Dark panels: drawn rather than a second pair of PNGs, so the two positions
+	// cannot drift apart. The same shape as the light images (a rounded well, the
+	// paddle filling 60% of it, up for DELAY), in the dark faceplate's greys: the
+	// well darker than the #3a3a3e faceplate, the paddle lighter, lit from above.
+	void drawDark(NVGcontext* vg, bool on) {
+		const float w = box.size.x, h = box.size.y;
+		const float r = 0.2f * w, m = 0.05f * w;
+		const float ph = 0.6f * h, py = on ? m : h - m - ph, pr = r - m;
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, 0.f, 0.f, w, h, r);
+		nvgFillColor(vg, nvgRGB(0x26, 0x26, 0x2A));
+		nvgFill(vg);
+		nvgStrokeColor(vg, nvgRGB(0x1A, 0x1A, 0x1E));
+		nvgStrokeWidth(vg, 1.f);
+		nvgStroke(vg);
+		// the paddle's shadow on the well
+		nvgBeginPath(vg);
+		nvgRect(vg, 0.f, 0.f, w, h);
+		nvgFillPaint(vg, nvgBoxGradient(vg, m, py + 0.04f * h, w - 2.f * m, ph, pr, 0.08f * w,
+		                                nvgRGBA(0, 0, 0, 110), nvgRGBA(0, 0, 0, 0)));
+		nvgFill(vg);
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, m, py, w - 2.f * m, ph, pr);
+		nvgFillPaint(vg, nvgLinearGradient(vg, 0.f, py, 0.f, py + ph,
+		                                   nvgRGB(0x74, 0x74, 0x7C), nvgRGB(0x5A, 0x5A, 0x62)));
+		nvgFill(vg);
+		nvgStrokeColor(vg, nvgRGB(0x2E, 0x2E, 0x34));
+		nvgStrokeWidth(vg, 0.75f);
+		nvgStroke(vg);
 	}
 };
 

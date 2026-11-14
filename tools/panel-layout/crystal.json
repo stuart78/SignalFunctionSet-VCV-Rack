@@ -1,0 +1,6 @@
+{
+  "roles": {
+    "fill:black": "ink",
+    "stroke:black": "rule"
+  }
+}

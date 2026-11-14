@@ -466,3 +466,49 @@ The eighth and ninth TYPEs, one bar engine.
   hull of its projected surface), each note only where its surface faces the
   camera, and the bottom shell down to where it turns away. From a low camera the
   notes on the far slope used to show through the dome.
+
+## CV and TRIG out (2026-11-13)
+
+Two outputs at the left of the output plate report every note Canopy plays, so it
+can drive other voices: TRIG is a 1 ms trigger, CV the note's pitch at 1V/oct, held
+until that channel's next note. A note is the tongue, string, pad, bowl, tube,
+kettle or bar a hit lands on. The neighbours that ring with it, the shell and a
+drop landing between notes send nothing, and neither does a hit under A = 0.05 (a
+reference water drop from the top strikes at A = 1), so a drop that has nearly
+stopped or a tube brushing its neighbour does not fire. GATE's notes come out too.
+The pitch is the note as tuned: water in a bowl lowers what it sounds but not the
+CV, so a quantizer downstream stays in key.
+
+**Polyphony.** One channel by default, as VCV's MIDI-CV does, since a poly cable
+into a mono voice plays only its first channel. The menu sets 1 to 16 channels and
+how notes are dealt to them:
+
+- **Rotate** (default): each note to the next channel round. A trigger has no
+  note-off, so no channel is ever "free"; rotating gives each note the longest time
+  before its channel is used again, so a downstream voice with a decay rings out
+  under the notes that follow. Two notes in the same sample go to two channels.
+- **Reuse**: a note struck again goes back to the channel that carried it, so it
+  retriggers its own voice, as re-striking a ringing tongue does; a new note
+  rotates.
+
+"Lowest free channel", where a channel is busy only while its trigger is high,
+was considered and left out: with 1 ms triggers nearly every note lands on
+channel 1 and cuts the previous note's tail there, and the other channels see
+only coincidences.
+
+Measured over 40 s of default rain (`tools/canopy-harness.cpp`): 26 to 149
+triggers depending on the instrument, every CV one of the instrument's notes.
+
+## RATE at zero (2026-11-13)
+
+RATE fully left lets no drops fall, so Canopy can be played purely from GATE (and
+CLOCK, which drops one per pulse whatever RATE says). The knob was exponential from
+0.05 drops/s, one every 20 s, which is never silence. Now the bottom 4% of its
+travel ramps that curve down to zero (`cpRate()`); everything above 0.04 is the
+curve it always had, so a saved patch falls as before unless its RATE was within
+4% of fully left. The tooltip reads "Off" at zero. RATE CV is now added to the
+knob's position, one volt being one doubling, rather than multiplying the rate:
+above the ramp the two are the same number, and this way a positive CV can open
+a knob that is fully left, where a multiply would have stayed at zero. The first
+drop of a run also waits for a rate above zero; it used to fall on the first
+physics step whatever RATE said.
