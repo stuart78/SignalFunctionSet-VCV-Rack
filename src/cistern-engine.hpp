@@ -672,7 +672,7 @@ inline Space makeBasilica() {
 // ── the program the audio thread plays: built on the worker ────────────────
 static const int RB = 3;                                   // render bands: low, mid, high
 static const int NSRC = 2;                                 // sources: one per input channel
-struct Tap { int delay; int in; float g[2][RB]; bool direct = false; };   // which input, per ear, per render band; the direct path's own tap
+struct Tap { int delay = 0; int in = 0; float g[2][RB] = {}; bool direct = false; };   // which input, per ear, per render band; the direct path's own tap
 // A tap as the audio thread reads it: both ears' three band gains padded to
 // four, so one tap is two four-wide multiply-adds against the four floats a
 // history sample occupies (the fourth is zero on both sides). Built by

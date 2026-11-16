@@ -107,6 +107,15 @@ away without arriving too late to play with (150 m is heard as about 65 m).
 Choose **True** in the menu for the delay and level as the model calculates
 them.
 
+Patches saved before 2.25.0 open with both of the following off, so they sound
+as they did. A new Cistern has both on.
+
+- **Level follows distance.** The wet level is set from a second trace at the
+  room's default positions, so a source closer to the listener is louder (by up
+  to 6 dB) and one further away is quieter.
+- **MIX blends the room's direct sound.** The direct sound is part of the trace,
+  delayed and placed by where the source stands.
+
 ## Controls
 
 | Control | What it does |
@@ -117,7 +126,7 @@ them.
 | **SCATTER** | How much of each reflection goes diffuse instead of bouncing like a mirror. Low, a curved wall focuses sound back at you (listen for it in the round cistern); high, the room is smooth. Default 50%. |
 | **HUMID** | The humidity of the air, 10% to 90%. Drier air absorbs more high frequencies, and over the 15 km a sound travels in a 45-second tail that is most of what darkens it. |
 | **MOVE** | Slow movement in the tail's delays, so a long tail does not settle into fixed resonances that sound metallic. |
-| **MIX** | Dry to wet. |
+| **MIX** | By default, the room's direct sound against its reverberation: at the centre you hear the room as traced, with the direct sound delayed and placed where the source stands. The menu can set it to the dry input against the room instead. |
 | **FREEZE** | Holds the tail indefinitely and shuts the input out of it. The gate input does the same while it is high. |
 
 ## Changing space
@@ -152,6 +161,11 @@ DECAY, SCATTER, HUMID, MOVE and MIX.
 
 - Space
 - Distance: musical or true
+- Level: follows distance (the default), where a source closer to the listener is
+  louder by up to 6 dB, or the same wherever the sources stand
+- MIX blends: the room's direct sound against its reverberation (the default), or
+  the dry input against the room. With the dry input, the undelayed dry signal
+  covers most of what placement changes.
 - Reset the positions
 - Reset the view
 - Scan credits

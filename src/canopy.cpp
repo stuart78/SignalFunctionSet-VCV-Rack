@@ -151,7 +151,7 @@ static inline float cpBowlInner(float h) { return cpBowlOuter(h) - CP_BOWL_WALL;
 enum { CPB_OUTSIDE, CPB_LIP, CPB_INSIDE };
 struct CpBowlSection {
 	static const int K = 16, L = 6, N = 2 * K + L + 3;
-	float r[N], h[N];
+	float r[N] = {}, h[N] = {};
 	int kind(int seg) const { return seg <= K ? CPB_OUTSIDE : seg <= K + L ? CPB_LIP : CPB_INSIDE; }
 };
 // ── the wind chimes (2026-11) ──────────────────────────────────────────────

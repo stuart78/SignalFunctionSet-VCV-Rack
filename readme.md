@@ -7,6 +7,9 @@ A plugin for [VCV Rack](https://vcvrack.com/) by Stuart Frederich-Smith.
 Module walkthroughs, patch notes and demos live on the site. The Discord is the
 place for questions, bug reports and works in progress.
 
+Every panel has a dark version, used when Rack's "Use dark panels if available"
+is on.
+
 ## Contents
 
 Modules grouped by function:
@@ -32,7 +35,7 @@ Modules grouped by function:
 - [Wheel](#wheel): Hurdy-gurdy drone instrument, one wheel bowing six strings
 - [Carillon](#carillon): Twenty-five bells joined by rods you draw
 - [Strata](#strata): A wavetable voice you travel through in three dimensions
-- [Canopy](#canopy): Steel tongue drum played by drops falling through leaves
+- [Canopy](#canopy): Nine instruments played by drops falling through leaves
 
 **Filters & Resonators**
 - [Band](#band): Harmonic bandpass bank (isolate individual harmonics)
@@ -593,7 +596,7 @@ Full detail in the [Strata manual](docs/strata-manual.md).
 
 <img src="screenshots/Canopy.png" alt="Canopy panel" height="320"> 
 
-A steel tongue drum played by drops falling past leaves you place. Drops appear above the drum and fall under gravity, bounce off the leaves, and sound the drum where they land. A leaf hit is silent: it only changes where the drop goes next. The screen is drawn from the same model, so the drop you see landing is the note you hear. You can also strike the tongues directly from GATE.
+A set of instruments played by drops falling past leaves you place. TYPE selects a steel tongue drum (the default), a zither, a steel pan, singing bowls, wind chimes, a handpan, a bonang, a marimba or a balafon. Drops appear above the instrument and fall under gravity, bounce off the leaves, and sound it where they land. A leaf hit is silent: it only changes where the drop goes next. The screen is drawn from the same model, so the drop you see landing is the note you hear. You can also strike the notes directly from GATE.
 
 **Features:**
 - **Every landing sounds.** On a tongue, that tongue rings and its neighbours ring faintly. Between tongues, the nearest ones ring quietly and the shell is louder, so the note sounds muted.
@@ -603,13 +606,15 @@ A steel tongue drum played by drops falling past leaves you place. Drops appear 
 - **Six leaf forms in real proportion.** Monstera, oak, maple, beech, willow and ginkgo are sized against a 45 cm drum, and the physics reads the same outlines the screen draws, so a small drop falls through a monstera's cut. Forms are in the menu.
 - **Leaf materials.** Leaf, felt, rubber, wood, glass, steel, or a different one per leaf. A glass marble rebounds at 0.08 of its speed off felt and 1.03 off rubber.
 - **Controlled movement.** DRIFT, TILT and SPEED move each leaf around where you placed it, within hard limits. At zero a leaf stays exactly where it was put.
-- **X and Z** move the column of drops, narrowing it to stay over the drum. **CLOCK** releases one drop per pulse.
+- **Nine instruments.** On the zither a drop resting on two strings rolls down them and sustains them. On the steel pan a drop rolling down the bowl knocks each pad it crosses. Water collects in the singing bowls and lowers their notes. The wind chimes swing on their cords, so one drop can set off a run of notes. The marimba is laid out in a circle. The balafon's gourds buzz when struck hard.
+- **X and Z** move the column of drops, narrowing it to stay over the drum. **CLOCK** releases one drop per pulse. **RATE** fully left drops nothing, for playing from GATE alone.
+- **CV and TRIG** send every note struck as a 1V/oct pitch and a trigger, on 1 to 16 channels, so the rain can play another voice.
 
-**Controls:** Rate, Material, Size, Scatter, Density, Leaf, Drift, Speed, Tilt, Decay, Tone, Root, Scale.
+**Controls:** Rate, Material, Size, Scatter, Density, Leaf, Drift, Speed, Tilt, Decay, Tone, Root, Scale, Type.
 **Inputs:** V/OCT, Gate, Vel (all poly), Clock, X, Z, and a CV for every control.
-**Outputs:** Poly (one channel per tongue), Left, Right.
+**Outputs:** CV, Trig, Poly (one channel per note), Left, Right.
 
-**Context menu:** ROOT CV, lowest tongue, leaf form, evenly spaced drops, reset leaf positions, reset view.
+**Context menu:** ROOT CV, steel pan tuning, lowest note, leaf form, evenly spaced drops, CV/TRIG channels and how notes are dealt to them, reset leaf positions, reset view.
 
 Full detail in the [Canopy manual](docs/canopy-manual.md).
 
@@ -742,7 +747,7 @@ Named for the Dan Harpole Cistern at Fort Worden, where Pauline Oliveros, Stuart
 **Inputs:** L, R (normalled to L), Freeze gate, and a CV for every control.
 **Outputs:** L, R.
 
-**Context menu:** Space, distance (musical or true), reset the positions, reset the view, scan credits. The **CREDITS** button on the screen lists every scan with its author and link.
+**Context menu:** Space, distance (musical or true), level (follows distance, or the same wherever the sources stand), what MIX blends (the room's direct sound against its reverberation, or the dry input against the room), reset the positions, reset the view, scan credits. The **CREDITS** button on the screen lists every scan with its author and link.
 
 **Scan credits** (all CC BY 4.0): "The Pantheon Interior", "Hintze Hall", "Leake Street Graffiti Tunnel", "Lincoln's Inn Chapel Undercroft", "St Bartholomew-the-Less Interior", "Church Of St Peter Stourton" and "Salt Tower Lower Room" by artfletch; "Old church modeling - Interior Scene" by Aurélien Martel; "Mosque of Tree of Al Buqayawiyya, Jordan" by SJoudeh. Links in the [Cistern manual](docs/cistern-manual.md#scan-credits) and `res/spaces/CREDITS.txt`.
 
