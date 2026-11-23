@@ -498,6 +498,9 @@ PLATES = {
     "concretein": [],
     # the three outputs at the foot
     "canopy": [(82.55, 110.49, 57.79, 16.51)],
+    # the two outputs at the foot
+    "pole": [(62.23, 110.49, 34.29, 16.51)],
+    "garamut": [(62.23, 110.49, 34.29, 16.51)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -551,6 +554,8 @@ MODULES = {
     "polykitin": ("PolyKitIn", "src/polykitin.cpp", "res/polykit-in.svg", {"PK_NCOL": 13, "PK_NCH": 8}),
     "field":   ("Field",   "src/field.cpp",   "res/field.svg",   {"FD_N": 19}),
     "canopy":  ("Canopy",  "src/canopy.cpp",  "res/canopy.svg",  {}),
+    "pole":    ("Pole",    "src/pole.cpp",    "res/pole.svg",    {}),
+    "garamut": ("Garamut", "src/garamut.cpp", "res/garamut.svg", {}),
     "drift":   ("Drift",   "src/quadlfo.cpp", "res/drift.svg",   {}),
     # the legacy panels, redrawn in code for dark panels (2026-11)
     "gsx": ("Gsx", "src/gsx.cpp", "res/gsx.svg", {}),
@@ -580,7 +585,7 @@ MODULES = {
 }
 
 # Panels drawn on the faceplate, with no screen, so the tool does not fill a slab.
-NO_SCREEN_SLAB = {"wheel", "flock", "carillon", "canopy"}
+NO_SCREEN_SLAB = {"wheel", "flock", "carillon", "canopy", "garamut"}
 
 # Panels whose ART is now the specification: the designer has drawn them, their
 # screens and plates are flattened into the export, and regenerating over one

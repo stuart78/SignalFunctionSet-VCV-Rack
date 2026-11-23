@@ -95,6 +95,8 @@ DARK = {
     "strata": "strata",
     "cistern": "cistern",
     "hocket": "hocket",
+    "pole": "pole",
+    "garamut": "garamut",
     "concrete": "concrete",
     "concretein": "concretein",
     "touch": "touch",

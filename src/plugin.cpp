@@ -64,6 +64,8 @@ void init(Plugin* p) {
 	p->addModel(modelConcreteIn);
 	p->addModel(modelCanopy);
 	p->addModel(modelWheel);
+	p->addModel(modelPole);
+	p->addModel(modelGaramut);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

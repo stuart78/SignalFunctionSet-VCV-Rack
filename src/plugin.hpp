@@ -66,3 +66,5 @@ extern Model* modelConcrete;
 extern Model* modelConcreteIn;
 extern Model* modelCanopy;
 extern Model* modelWheel;
+extern Model* modelPole;
+extern Model* modelGaramut;
