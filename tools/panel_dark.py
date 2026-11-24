@@ -97,6 +97,8 @@ DARK = {
     "hocket": "hocket",
     "pole": "pole",
     "garamut": "garamut",
+    "battery": "battery",
+    "wake": "wake",
     "concrete": "concrete",
     "concretein": "concretein",
     "touch": "touch",

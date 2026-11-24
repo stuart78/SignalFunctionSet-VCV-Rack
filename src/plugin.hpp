@@ -68,3 +68,5 @@ extern Model* modelCanopy;
 extern Model* modelWheel;
 extern Model* modelPole;
 extern Model* modelGaramut;
+extern Model* modelBattery;
+extern Model* modelWake;

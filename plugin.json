@@ -654,6 +654,29 @@
         "Physical modeling",
         "Polyphonic"
       ]
+    },
+    {
+      "slug": "Battery",
+      "name": "Battery",
+      "description": "Eight-lane drum sequencer with a per-step chance and a per-step route between two channels.",
+      "tags": [
+        "Drum",
+        "Sequencer",
+        "Polyphonic",
+        "Random"
+      ],
+      "hidden": true
+    },
+    {
+      "slug": "Wake",
+      "name": "Wake",
+      "description": "Up to four cycles drive on a grid and leave trails. Each turn sets a pitch, and a crash sends a gate.",
+      "tags": [
+        "Sequencer",
+        "Random",
+        "Visual"
+      ],
+      "hidden": true
     }
   ]
 }

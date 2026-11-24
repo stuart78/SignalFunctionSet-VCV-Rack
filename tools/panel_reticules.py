@@ -501,6 +501,9 @@ PLATES = {
     # the two outputs at the foot
     "pole": [(62.23, 110.49, 34.29, 16.51)],
     "garamut": [(62.23, 110.49, 34.29, 16.51)],
+    # EOC and the output grid
+    "battery": [(104.14, 82.55, 63.5, 44.45)],
+    "wake": [(93.98, 73.66, 41.91, 50.8)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -556,6 +559,8 @@ MODULES = {
     "canopy":  ("Canopy",  "src/canopy.cpp",  "res/canopy.svg",  {}),
     "pole":    ("Pole",    "src/pole.cpp",    "res/pole.svg",    {}),
     "garamut": ("Garamut", "src/garamut.cpp", "res/garamut.svg", {}),
+    "battery": ("Battery", "src/battery.cpp", "res/battery.svg", {}),
+    "wake": ("Wake", "src/wake.cpp", "res/wake.svg", {}),
     "drift":   ("Drift",   "src/quadlfo.cpp", "res/drift.svg",   {}),
     # the legacy panels, redrawn in code for dark panels (2026-11)
     "gsx": ("Gsx", "src/gsx.cpp", "res/gsx.svg", {}),
