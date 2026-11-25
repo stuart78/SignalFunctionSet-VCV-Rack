@@ -36,6 +36,7 @@ Modules grouped by function:
 - [Carillon](#carillon): Twenty-five bells joined by rods you draw
 - [Strata](#strata): A wavetable voice you travel through in three dimensions
 - [Canopy](#canopy): Nine instruments played by drops falling through leaves
+- [Garamut](#garamut): Slit drum with two lips, struck from either side
 
 **Filters & Resonators**
 - [Band](#band): Harmonic bandpass bank (isolate individual harmonics)
@@ -53,9 +54,11 @@ Modules grouped by function:
 - [Count](#count): A narrow clock: six gate outputs, each a rate and a mask
 - [Beat](#beat): Per-voice pattern sequencer (8 patterns × 16 steps)
 - [Fill](#fill): Auto-playing 8-channel drum sequencer with a pressure engine
+- [Battery](#battery): Eight-lane drum sequencer with per-step chance and A/B routing
 - [Note](#note): Pitched CV/gate sequencer with 19 scales
 - [Chance](#chance): Generative melodic walk sequencer (8 seeded patterns)
 - [Canon](#canon): Four arpeggiators reading one chord progression
+- [Wake](#wake): Four-channel sequence generator based on competing cycle racers
 - [Fugue](#fugue): 8-step harmonic deviation sequencer (3 voices)
   - [Fugue X (Expander)](#fugue-x-expander)
   - [MetaFugue](#metafugue)
@@ -618,6 +621,26 @@ A set of instruments played by drops falling past leaves you place. TYPE selects
 
 Full detail in the [Canopy manual](docs/canopy-manual.md).
 
+#### Garamut
+
+<img src="screenshots/Garamut.png" alt="Garamut panel" height="320"> 
+
+A slit drum: a hollow column with a slit along it, where the wall on either side of the slit is a lip with its own note. GATE L and GATE R strike the left or the right lip, at the height Y sets. Every channel of every gate plays the same drum, so a strike can land on a lip that is still ringing. The drum is drawn on the faceplate, and its lips light up as they ring.
+
+**Features:**
+- **Two lips, two notes.** INTERVAL sets the right lip's note above the left's, from unison to an octave, and is exact to the cent.
+- **ROLL** strikes for as long as its gate is high, at ROLL RATE (4 to 30 strokes a second), with two hands taking turns. The second hand is a little lighter and lands a little off the first one's spot. A roll stays on the lip that channel last struck, or alternates the two lips (menu).
+- **The lips are modelled mode by mode**, and the air inside the column is a resonator through the slit, driven by the lips.
+- **SHAPE** runs from a square column through a round one to a pear. **MATERIAL** runs from cedar through hardwood to aluminium and steel. **SLIT** makes the lips longer and the slit wider together.
+- **MALLET** runs felt, rubber, wood, brass. The mallet scales with SIZE, so the level stays even across SIZE and V/OCT.
+- **Click a lip** on the drawing to strike it at that height.
+
+**Controls:** Size, Shape, Material, Slit, Mallet, Y (strike height), Interval, Decay, Roll rate, Tune.
+**Inputs:** Gate L, Gate R, Roll, Y, Vel (all poly), V/OCT (the whole drum), and a CV for Size, Shape, Material, Slit, Mallet, Interval, Decay and Roll rate.
+**Outputs:** Left, Right.
+
+**Context menu:** whether a roll alternates the two lips.
+
 ### Filters & Resonators
 
 #### Band
@@ -918,6 +941,27 @@ The idea it is built around is **pressure**. One internal value accumulates a li
 **Context menu:** Clock resolution, Fills, Play fills, Queue advance, Tier balance, Tier follows.
 
 See [docs/fill-manual.md](docs/fill-manual.md) for the full manual.
+#### Battery
+
+<img src="screenshots/Battery.png" alt="Battery panel" height="320"> 
+
+A polyphonic drum sequencer: eight lanes of up to 64 steps (four pages of 16, all eight lanes on screen), and eight patterns. Each lane plays one of two channels, A or B, chosen step by step, so one lane can move between two sounds. A new module starts blank; the Templates menu loads 27 grooves from Fill's bank.
+
+**Features:**
+- **A step holds** on/off, velocity, a chance of playing, a chance of going to the B channel (ROUTE), and a ratchet of 1 to 4 hits. Every ratchet of one step goes to the same channel.
+- **Channels.** Lane N is channel N (A) or N + 8 (B) on the 16-channel GATE, VEL and V/OCT outs. The same signals come split on two 8-channel cables, A and B, so each can drive its own [Kit](#kit). V/OCT carries a note per lane and side, for samplers that choose by pitch.
+- **Per lane and pattern:** length, rate (/4 to x4) and play order: forward, backward, pendulum, ping-pong, random, drunk, and serial (every step once per pass, in a new order each pass).
+- **LOCK** repeats the pass that was playing when it was locked, random choices included. **NEW** draws a new set of random choices. BIAS adds to every step's ROUTE chance, with a poly CV per lane.
+- **Patterns** change on BAR when it is patched, otherwise at the end of the longest lane, or on the next step if the menu says so. NEXT, the PATTERN CV and a double-click on the screen choose the next one.
+- **Right-click a lane** for a Euclidean fill, rotate, randomize, copy, paste and clear, and its notes. **Right-click a page tab** to copy, paste, clear or duplicate a page.
+- **Templates** load a groove into the pattern on screen, or all of its variations into patterns 1 onward. Fill's swing is shown next to each name; swing the clock to get it.
+
+**Controls:** Run, Reset, Next, Bias, Lock, New.
+**Inputs:** Clock, Bar, Run, Reset, Pattern, Next, Bias (poly), Lock, New, Mute (poly).
+**Outputs:** Gate, Vel, V/OCT (16 channels each), A Gate, A Vel, A V/OCT, B Gate, B Vel, B V/OCT (8 channels each), EOC.
+
+**Context menu:** Templates, when a new pattern starts, reset when RUN starts, whether the screen follows the playing pattern.
+
 #### Note
 
 <img src="screenshots/Note.png" alt="Note panel" height="320"> 
@@ -992,6 +1036,26 @@ Four arpeggiators reading one chord progression. Canon holds four chords (sets) 
 **Outputs:** A V/OCT and a Gate per channel.
 
 **Context menu:** Progressions, per-channel step offset, restart on set change, wander may rest, screen follows the set playing, what a missed note does.
+
+#### Wake
+
+<img src="screenshots/Wake.png" alt="Wake panel" height="320"> 
+
+Up to four cycles drive on a grid. Each moves one cell per step and leaves a trail, and a cycle that runs into a trail, the edge or another cycle crashes. Each cycle's moves set its pitch, and a crash fires its CRASH gate. The screen shows the arena in 3D by default, with the trails as walls; drag it to turn the view.
+
+**Features:**
+- **Driving styles** per cycle (STYLE knob and CV): Straight, Careful, Hunter, Random, Hugger, Zigzag, Spiral, and Keys, which you steer: click the screen, then Z and X turn the first Keys cycle left and right, and comma and period the second. TURN turns a cycle toward the side with more room.
+- **NOTES** sets how a cycle's moves become pitch: each turn adds an interval, every cell adds one, turns step up and down the scale, or the pitch comes from the cycle's column, row, the room left around it, or its distance from the nearest other cycle. All of it is quantized to ROOT and SCALE (Key's scale bus works), within RANGE octaves.
+- **Grid shapes:** square, hex or triangle cells, at 32 to 96 columns (menu). On a hex grid with the fifth and major third interval set, the notes lie out as a Tonnetz.
+- **TRAIL** sets how long a trail is, from 4 cells to no limit. After a crash the trail is removed and the cycle starts again at a free cell.
+- **SCORE** counts cells driven, plus 50 for every other cycle that crashes into your trail, at 0.01 V a point.
+- **RATE** from 0.5 to 32 steps a second, or one step per CLOCK pulse. Right-click a cycle's name on the screen to give it its own speed, every 1 to 4 steps.
+
+**Controls:** Rate, Trail, Range, Reset, Root, Scale, Notes, and per cycle On and Style.
+**Inputs:** Clock, Reset, Rate, Trail, Range, Root, Scale, Notes, and per cycle Style and Turn.
+**Outputs:** per cycle V/OCT, Gate, Crash, Score.
+
+**Context menu:** ROOT CV, grid shape, grid size, edges (solid or open), how soon a cycle starts again after a crash, whether SCORE wraps or holds above 10 V, the interval for each heading, gate and crash length, 3D or flat view.
 
 #### Fugue
 
