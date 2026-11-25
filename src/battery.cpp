@@ -264,7 +264,7 @@ struct Battery : Module {
 		long passBase = 0;       // passes before the last restart (unlocked draws stay fresh)
 		long lockPass = 0;
 		int walk = 0, walkStart = 0, lockWalkStart = 0;
-		int perm[BT_S];
+		int perm[BT_S] = {};
 		int permLen = 0;
 		long permPass = -1;
 		// the step's hits

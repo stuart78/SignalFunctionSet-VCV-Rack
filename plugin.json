@@ -1,7 +1,7 @@
 {
   "slug": "SignalFunctionSet",
   "name": "Signal Function Set",
-  "version": "2.25.0",
+  "version": "2.26.0",
   "_comment": "Build script will modify slug/name/version for dev builds to allow coexistence",
   "license": "GPL-3.0-or-later",
   "brand": "SignalFunctionSet",
@@ -658,25 +658,23 @@
     {
       "slug": "Battery",
       "name": "Battery",
-      "description": "Eight-lane drum sequencer with a per-step chance and a per-step route between two channels.",
+      "description": "Eight-lane drum sequencer with per-step chance and A/B routing.",
       "tags": [
         "Drum",
         "Sequencer",
         "Polyphonic",
         "Random"
-      ],
-      "hidden": true
+      ]
     },
     {
       "slug": "Wake",
       "name": "Wake",
-      "description": "Up to four cycles drive on a grid and leave trails. Each turn sets a pitch, and a crash sends a gate.",
+      "description": "Four-channel sequence generator based on competing cycle racers.",
       "tags": [
         "Sequencer",
         "Random",
         "Visual"
-      ],
-      "hidden": true
+      ]
     }
   ]
 }

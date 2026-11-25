@@ -285,7 +285,7 @@ static Garamut* garamutPreview() {
 // from the first. A click on a lip strikes it there.
 // =============================================================================
 struct GaramutView {
-	float cx, base, s;          // centre x, the column's base y, px per height
+	float cx = 0.f, base = 0.f, s = 1.f;  // centre x, the column's base y, px per height
 	float yaw = 0.32f, tilt = 0.30f;
 	float n = 2.f;              // superellipse exponent: 2 round, larger square
 	float pear = 0.f, rad = 0.17f;

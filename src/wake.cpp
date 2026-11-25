@@ -171,7 +171,7 @@ struct Wake : Module {
 	struct Cyc {
 		bool on = true, alive = false;
 		int x = 0, y = 0, dir = WK_DE;
-		int trail[WK_MAXC];            // cells, oldest first from tStart (a ring)
+		int trail[WK_MAXC] = {};          // cells, oldest first from tStart (a ring)
 		int tStart = 0, tLen = 0;
 		int acc = 0;                   // semitones since this life started (Turns, Every cell)
 		int deg = 0;                   // the scale degree (Steps, and the position modes)
@@ -195,7 +195,7 @@ struct Wake : Module {
 		std::atomic<unsigned> kw{0}, kr{0};
 		int kq[8] = {};
 		// the screen
-		int ghost[WK_MAXC];
+		int ghost[WK_MAXC] = {};
 		int ghostLen = 0, crashCell = -1;
 		double ghostT = -10.0;
 		// outputs
