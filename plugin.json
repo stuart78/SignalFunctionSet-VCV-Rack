@@ -332,6 +332,7 @@
       "slug": "Fill",
       "name": "Fill",
       "description": "Auto-playing drum sequencer that generates fills and variations.",
+      "manualUrl": "https://signalfunctionset.com/projects/fill/",
       "tags": [
         "Sequencer",
         "Drum",
@@ -343,6 +344,7 @@
       "slug": "Chime",
       "name": "Chime",
       "description": "Eight-note drone machine with rotating resonator tubes.",
+      "manualUrl": "https://signalfunctionset.com/projects/chime/",
       "tags": [
         "Physical modeling",
         "Oscillator",
@@ -354,6 +356,7 @@
       "slug": "Crystal",
       "name": "Crystal",
       "description": "Echo chamber modelled on real crystal shapes, with four outputs.",
+      "manualUrl": "https://signalfunctionset.com/projects/crystal/",
       "tags": [
         "Reverb",
         "Delay",
@@ -365,6 +368,7 @@
       "slug": "Loom",
       "name": "Loom",
       "description": "Eight waveguide strings sharing one resonant bridge.",
+      "manualUrl": "https://signalfunctionset.com/projects/loom/",
       "tags": [
         "Physical modeling",
         "Synth voice",
@@ -375,7 +379,8 @@
     {
       "slug": "Key",
       "name": "Key",
-      "description": "Four-channel quantizer that reads its root and scale as CV.",
+      "description": "Four-channel quantizer for root and scale CV, with microtonal and Scala scales.",
+      "manualUrl": "https://signalfunctionset.com/projects/key/",
       "tags": [
         "Quantizer",
         "Polyphonic",
@@ -386,6 +391,7 @@
       "slug": "Slide",
       "name": "Slide",
       "description": "Electric lap steel model with eight strings and a steel bar.",
+      "manualUrl": "https://signalfunctionset.com/projects/slide/",
       "tags": [
         "Physical modeling",
         "Synth voice",
@@ -396,6 +402,7 @@
       "slug": "OpMorph",
       "name": "OP MORPH",
       "description": "Expander for Operator that blends between DX7 algorithms.",
+      "manualUrl": "https://signalfunctionset.com/projects/op-morph/",
       "tags": [
         "Expander",
         "Oscillator",
@@ -406,6 +413,7 @@
       "slug": "SlideX",
       "name": "SLIDE XP",
       "description": "Expander for Slide with a gate input and output per string.",
+      "manualUrl": "https://signalfunctionset.com/projects/slide-xp/",
       "tags": [
         "Expander",
         "Polyphonic"
@@ -414,7 +422,8 @@
     {
       "slug": "Slice",
       "name": "Slice",
-      "description": "Cuts live audio into slices and reverses, repeats or reorders them.",
+      "description": "Glitch effect that cuts live audio into slices and reverses, repeats or reorders them.",
+      "manualUrl": "https://signalfunctionset.com/projects/slice/",
       "tags": [
         "Effect",
         "Sampler",
@@ -426,6 +435,7 @@
       "slug": "Kit",
       "name": "Kit",
       "description": "Eight physically modelled drums, including a two-plate hi-hat.",
+      "manualUrl": "https://signalfunctionset.com/projects/kit/",
       "tags": [
         "Physical modeling",
         "Drum",
@@ -436,6 +446,7 @@
       "slug": "PolyKitIn",
       "name": "PolyKit In",
       "description": "Expander for Kit with a jack for every input of every drum.",
+      "manualUrl": "https://signalfunctionset.com/projects/polykit-in/",
       "tags": [
         "Expander",
         "Drum",
@@ -446,6 +457,7 @@
       "slug": "Field",
       "name": "Field",
       "description": "Nineteen random voltages sampled from one smooth noise field.",
+      "manualUrl": "https://signalfunctionset.com/projects/field/",
       "tags": [
         "Random",
         "Polyphonic",
@@ -457,6 +469,7 @@
       "slug": "Trace",
       "name": "Trace",
       "description": "Four CV lanes on a scrolling loop, drawn by mouse or by CV.",
+      "manualUrl": "https://signalfunctionset.com/projects/trace/",
       "tags": [
         "Controller",
         "Low-frequency oscillator",
@@ -469,6 +482,7 @@
       "slug": "Sigma",
       "name": "Sigma",
       "description": "Additive voice of up to 64 partials, morphed by velocity.",
+      "manualUrl": "https://signalfunctionset.com/projects/sigma/",
       "tags": [
         "Oscillator",
         "Polyphonic",
@@ -489,6 +503,7 @@
       "slug": "Wheel",
       "name": "Wheel",
       "description": "Hurdy-gurdy drone model with six strings and a cranked wheel.",
+      "manualUrl": "https://signalfunctionset.com/projects/wheel/",
       "tags": [
         "Oscillator",
         "Polyphonic",
@@ -520,7 +535,8 @@
     {
       "slug": "Spool",
       "name": "Spool",
-      "description": "Four-tape sampler where each tape resumes from where it stopped.",
+      "description": "Four-tape sampler after the Mellotron, where each tape resumes from where it stopped.",
+      "manualUrl": "https://signalfunctionset.com/projects/spool/",
       "tags": [
         "Sampler",
         "Polyphonic",
@@ -530,7 +546,8 @@
     {
       "slug": "Flock",
       "name": "Flock",
-      "description": "Granular voice driven by a simulated flock of birds.",
+      "description": "Granular voice driven by a boids model of a murmuration of birds.",
+      "manualUrl": "https://signalfunctionset.com/projects/flock/",
       "tags": [
         "Granular",
         "Synth voice",
@@ -541,6 +558,7 @@
       "slug": "FlockIn",
       "name": "Flock In",
       "description": "Expander for Flock that feeds live audio to its grains.",
+      "manualUrl": "https://signalfunctionset.com/projects/flock-in/",
       "tags": [
         "Expander",
         "Granular",
@@ -551,6 +569,7 @@
       "slug": "Canon",
       "name": "Canon",
       "description": "Four arpeggiators playing from one chord progression.",
+      "manualUrl": "https://signalfunctionset.com/projects/canon/",
       "tags": [
         "Arpeggiator",
         "Sequencer",
@@ -561,6 +580,7 @@
       "slug": "Count",
       "name": "Count",
       "description": "Clock with six gate outputs set by rate and step mask.",
+      "manualUrl": "https://signalfunctionset.com/projects/count/",
       "tags": [
         "Clock generator",
         "Clock modulator",
@@ -571,6 +591,7 @@
       "slug": "Carillon",
       "name": "Carillon",
       "description": "Modelled bells that pass a strike along rods you draw.",
+      "manualUrl": "https://signalfunctionset.com/projects/carillon/",
       "tags": [
         "Physical modeling",
         "Synth voice",
@@ -581,6 +602,7 @@
       "slug": "Strata",
       "name": "Strata",
       "description": "Wavetable voice that reads from a 3D grid of frames.",
+      "manualUrl": "https://signalfunctionset.com/projects/strata/",
       "tags": [
         "Oscillator",
         "Polyphonic"
@@ -590,6 +612,7 @@
       "slug": "Cistern",
       "name": "Cistern",
       "description": "Reverb modelled on real rooms, scanned or built from plans.",
+      "manualUrl": "https://signalfunctionset.com/projects/cistern/",
       "tags": [
         "Reverb",
         "Effect"
@@ -599,6 +622,7 @@
       "slug": "Hocket",
       "name": "Hocket",
       "description": "Routes one line of notes or audio to eight channels in turn.",
+      "manualUrl": "https://signalfunctionset.com/projects/hocket/",
       "tags": [
         "Switch",
         "Sequencer",
@@ -609,6 +633,7 @@
       "slug": "Concrete",
       "name": "Concrète",
       "description": "Four-lane clip sampler on a 1-8 bar tape loop with automation.",
+      "manualUrl": "https://signalfunctionset.com/projects/concrete/",
       "tags": [
         "Sampler",
         "Sequencer",
@@ -619,6 +644,7 @@
       "slug": "ConcreteIn",
       "name": "Concrète In",
       "description": "Expander for Concrète that records each lane from its own input.",
+      "manualUrl": "https://signalfunctionset.com/projects/concrete-in/",
       "tags": [
         "Sampler",
         "Expander"
@@ -628,6 +654,7 @@
       "slug": "Canopy",
       "name": "Canopy",
       "description": "Drops falling through leaves you place play a tongue drum, zither, pan and more.",
+      "manualUrl": "https://signalfunctionset.com/projects/canopy/",
       "tags": [
         "Drum",
         "Physical modeling",
@@ -649,6 +676,7 @@
       "slug": "Garamut",
       "name": "Garamut",
       "description": "Slit drum with two lips, struck from either side by up to sixteen poly channels.",
+      "manualUrl": "https://signalfunctionset.com/projects/garamut/",
       "tags": [
         "Drum",
         "Physical modeling",
@@ -659,6 +687,7 @@
       "slug": "Battery",
       "name": "Battery",
       "description": "Eight-lane drum sequencer with per-step chance and A/B routing.",
+      "manualUrl": "https://signalfunctionset.com/projects/battery/",
       "tags": [
         "Drum",
         "Sequencer",
@@ -670,6 +699,7 @@
       "slug": "Wake",
       "name": "Wake",
       "description": "Four-channel sequence generator based on competing cycle racers.",
+      "manualUrl": "https://signalfunctionset.com/projects/wake/",
       "tags": [
         "Sequencer",
         "Random",
