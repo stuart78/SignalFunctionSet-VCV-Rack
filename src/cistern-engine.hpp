@@ -1073,8 +1073,15 @@ static const double TAIL_AP_SEC[6] = {0.0047, 0.0071, 0.0113, 0.0167, 0.0239, 0.
 struct Tail {
 	struct Line { std::vector<float> buf; int w = 0, mask = 0; double len = 0, lenTarget = 0, spread = 1;
 	              double depthFrac = 0, modDepth = 0, modPhase = 0, modInc = 0;
-	              double g0 = 1; BQ sh[EQ_N - 1]; };
+	              double ms = 0, mc = 1, ri = 1, rs = 0;   // the modulation's sine and cosine, turned by (ri, rs) a sample
+	              double g0 = 1; };
 	Line line[NL];
+	// The loss shelves, stored shelf by shelf across the lines (coefficients
+	// and state), so each shelf runs over all sixteen lines in one loop the
+	// compiler can vectorise. Same arithmetic, same order, as a BQ per line.
+	double sb0[EQ_N - 1][NL], sb1[EQ_N - 1][NL], sb2[EQ_N - 1][NL], sa1[EQ_N - 1][NL], sa2[EQ_N - 1][NL];
+	double sz1[EQ_N - 1][NL] = {}, sz2[EQ_N - 1][NL] = {};
+	int renorm = 0;
 	float out[2] = {0, 0};
 	struct AP { std::vector<float> b; int w = 0, mask = 0, len = 1; float g = 0.6f; };
 	// six allpasses ahead of the feed: with four, the onset's worst crest ran 4.5
@@ -1114,6 +1121,9 @@ struct Tail {
 			L.depthFrac = 0.0004 + 0.0006 * r.u();
 			L.modInc = 2 * M_PI * (0.05 + 0.25 * r.u()) / sr;
 			L.modPhase = 2 * M_PI * r.u();
+			// a rotating phasor in place of a sine a sample, renormalised now and then
+			L.ms = std::sin(L.modPhase); L.mc = std::cos(L.modPhase);
+			L.ri = std::cos(L.modInc); L.rs = std::sin(L.modInc);
 			L.buf.assign(size, 0.f); L.mask = size - 1; L.w = 0;
 		}
 		setMod(modAmt);
@@ -1125,7 +1135,10 @@ struct Tail {
 		for (int i = 0; i < NL; i++)
 			for (int k = 0; k < VEL_N; k++)
 				vel.push_back({(int)((k + r.u()) * vlen / VEL_N), i, r.u() < 0.5 ? -g : g});
-		std::sort(vel.begin(), vel.end(), [](const VTap& a, const VTap& b) { return a.d < b.d; });
+		// grouped by line, each line's in order of delay: a line's sum is taken in the
+		// same order as when every tap was sorted by delay, and with no scatter
+		std::stable_sort(vel.begin(), vel.end(), [](const VTap& a, const VTap& b) { return a.d < b.d; });
+		std::stable_sort(vel.begin(), vel.end(), [](const VTap& a, const VTap& b) { return a.line < b.line; });
 		int vs = 1; while (vs < vlen + 2) vs <<= 1;
 		vbuf.assign(vs, 0.f); vmask = vs - 1; vw = 0;
 		setDecay(P);
@@ -1185,8 +1198,8 @@ struct Tail {
 			}
 			// coefficients only: the filters' state carries over, so a running tail does not click
 			for (int k = 0; k < EQ_N - 1; k++) {
-				L.sh[k].b0 = sh[k].b0; L.sh[k].b1 = sh[k].b1; L.sh[k].b2 = sh[k].b2;
-				L.sh[k].a1 = sh[k].a1; L.sh[k].a2 = sh[k].a2;
+				sb0[k][i] = sh[k].b0; sb1[k][i] = sh[k].b1; sb2[k][i] = sh[k].b2;
+				sa1[k][i] = sh[k].a1; sa2[k][i] = sh[k].a2;
 			}
 			L.g0 = std::pow(10.0, c[0] / 20);
 		}
@@ -1206,21 +1219,46 @@ struct Tail {
 		}
 		vbuf[vw] = in;
 		float feed[NL] = {};
-		for (const VTap& t : vel) feed[t.line] += t.g * vbuf[(vw - t.d) & vmask];
+		{
+			const VTap* t = vel.data();
+			for (int i = 0; i < NL; i++) {
+				float f = 0.f;
+				for (int k = 0; k < VEL_N; k++, t++) f += t->g * vbuf[(vw - t->d) & vmask];
+				feed[i] = f;
+			}
+		}
 		vw = (vw + 1) & vmask;
 		float o[NL];
+		double ys[NL];
+		bool norm = ++renorm >= 4096;
+		if (norm) renorm = 0;
 		for (int i = 0; i < NL; i++) {
 			Line& L = line[i];
 			double dl = L.lenTarget - L.len;
 			const double gl = LEN_GLIDE;
 			if (dl != 0) L.len += std::max(-gl, std::min(gl, dl));
-			L.modPhase += L.modInc; if (L.modPhase > 2 * M_PI) L.modPhase -= 2 * M_PI;
-			double rd = L.w - L.len - L.modDepth * (1.0 + std::sin(L.modPhase));
-			double x = cubic(L.buf, L.mask, rd);
-			if (freeze) { o[i] = (float)x; continue; }
-			double y = L.g0 * x;
-			for (int k = 0; k < EQ_N - 1; k++) y = L.sh[k].run(y);
-			o[i] = (float)y;
+			double s2 = L.ms * L.ri + L.mc * L.rs, c2 = L.mc * L.ri - L.ms * L.rs;
+			if (norm) { double k = 1.0 / std::sqrt(s2 * s2 + c2 * c2); s2 *= k; c2 *= k; }
+			L.ms = s2; L.mc = c2;
+			double rd = L.w - L.len - L.modDepth * (1.0 + L.ms);
+			ys[i] = cubic(L.buf, L.mask, rd);
+		}
+		if (freeze) {
+			for (int i = 0; i < NL; i++) o[i] = (float)ys[i];
+		} else {
+			for (int i = 0; i < NL; i++) ys[i] *= line[i].g0;
+			for (int k = 0; k < EQ_N - 1; k++) {
+				const double *b0 = sb0[k], *b1 = sb1[k], *b2 = sb2[k], *a1 = sa1[k], *a2 = sa2[k];
+				double *z1 = sz1[k], *z2 = sz2[k];
+				for (int i = 0; i < NL; i++) {
+					double x = ys[i];
+					double y = b0[i] * x + z1[i];
+					z1[i] = b1[i] * x - a1[i] * y + z2[i];
+					z2[i] = b2[i] * x - a2[i] * y;
+					ys[i] = y;
+				}
+			}
+			for (int i = 0; i < NL; i++) o[i] = (float)ys[i];
 		}
 		// Hadamard 16, orthonormal (fast transform)
 		float h[NL]; for (int i = 0; i < NL; i++) h[i] = o[i];

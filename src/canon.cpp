@@ -18,6 +18,7 @@
 #include "root-cv.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
+#include "pulse-width.hpp"
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "harmonic-tiers.hpp"
@@ -119,6 +120,9 @@ struct Canon : Module {
 		uint32_t rng = 0x9E3779B9u;
 		dsp::SchmittTrigger trig;
 		dsp::PulseGenerator pulse;
+		sfs::GatePulse share;             // gateMode 2..6: a share of the step
+		float sinceEdge = 0.f;            // seconds since this channel's last gate-in edge
+		float step = 0.f;                 // the measured time between its last two edges (0 = not yet)
 	};
 	Ch ch[CN_CH];
 
@@ -127,7 +131,11 @@ struct Canon : Module {
 	bool restartOnSet = false;            // a channel keeps its place through a set change
 	bool wanderRest = true;               // WANDER's top tier may substitute a rest
 	bool missSkips = false;               // a note that misses its chance: rest (false) or play the next note
-	int  gateMode = 0;                    // 0 follows the input, 1 a 10 ms trigger
+	// Gate out: 0 follows the input, 1 a 10 ms trigger, 2..6 a share of the
+	// step (10/25/50/75/100%), the step being the measured time between this
+	// channel's gate-in edges. Until two edges have been seen there is no step,
+	// and the gate follows the input.
+	int  gateMode = 0;
 	// the screen: which set's tab is open, and whether it follows the set
 	// playing (it does, except for a few seconds after you click it)
 	int  viewSet = 0;
@@ -508,6 +516,12 @@ struct Canon : Module {
 		C.rest = false; C.sounding = true; C.played = true; C.semi = pick;
 		C.cv = ((float)root + pick) / 12.f;
 		C.pulse.trigger(0.01f);
+		if (gateMode >= 2 && C.step > 0.f) sfs::firePulse(C.share, shareIndex(), C.step);
+	}
+	enum { CN_NGATE = 7 };              // gateMode values
+	int shareIndex() const {
+		static const int IDX[CN_NGATE] = {0, 0, sfs::PW_10, 5, sfs::PW_50, 7, sfs::PW_100};
+		return IDX[clamp(gateMode, 0, CN_NGATE - 1)];
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -530,11 +544,21 @@ struct Canon : Module {
 		for (int c = 0; c < CN_CH; c++) {
 			Ch& C = ch[c];
 			float g = gateVoltage(c);
-			if (C.trig.process(g, 0.1f, 1.f)) step(c);
+			C.sinceEdge += args.sampleTime;
+			if (C.trig.process(g, 0.1f, 1.f)) {
+				// the step a share is measured against: the time since the last edge
+				if (C.sinceEdge > 0.002f && C.sinceEdge < 10.f) C.step = C.sinceEdge;
+				else C.step = 0.f;
+				C.sinceEdge = 0.f;
+				step(c);
+			}
 			C.gateHi = g >= 1.f;
-			if (!C.gateHi && gateMode == 0) C.sounding = false;
+			bool follow = gateMode == 0 || (gateMode >= 2 && C.step <= 0.f);
+			if (!C.gateHi && follow) C.sounding = false;
+			bool shareHi = C.share.process(args.sampleTime);
 			bool out = C.rest ? false
-			         : (gateMode == 0 ? C.gateHi : C.pulse.process(args.sampleTime));
+			         : follow ? C.gateHi
+			         : gateMode == 1 ? C.pulse.process(args.sampleTime) : shareHi;
 			if (gateMode == 1) C.pulse.process(0.f);
 			outputs[GATE_OUTPUT + c].setVoltage(out ? 10.f : 0.f);
 			outputs[CV_OUTPUT + c].setVoltage(C.cv);
@@ -605,7 +629,7 @@ struct Canon : Module {
 		if (json_t* j = json_object_get(r, "lock")) lock = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "restartOnSet")) restartOnSet = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "wanderRest")) wanderRest = json_boolean_value(j);
-		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, CN_NGATE - 1);
 		if (json_t* j = json_object_get(r, "viewSet")) viewSet = clamp((int)json_integer_value(j), 0, CN_SETS - 1);
 		if (json_t* j = json_object_get(r, "missSkips")) missSkips = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "viewFollow")) viewFollow = json_boolean_value(j);
@@ -1036,7 +1060,17 @@ struct CanonWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem("Screen follows the set playing", "", &m->viewFollow));
 		menu->addChild(createIndexSubmenuItem("A note that misses its chance", {"Rests", "Plays the next note instead"},
 			[=]() { return m->missSkips ? 1 : 0; }, [=](int v) { m->missSkips = v == 1; }));
-		menu->addChild(createIndexPtrSubmenuItem("Gate out", {"Follows the gate in", "10 ms trigger"}, &m->gateMode));
+		menu->addChild(createSubmenuItem("Gate out", "", [=](Menu* sub) {
+			static const char* L[Canon::CN_NGATE] = {
+				"Follows the gate in", "10 ms trigger",
+				"10% of the step", "25% of the step", "50% of the step", "75% of the step",
+				"100% of the step (low for 1 ms before the next step)" };
+			for (int i = 0; i < Canon::CN_NGATE; i++) {
+				if (i == 2) sub->addChild(createMenuLabel("A step is the time between two gates in on that channel"));
+				sub->addChild(createCheckMenuItem(L[i], "",
+					[=]() { return m->gateMode == i; }, [=]() { m->gateMode = i; }));
+			}
+		}));
 		// STEP OFFSET, per channel: how many steps ahead of its count the
 		// channel reads. Four channels on one clock with the same pattern and
 		// offsets 0 1 2 3 play the chord's notes together -- the arpeggiator

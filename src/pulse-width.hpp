@@ -31,14 +31,22 @@
 namespace sfs {
 
 static const int   NUM_FIXED_WIDTHS = 4;    // indices 0..3 -- absolute milliseconds
-static const int   NUM_PULSE_WIDTHS = 9;    // indices 4..8 -- fractions of the period
+static const int   NUM_PULSE_WIDTHS = 11;   // indices 4..10 -- fractions of the period
+// 10% and 100% were appended (2026-11) after 87.5%, so every stored index keeps
+// its meaning; the menu lists the shares in order (PULSE_MENU_ORDER).
+static const int   PW_10 = 9, PW_100 = 10, PW_50 = 6;
 static const float PULSE_WIDTHS[NUM_PULSE_WIDTHS] = {
-	0.001f, 0.002f, 0.005f, 0.010f,   0.f, 0.f, 0.f, 0.f, 0.f };
+	0.001f, 0.002f, 0.005f, 0.010f,   0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 static const float PULSE_DUTIES[NUM_PULSE_WIDTHS] = {
-	0.f, 0.f, 0.f, 0.f,   0.125f, 0.25f, 0.5f, 0.75f, 0.875f };
+	0.f, 0.f, 0.f, 0.f,   0.125f, 0.25f, 0.5f, 0.75f, 0.875f, 0.1f, 1.f };
 static const char* PULSE_WIDTH_LABELS[NUM_PULSE_WIDTHS] = {
-	"1 ms (default)", "2 ms", "5 ms (encoder-safe)", "10 ms",
-	"12.5% gate", "25% gate", "50% gate", "75% gate", "87.5% gate" };
+	"1 ms", "2 ms", "5 ms (encoder-safe)", "10 ms",
+	"12.5% gate", "25% gate", "50% gate", "75% gate", "87.5% gate",
+	"10% gate", "100% gate (low for 1 ms before the next step)" };
+static const int PULSE_MENU_ORDER[NUM_PULSE_WIDTHS] = {0, 1, 2, 3, 9, 4, 5, 6, 7, 8, 10};
+// A 100% gate goes low this long before the next step, so a voice sees each
+// step as a new note.
+static const float GATE_GAP_SEC = 0.001f;
 
 inline bool pulseIsDuty(int idx) {
 	return idx >= NUM_FIXED_WIDTHS && idx < NUM_PULSE_WIDTHS;
@@ -58,9 +66,61 @@ inline float pulseWidthSec(int idx) {
 // past the pulse that should end it -- which reads downstream as a gate that
 // never falls.
 inline float pulseWidthSec(int idx, float periodSec) {
-	if (pulseIsDuty(idx) && periodSec > 0.f)
-		return periodSec * PULSE_DUTIES[idx];
+	if (pulseIsDuty(idx) && periodSec > 0.f) {
+		if (idx == PW_100) return std::max(0.001f, periodSec - GATE_GAP_SEC);
+		return std::max(0.001f, periodSec * PULSE_DUTIES[idx]);
+	}
 	return pulseWidthSec(idx);
+}
+
+// A pulse generator for an output that can send gates as long as the step.
+// dsp::PulseGenerator, fired again while still high, only extends the pulse,
+// so two gates a step apart at 100% would run together into one. Fired as a
+// GATE (`gate` true) while still high, this goes low for GATE_GAP_SEC first
+// and then starts the new gate. Fired as a trigger (`gate` false) it behaves
+// exactly as dsp::PulseGenerator, so the fixed widths do what they always did.
+struct GatePulse {
+	float remaining = 0.f;          // a trigger, counted exactly as dsp::PulseGenerator counts it
+	double held = 0.0;              // a gate, counted in double: a 128-bar gate in float drifts by seconds
+	double gap = 0.0, pend = 0.0;   // the 1 ms low before a gate fired over one still high
+	double lowFor = 1.0;            // how long the output has been low
+	void trigger(float dur, bool gate = false) {
+		if (gate) {
+			// the gap is part of the new step, so the gate after it is that much shorter
+			double len = std::max(0.001, (double)dur - GATE_GAP_SEC);
+			if (isHigh()) { remaining = 0.f; held = 0.0; gap = GATE_GAP_SEC; pend = len; }
+			else if (gap > 0.0) pend = std::max(pend, len);
+			// A gate that ended on its own less than 1 ms ago (a step arriving a
+			// little early, as a tempo speeds up) still gets its full 1 ms low.
+			else if (lowFor < GATE_GAP_SEC) {
+				gap = GATE_GAP_SEC - lowFor;
+				pend = std::max(0.001, (double)dur - gap);
+			}
+			else held = dur;
+			return;
+		}
+		if (gap > 0.0) { pend = std::max(pend, (double)dur); return; }
+		if (dur > remaining) remaining = dur;
+	}
+	bool process(float dt) {
+		if (gap > 0.0) {
+			gap -= dt;
+			if (gap <= 0.0) { held = pend; pend = 0.0; }
+			lowFor = 0.0;
+			return false;
+		}
+		bool hi = false;
+		if (held > 0.0) { held -= dt; hi = true; }
+		if (remaining > 0.f) { remaining -= dt; hi = true; }
+		lowFor = hi ? 0.0 : lowFor + dt;
+		return hi;
+	}
+	bool isHigh() const { return remaining > 0.f || held > 0.0; }
+	void reset() { remaining = 0.f; held = gap = pend = 0.0; lowFor = 1.0; }
+};
+// Fire `g` for stored index `idx` on an output whose step is `periodSec` long.
+inline void firePulse(GatePulse& g, int idx, float periodSec) {
+	g.trigger(pulseWidthSec(idx, periodSec), pulseIsDuty(idx) && periodSec > 0.f);
 }
 
 // Append a "Gate/trigger width" submenu that reads/writes *idxPtr. The current
@@ -75,8 +135,9 @@ inline void addPulseWidthMenu(Menu* menu, int* idxPtr,
 	int cur = (*idxPtr >= 0 && *idxPtr < last) ? *idxPtr : 0;
 	menu->addChild(createSubmenuItem(label, PULSE_WIDTH_LABELS[cur],
 		[idxPtr, last](Menu* sub) {
-			for (int i = 0; i < last; i++) {
-				if (i == NUM_FIXED_WIDTHS)
+			for (int k = 0; k < last; k++) {
+				int i = PULSE_MENU_ORDER[k];
+				if (k == NUM_FIXED_WIDTHS)
 					sub->addChild(createMenuLabel("Gate, as a share of the step"));
 				sub->addChild(createCheckMenuItem(PULSE_WIDTH_LABELS[i], "",
 					[idxPtr, i]() { return *idxPtr == i; },

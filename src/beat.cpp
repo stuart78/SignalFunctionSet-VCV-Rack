@@ -140,8 +140,21 @@ struct Beat : Module {
 	dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger barTrigger;
 	dsp::SchmittTrigger resetTrigger;
-	dsp::PulseGenerator gatePulse;
-	dsp::PulseGenerator accentPulse;
+	// GatePulse: a gate fired while the last is still high goes low for 1 ms
+	// first, so 100% gates on consecutive steps stay separate notes. With a
+	// fixed width it behaves exactly as dsp::PulseGenerator.
+	sfs::GatePulse gatePulse;
+	sfs::GatePulse accentPulse;
+	float sinceGate = 1.f, sinceAccent = 1.f;   // seconds since each last fired
+
+	// The step is the CLOCK period, measured between rising edges, and is what
+	// a gate set as a share of the step is a share of. 0 until two edges have
+	// arrived, which falls the gate back to the 1 ms default. A gap longer than
+	// 4 s is the clock stopping, not a step, and is not measured.
+	float samplesSinceClock = 0.f;
+	float clockPeriodSec = 0.f;
+	bool clockSeen = false;
+	float sampleTimeC = 1.f / 48000.f;
 
 	// Bar/clock coincidence handling. CLOCK and BAR from Meter SHOULD arrive
 	// on the same sample, but in practice can be off by a few samples. Two
@@ -206,10 +219,28 @@ struct Beat : Module {
 		// Probability check — fires only if random draw is below the set
 		// probability. p=1 always fires, p=0 never fires.
 		if (random::uniform() >= p.probabilities[playStep]) return;
-		const float pw = sfs::pulseWidthSec(pulseWidthIdx);
-		gatePulse.trigger(pw);
+		fireGate(gatePulse, sinceGate);
 		currentVelocity = clamp(p.velocities[playStep], 0.f, 1.f);
-		if (p.accents[playStep]) accentPulse.trigger(pw);
+		if (p.accents[playStep]) fireGate(accentPulse, sinceAccent);
+	}
+
+	// A second fire within 1 ms of the last is the same step arriving twice
+	// (a deferred CLOCK, then a BAR just outside its window), so it lengthens
+	// the pulse rather than opening a gap in it.
+	//
+	// With BAR patched a CLOCK step fires 0.5 ms after its edge (the deferral
+	// above) while a BAR step fires on its edge, so the gate is a share of the
+	// time to the NEXT CLOCK edge, not of a whole period from now: otherwise a
+	// 100% gate before a BAR step is low for only 0.5 ms. A step fired more
+	// than half a period after the last edge is a BAR arriving just ahead of
+	// its CLOCK, and gets the whole period.
+	void fireGate(sfs::GatePulse& g, float& since) {
+		float per = clockPeriodSec;
+		float late = samplesSinceClock * sampleTimeC;
+		if (per > 0.f && late < 0.5f * per) per -= late;
+		if (since < sfs::GATE_GAP_SEC) g.trigger(sfs::pulseWidthSec(pulseWidthIdx, per));
+		else sfs::firePulse(g, pulseWidthIdx, per);
+		since = 0.f;
 	}
 
 	void doReset() {
@@ -275,6 +306,19 @@ struct Beat : Module {
 			}
 		};
 
+		// Every CLOCK edge measures the step, including the ones the BAR
+		// coincidence logic below drops. Read before BAR is handled, so a step
+		// that BAR fires knows how far it is from the CLOCK edge.
+		sampleTimeC = args.sampleTime;
+		bool clockFired = clockTrigger.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
+		samplesSinceClock += 1.f;
+		if (clockFired) {
+			float gap = samplesSinceClock * args.sampleTime;
+			if (clockSeen && gap <= 4.f) clockPeriodSec = gap;
+			clockSeen = true;
+			samplesSinceClock = 0.f;
+		}
+
 		bool barFired = barConnected
 			&& barTrigger.process(inputs[BAR_INPUT].getVoltage(), 0.1f, 1.f);
 		if (barFired) {
@@ -284,7 +328,6 @@ struct Beat : Module {
 			advanceBar();
 		}
 
-		bool clockFired = clockTrigger.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
 		if (clockFired && !barFired) {
 			if (barConnected) {
 				if (barSuppressionSamples > 0) {
@@ -310,6 +353,8 @@ struct Beat : Module {
 
 		bool gateHi = gatePulse.process(args.sampleTime);
 		bool accHi = accentPulse.process(args.sampleTime);
+		sinceGate += args.sampleTime;
+		sinceAccent += args.sampleTime;
 
 		outputs[GATE_OUTPUT].setVoltage(gateHi ? 10.f : 0.f);
 		outputs[VELOCITY_OUTPUT].setVoltage(currentVelocity * 10.f);
@@ -1281,7 +1326,9 @@ struct BeatWidget : ModuleWidget {
 		menu->addChild(createBoolPtrMenuItem(
 			"Advance only on bar trigger", "",
 			&module->advanceOnBarOnly));
-		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
+		// true == offer gates as a share of the step: the step is the measured
+		// CLOCK period.
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx, "Gate/trigger width", true);
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Copy / paste"));

@@ -160,6 +160,42 @@ int main() {
 		check(std::fabs(m.bpmEff - 100.f) < 0.5f && m.extBeats == before + 2, string::f("resumed: %.1f BPM, the gap across the stop not taken as a period", m.bpmEff));
 	}
 
+	printf("== GATE trimpots: each output's own length ==\n");
+	{
+		// 120 BPM, x1: a pulse is 24000 samples. Outputs 1-4 at 50%, fully left,
+		// fully right and 25%; high time and the low before the next pulse
+		Count m; rack::engine::Module::ProcessArgs a; a.sampleRate = SR; a.sampleTime = 1.f / SR; int64_t frame = 0;
+		const float gv[4] = {0.5f, 0.f, 1.f, 0.25f};
+		for (int i = 0; i < 4; i++) m.params[Count::GATE_PARAM + i].setValue(gv[i]);
+		int hi[4] = {}, run[4] = {}, lowRun[4] = {}, minLow[4] = {1 << 30, 1 << 30, 1 << 30, 1 << 30}, lastHi[4] = {};
+		bool was[4] = {};
+		for (int sIdx = 0; sIdx < (int)(4.f * SR); sIdx++) {
+			a.frame = frame++; m.process(a);
+			for (int i = 0; i < 4; i++) {
+				bool h = m.outputs[Count::GATE_OUTPUT + i].getVoltage() > 5.f;
+				if (h) { run[i]++; if (!was[i] && sIdx > 0 && lowRun[i] > 0) minLow[i] = std::min(minLow[i], lowRun[i]); lowRun[i] = 0; }
+				else { if (was[i]) lastHi[i] = run[i]; run[i] = 0; lowRun[i]++; }
+				if (h) hi[i]++;
+				was[i] = h;
+			}
+		}
+		check(std::abs(lastHi[0] - 12000) <= 1, string::f("50%%: high %d samples of a 24000-sample pulse (as Count has always sent)", lastHi[0]));
+		check(std::abs(lastHi[1] - 240) <= 1, string::f("fully left: a %d-sample trigger (5 ms)", lastHi[1]));
+		check(minLow[2] >= 47 && minLow[2] <= 49, string::f("fully right: low %d samples before each pulse (1 ms)", minLow[2]));
+		check(std::abs(lastHi[3] - 6000) <= 1, string::f("25%%: high %d samples", lastHi[3]));
+		// an old patch's "gateMode" 0 (5 ms trigger) sets every trimpot fully left
+		Count o;
+		json_t* j = json_object(); json_object_set_new(j, "gateMode", json_integer(0));
+		o.dataFromJson(j); json_decref(j);
+		bool allLeft = true;
+		for (int i = 0; i < CT_N; i++) allLeft = allLeft && o.params[Count::GATE_PARAM + i].getValue() == 0.f;
+		check(allLeft && o.trigIdx == 2, "a patch from before the trimpots with the 5 ms trigger opens with every GATE fully left");
+		Count n;
+		json_t* k = json_object(); json_object_set_new(k, "gateMode", json_integer(1));
+		n.dataFromJson(k); json_decref(k);
+		check(n.params[Count::GATE_PARAM].getValue() == 0.5f, "and with half the pulse, at 50%");
+	}
+
 	printf("\n%d failure(s)\n", fails);
 	return fails ? 1 : 0;
 }

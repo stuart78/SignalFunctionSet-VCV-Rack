@@ -3,6 +3,7 @@
 #include "scale-bus.hpp"
 #include "scales.hpp"
 #include "panel-style.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 
@@ -288,6 +289,11 @@ struct Muse : Module {
 	int  tickInterval = 0;
 	bool haveTickInterval = false;
 	int  gateRemaining = 0;
+	// Gate length (menu, saved as "gateLen"). sfs::PW_50 is the original 50% gate and
+	// runs the original sample-count code above; any other choice runs gateGP, sized
+	// against the same measured tick interval.
+	int  gateLen = sfs::PW_50;
+	sfs::GatePulse gateGP;
 
 	bool running = true;
 	bool gateOnChangeOnly = false;
@@ -529,6 +535,7 @@ struct Muse : Module {
 			if (!followingThisFrame) core.clearState();
 			lastPitchAddr = -1;
 			gateRemaining = 0;
+			gateGP.reset();
 			samplesSinceTick = 0;
 			haveTickInterval = false;
 		}
@@ -575,7 +582,7 @@ struct Muse : Module {
 				lastPitchAddr = addr;
 				if (emitGate) {
 					int ivl = haveTickInterval ? samplesSinceTick : (int)(args.sampleRate * 0.05f);
-					gateRemaining = std::max(1, ivl / 2);
+					fireGate(ivl, args.sampleTime);
 				}
 			}
 		} else {
@@ -602,7 +609,7 @@ struct Muse : Module {
 					lastPitchAddr = addr;
 					if (emitGate) {
 						int ivl = haveTickInterval ? samplesSinceTick : (int)(args.sampleRate * 0.05f);
-						gateRemaining = std::max(1, ivl / 2);
+						fireGate(ivl, args.sampleTime);
 					}
 				}
 			}
@@ -662,7 +669,21 @@ struct Muse : Module {
 		outputs[VOCT_OUTPUT].setVoltage(cvOut);
 		bool gateHi = gateRemaining > 0;
 		if (gateRemaining > 0) gateRemaining--;
+		if (gateGP.process(args.sampleTime)) gateHi = true;
 		outputs[GATE_OUTPUT].setVoltage(gateHi ? 10.f : 0.f);
+	}
+
+	// Start a gate on a tick, `ivl` samples after the previous one.
+	void fireGate(int ivl, float sampleTime) {
+		if (gateLen == sfs::PW_50) {
+			gateGP.reset();
+			gateRemaining = std::max(1, ivl / 2);       // the original 50% gate, exactly
+			return;
+		}
+		// A gate still high from the 50% path hands over to gateGP as a gate in
+		// progress, so a 100% gate following it still goes low for 1 ms.
+		if (gateRemaining > 0) { gateGP.trigger(gateRemaining * sampleTime); gateRemaining = 0; }
+		sfs::firePulse(gateGP, gateLen, ivl * sampleTime);
 	}
 
 	int rootCvMode = sfs::ROOT_CV_VOCT;
@@ -672,6 +693,7 @@ struct Muse : Module {
 		sfs::rootCvToJson(rootJ, rootCvMode);
 		json_object_set_new(rootJ, "running", json_boolean(running));
 		json_object_set_new(rootJ, "gateOnChangeOnly", json_boolean(gateOnChangeOnly));
+		json_object_set_new(rootJ, "gateLen", json_integer(gateLen));
 		json_object_set_new(rootJ, "randomScope", json_integer(randomScope));
 		json_object_set_new(rootJ, "linkingEnabled", json_boolean(linkingEnabled));
 		json_object_set_new(rootJ, "cvScaleMode", json_integer(cvScaleMode));
@@ -692,6 +714,8 @@ struct Muse : Module {
 			params[SCALE_PARAM].setValue((float)v);
 		}
 		if (json_t* j = json_object_get(rootJ, "gateOnChangeOnly")) gateOnChangeOnly = json_boolean_value(j);
+		if (json_t* j = json_object_get(rootJ, "gateLen"))
+			gateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
 		if (json_t* j = json_object_get(rootJ, "randomScope"))      randomScope = clamp((int)json_integer_value(j), 0, 2);
 		if (json_t* j = json_object_get(rootJ, "linkingEnabled"))   linkingEnabled = json_boolean_value(j);
 		if (json_t* j = json_object_get(rootJ, "cvScaleMode"))      cvScaleMode = clamp((int)json_integer_value(j), 0, 3);
@@ -1541,6 +1565,7 @@ struct MuseWidget : ModuleWidget {
 			[=]() { return module->gateOnChangeOnly; },
 			[=]() { module->gateOnChangeOnly = true; }
 		));
+		sfs::addPulseWidthMenu(menu, &module->gateLen, "Gate length (default 50% gate)", true);
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Randomize"));

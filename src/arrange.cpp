@@ -2,6 +2,7 @@
 #include "scales.hpp"
 #include "scale-bus.hpp"
 #include "panel-style.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 #include <cstring>
 
@@ -75,8 +76,22 @@ struct Arrange : Module {
 	bool started = false;
 
 	dsp::SchmittTrigger barTrig, clockTrig, resetTrigIn, resetTrigBtn;
-	dsp::PulseGenerator chBar[NUM_CHANNELS], chClk[NUM_CHANNELS], chRst[NUM_CHANNELS], chEoc[NUM_CHANNELS];
+	dsp::PulseGenerator chRst[NUM_CHANNELS], chEoc[NUM_CHANNELS];
+	// The channel CLOCK and BAR outs: sfs::GatePulse fires a trigger exactly as
+	// dsp::PulseGenerator does, so the default 1 ms is unchanged.
+	sfs::GatePulse chBar[NUM_CHANNELS], chClk[NUM_CHANNELS];
 	int clkCount[NUM_CHANNELS] = {};
+	// Gate length of the channel CLOCK outs and of the channel BAR outs (menu; saved
+	// as "clockGateLen" / "barGateLen"; default 0 = 1 ms). A share of the step is sized
+	// against the measured CLOCK input interval x the channel's division, and against
+	// the measured interval between BAR inputs.
+	int clockGateLen = 0, barGateLen = 0;
+	int sinceClock = -1, sinceBar = -1;             // samples since the last edge (-1 = none yet)
+	float clockPer = 0.f, barPer = 0.f;             // measured intervals, s (0 = not yet)
+	// CLOCK pulses since the last BAR, and in the last whole bar (0 = not yet known).
+	// The divisions restart on every BAR, so the last divided step of a bar can be
+	// shorter than the division: a ÷3 channel in 4/4 plays steps of 3 and 1 clocks.
+	int clocksInBar = 0, clocksPerBar = 0;
 
 	Arrange() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -137,6 +152,7 @@ struct Arrange : Module {
 	int  nextActive(int from) { for (int k = 1; k <= NUM_PHRASES; k++) { int j = (from + k) % NUM_PHRASES; if (active[j]) return j; } return from; }
 	void doReset() {
 		curPhrase = firstActive(); barInPhrase = 0; barsSinceReset = 0; started = false;
+		sinceBar = -1; clocksInBar = 0;   // a reset may restart the bar: do not measure across it
 		for (int c = 0; c < NUM_CHANNELS; c++) { clkCount[c] = 0; chRst[c].trigger(1e-3f); }
 	}
 
@@ -148,7 +164,14 @@ struct Arrange : Module {
 		// BAR edge — advances the arrangement (processed before CLOCK so a coincident
 		// downbeat clock lands on the freshly-reset division counters).
 		bool bar = barTrig.process(inputs[BAR_INPUT].getVoltage(), 0.1f, 1.f);
+		// Interval measurement for the gate lengths: from one edge to the next, so the
+		// first edge measures nothing, and a gap over 20 s is not counted as a tempo.
+		const int maxGap = (int)(args.sampleRate * 20.f);
+		if (sinceBar >= 0 && sinceBar < maxGap) sinceBar++;
+		if (sinceClock >= 0 && sinceClock < maxGap) sinceClock++;
 		if (bar) {
+			if (sinceBar > 0 && sinceBar < maxGap) { barPer = sinceBar * dt; clocksPerBar = clocksInBar; }
+			sinceBar = 0; clocksInBar = 0;
 			if (!started) { started = true; curPhrase = firstActive(); barInPhrase = 0; barsSinceReset = 1; }
 			else {
 				barsSinceReset++; barInPhrase++;
@@ -165,7 +188,7 @@ struct Arrange : Module {
 			}
 			for (int c = 0; c < NUM_CHANNELS; c++) {
 				clkCount[c] = 0;   // divisions re-align to the bar
-				if (chanOn[curPhrase][c]) chBar[c].trigger(1e-3f);
+				if (chanOn[curPhrase][c]) sfs::firePulse(chBar[c], barGateLen, barPer);
 			}
 		}
 
@@ -178,10 +201,19 @@ struct Arrange : Module {
 		// measure or two to click" bug. Counters still advance so a channel
 		// re-enabled mid-arrangement stays phase-locked.
 		if (clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f)) {
+			if (sinceClock > 0 && sinceClock < maxGap) clockPer = sinceClock * dt;
+			sinceClock = 0;
 			for (int c = 0; c < NUM_CHANNELS; c++) {
-				if (started && clkCount[c] % divOf(c) == 0 && chanOn[curPhrase][c]) chClk[c].trigger(1e-3f);
+				if (started && clkCount[c] % divOf(c) == 0 && chanOn[curPhrase][c]) {
+					// the step runs to this channel's next pulse: `div` clocks on, or the next BAR
+					int steps = divOf(c);
+					if (clocksPerBar > 0 && clocksPerBar - clkCount[c] > 0)
+						steps = std::min(steps, clocksPerBar - clkCount[c]);
+					sfs::firePulse(chClk[c], clockGateLen, clockPer * (float)steps);
+				}
 				clkCount[c]++;
 			}
+			clocksInBar++;
 		}
 
 		outputs[PHRASE_OUTPUT].setVoltage(clamp((float)curPhrase, 0.f, 10.f));
@@ -216,6 +248,8 @@ struct Arrange : Module {
 		json_object_set_new(root, "bars", ba);   json_object_set_new(root, "active", ac);
 		json_object_set_new(root, "chanOn", ch);
 		json_object_set_new(root, "editPhrase", json_integer(editPhrase));
+		json_object_set_new(root, "clockGateLen", json_integer(clockGateLen));
+		json_object_set_new(root, "barGateLen", json_integer(barGateLen));
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
@@ -223,6 +257,8 @@ struct Arrange : Module {
 		if (json_t* a = json_object_get(root, "active")) for (int i=0;i<NUM_PHRASES;i++) if (json_t* v=json_array_get(a,i)) active[i]=json_boolean_value(v);
 		if (json_t* a = json_object_get(root, "chanOn")) for (int i=0;i<NUM_PHRASES;i++) for (int c=0;c<NUM_CHANNELS;c++) if (json_t* v=json_array_get(a,i*NUM_CHANNELS+c)) chanOn[i][c]=json_boolean_value(v);
 		if (json_t* j = json_object_get(root, "editPhrase")) editPhrase = clamp((int)json_integer_value(j), 0, NUM_PHRASES - 1);
+		if (json_t* j = json_object_get(root, "clockGateLen")) clockGateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
+		if (json_t* j = json_object_get(root, "barGateLen")) barGateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
 	}
 };
 
@@ -523,6 +559,9 @@ struct ArrangeWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Trimpots = scale / root / BPM · LEDs link each row independently (linked = inherit)"));
 		menu->addChild(createMenuLabel("Grid = bars · colored bars = channel enables · dbl-click phrase = on/off"));
+		menu->addChild(new MenuSeparator);
+		sfs::addPulseWidthMenu(menu, &m->clockGateLen, "Channel CLOCK out length", true);
+		sfs::addPulseWidthMenu(menu, &m->barGateLen, "Channel BAR out length", true);
 	}
 };
 

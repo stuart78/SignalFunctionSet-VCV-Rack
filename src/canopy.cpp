@@ -13,6 +13,7 @@
 #include "plugin.hpp"
 #include "root-cv.hpp"
 #include "fastmath.hpp"
+#include "pulse-width.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
 #include "scale-bus.hpp"
@@ -561,7 +562,13 @@ struct Canopy : Module {
 	int   noteNext = 0;
 	float noteCv[16] = {};
 	int   noteOn[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-	dsp::PulseGenerator notePulse[16];
+	sfs::GatePulse notePulse[16];
+	// TRIG length (saved as "trigLen", index into CP_TRIG_SEC; 0 = 1 ms, as
+	// before the menu existed). The last entry holds the gate until that channel's
+	// next note. Any length but 1 ms is a gate: a note on a channel whose gate is
+	// still high takes it low for 1 ms and starts it again, so two notes stay two.
+	int   trigLen = 0;
+	bool  noteFiredNow[16] = {};   // a note already started this sample on that channel
 
 	// ── the leaves ───────────────────────────────────────────────────────
 	// The UI thread edits `leaf` and publishes it; the audio thread moves each
@@ -696,7 +703,7 @@ struct Canopy : Module {
 		configOutput(L_OUTPUT, "Mix left");
 		configOutput(R_OUTPUT, "Mix right");
 		configOutput(CV_OUTPUT, "Pitch of each note struck (1V/oct, held until the next; channels set in the menu)");
-		configOutput(TRIG_OUTPUT, "Trigger on each note struck (1 ms)");
+		configOutput(TRIG_OUTPUT, "Trigger on each note struck (length in the menu, 1 ms by default)");
 		buildShape();
 		buildForms();
 		rng ^= random::u32() | 1u;
@@ -1020,7 +1027,12 @@ struct Canopy : Module {
 		if (c < 0) { c = noteNext % n; noteNext = (c + 1) % n; }
 		noteCv[c] = noteVolts(t);
 		noteOn[c] = t;
-		notePulse[c].trigger(1e-3f);
+		static const float CP_TRIG_SEC[5] = {1e-3f, 0.01f, 0.05f, 0.25f, 1e9f};
+		const int li = clamp(trigLen, 0, 4);
+		// a second note on this channel in the same sample only extends it, or the
+		// gate would go low for 1 ms at the very sample it started
+		notePulse[c].trigger(CP_TRIG_SEC[li], li > 0 && !noteFiredNow[c]);
+		noteFiredNow[c] = true;
 	}
 	// A string is fixed at both ends, so harmonic n moves as sin(n pi xi) along it:
 	// a hit at the middle gives only the odd harmonics, one near an end all of them.
@@ -3066,6 +3078,7 @@ struct Canopy : Module {
 				outputs[CV_OUTPUT].setVoltage(noteCv[c], c);
 				outputs[TRIG_OUTPUT].setVoltage(notePulse[c].process(args.sampleTime) ? 10.f : 0.f, c);
 			}
+			for (int c = 0; c < 16; c++) noteFiredNow[c] = false;
 		}
 		if (nT <= 16) {
 			outputs[POLY_OUTPUT].setChannels(nT);
@@ -3106,6 +3119,7 @@ struct Canopy : Module {
 		json_object_set_new(r, "camTilt", json_real(camTilt));
 		json_object_set_new(r, "noteChans", json_integer(noteChans));
 		json_object_set_new(r, "noteMode", json_integer(noteMode));
+		json_object_set_new(r, "trigLen", json_integer(trigLen));
 		json_t* a = json_array();
 		for (int i = 0; i < CP_MAXLEAVES; i++) {
 			const CanopyLeaf& P = leaf[i];
@@ -3127,6 +3141,7 @@ struct Canopy : Module {
 		if (json_t* j = json_object_get(r, "camTilt")) camTilt = clamp((float)json_real_value(j), 0.15f, 1.4f);
 		if (json_t* j = json_object_get(r, "noteChans")) noteChans = clamp((int)json_integer_value(j), 1, 16);
 		if (json_t* j = json_object_get(r, "noteMode")) noteMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "trigLen")) trigLen = clamp((int)json_integer_value(j), 0, 4);
 		if (json_t* a = json_object_get(r, "leaves")) {
 			int n = std::min((int)json_array_size(a), CP_MAXLEAVES);
 			for (int i = 0; i < n; i++) {
@@ -4602,6 +4617,9 @@ struct CanopyWidget : ModuleWidget {
 		}
 		menu->addChild(createIndexPtrSubmenuItem("CV/TRIG note to channel",
 			{"Rotate: each note to the next channel", "Reuse: a note struck again goes to its own channel"}, &m->noteMode));
+		menu->addChild(createIndexPtrSubmenuItem("TRIG length",
+			{"1 ms (default)", "10 ms", "50 ms", "250 ms",
+			 "Until the next note on that channel (low for 1 ms before it)"}, &m->trigLen));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Drag a leaf to move it. Shift-drag to change its height. Drag an end to tilt it."));
 		menu->addChild(createMenuLabel("Drag empty space to turn the view."));

@@ -882,7 +882,9 @@ A narrow clock. Set a tempo (or patch a clock) and a number of STEPS, and each o
 **Inputs:** BPM CV, Steps CV, Clock, Reset.
 **Outputs:** Six gates.
 
-**Context menu:** Gate length (a gate of half the pulse by default, or a 5 ms trigger), reset when RUN starts, per-output rotation and offset.
+**GATE trimpots:** one per output, its gate as a share of that output's own pulse, 50% by default; fully left is a trigger, fully right the whole pulse less 1 ms.
+
+**Context menu:** trigger width for a GATE trimpot fully left (1, 2, 5 or 10 ms; 5 ms by default), reset when RUN starts, per-output rotation and offset.
 
 #### Beat
 
@@ -1048,14 +1050,14 @@ Up to four cycles drive on a grid. Each moves one cell per step and leaves a tra
 - **NOTES** sets how a cycle's moves become pitch: each turn adds an interval, every cell adds one, turns step up and down the scale, or the pitch comes from the cycle's column, row, the room left around it, or its distance from the nearest other cycle. All of it is quantized to ROOT and SCALE (Key's scale bus works), within RANGE octaves.
 - **Grid shapes:** square, hex or triangle cells, at 32 to 96 columns (menu). On a hex grid with the fifth and major third interval set, the notes lie out as a Tonnetz.
 - **TRAIL** sets how long a trail is, from 4 cells to no limit. After a crash the trail is removed and the cycle starts again at a free cell.
-- **SCORE** counts cells driven, plus 50 for every other cycle that crashes into your trail, at 0.01 V a point.
+- **SCORE** counts cells driven, plus 50 for every other cycle that crashes into your trail, at 0.01 V a point. A crash sets it back to 0 V (menu: or count every life since RESET).
 - **RATE** from 0.5 to 32 steps a second, or one step per CLOCK pulse. Right-click a cycle's name on the screen to give it its own speed, every 1 to 4 steps.
 
 **Controls:** Rate, Trail, Range, Reset, Root, Scale, Notes, and per cycle On and Style.
 **Inputs:** Clock, Reset, Rate, Trail, Range, Root, Scale, Notes, and per cycle Style and Turn.
 **Outputs:** per cycle V/OCT, Gate, Crash, Score.
 
-**Context menu:** ROOT CV, grid shape, grid size, edges (solid or open), how soon a cycle starts again after a crash, whether SCORE wraps or holds above 10 V, the interval for each heading, gate and crash length, 3D or flat view.
+**Context menu:** ROOT CV, grid shape, grid size, edges (solid or open), how soon a cycle starts again after a crash, whether SCORE counts one life or every life, whether SCORE wraps or holds above 10 V, the interval for each heading, gate and crash length (half a step by default; a trigger, 10% to 100% of the step, or GATE held until the next note), 3D or flat view.
 
 #### Fugue
 

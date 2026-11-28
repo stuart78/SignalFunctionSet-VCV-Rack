@@ -98,7 +98,11 @@ mode from its CV). It applies to all four cycles.
 
 GATE also fires each time a cycle starts a new life. A gate that is still high
 goes low for 1 ms first, so a voice sees a new note. Gate and crash length is
-half a step by default, or a 5 ms trigger (menu).
+half a step by default (menu): a 5 ms trigger, half a step, a whole step (it
+ends 1 ms before the next step, so a gate on every step still goes low between
+them), or until the next note. Until the next note holds GATE high until the
+cycle's next note, which re-strikes through the same 1 ms low, and lets it go
+when the cycle crashes or is switched off; CRASH lasts a whole step there.
 
 **Turns and Every cell** count semitones. The interval for each heading is set
 in the menu; the default is the one Wake was designed with, north +12, south
@@ -142,8 +146,12 @@ pitch in Turns, but the turns still fire GATE.
 
 A cycle scores one point for every cell it moves, and 50 points each time
 another cycle crashes into its trail. A crash into a wall, into its own trail,
-or head-on scores nothing. SCORE is 0.01 V per point. By default it goes back
-to 0 V after 10 V and counts up again (menu: or stays at 10 V). The screen
+or head-on scores nothing. SCORE is 0.01 V per point. By default it counts the
+current life: a crash sets it to 0 and it counts up again from the next start.
+The menu can instead count every life since RESET, which is how a patch saved
+before the option loads, since the score used to run across crashes and rose
+too high to use as a CV. It goes back to 0 V after 10 V and counts up again
+(menu: or stays at 10 V). The screen
 shows each score as a number. RESET, or the menu's "Clear the arena and the
 scores", sets every score to 0. Scores are saved with the patch.
 

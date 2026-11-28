@@ -99,6 +99,7 @@ DARK = {
     "garamut": "garamut",
     "battery": "battery",
     "wake": "wake",
+    "diapason": "diapason",
     "concrete": "concrete",
     "concretein": "concretein",
     "touch": "touch",

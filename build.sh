@@ -124,11 +124,16 @@ echo -e "${GREEN}=== Building $PLATFORM / $BUILD_TARGET ===${NC}\n"
 mkdir -p "$BACKUP_DIR"
 cp "$MAKEFILE" "$BACKUP_DIR/Makefile.bak"
 cp "$PLUGIN_JSON" "$BACKUP_DIR/plugin.json.bak"
+# Presets name their plugin, and Rack refuses one whose plugin is not the one
+# loading it, so the dev build (slug SignalFunctionSet-dev) renames it in them
+# too, and they are put back afterwards.
+[ -d presets ] && cp -R presets "$BACKUP_DIR/presets.bak"
 
 cleanup() {
     echo -e "\n${YELLOW}Restoring original files...${NC}"
     mv "$BACKUP_DIR/Makefile.bak" "$MAKEFILE"
     mv "$BACKUP_DIR/plugin.json.bak" "$PLUGIN_JSON"
+    if [ -d "$BACKUP_DIR/presets.bak" ]; then rm -rf presets; mv "$BACKUP_DIR/presets.bak" presets; fi
     rmdir "$BACKUP_DIR" 2>/dev/null || true
     echo -e "${GREEN}Files restored${NC}"
 }
@@ -165,6 +170,10 @@ if [ "$BUILD_TARGET" = "dev" ]; then
     # "hidden": true in the source plugin.json (prod keeps the flags).
     sed -i.tmp 's/"hidden": *true/"hidden": false/g' "$PLUGIN_JSON"
     rm -f "${PLUGIN_JSON}.tmp"
+    if [ -d presets ]; then
+        find presets -name '*.vcvm' -exec sed -i.tmp 's/"plugin": *"SignalFunctionSet"/"plugin": "SignalFunctionSet-dev"/' {} +
+        find presets -name '*.vcvm.tmp' -delete
+    fi
 else
     sed -i.tmp 's/"slug": *"\([^"]*\)-dev"/"slug": "\1"/g' "$PLUGIN_JSON"
     sed -i.tmp 's/"name": *"\([^"]*\) (Dev)"/"name": "\1"/g' "$PLUGIN_JSON"

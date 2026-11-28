@@ -5,6 +5,7 @@
 #include "scales.hpp"
 #include "chance-markov.hpp"
 #include "sfs_lut.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 // ─── Chance — a garden of forking paths ──────────────────────────────────────
@@ -116,6 +117,29 @@ struct ChanceDisplay : OpaqueWidget {
 	Vec   dragPos;             // last press position (for onDoubleClick)
 };
 
+// ─── Gate length ────────────────────────────────────────────────────────────
+// GATE knob v (0..1) -> gate length as a share of the clock period.
+//   v <= 0.9:  share = 0.05 + 0.9 v          (the old mapping, unchanged: 5% .. 86%)
+//   v >  0.9:  share = 0.86 + 1.4 (v - 0.9)  (the top tenth now reaches 100%, where the
+//              old mapping stopped at 95%)
+// At a share of 100% the gate is the whole step less 1 ms (sfs::GATE_GAP_SEC), so
+// consecutive gates are separated by 1 ms low. Above 95% the gate never runs closer than
+// 1 ms to the next step.
+static inline float chanceGateFrac(float v) {
+	v = clamp(v, 0.f, 1.f);
+	// (written as rack::math::rescale computed it, so the old range is bit-identical)
+	return v <= 0.9f ? 0.05f + v * (0.95f - 0.05f) : 0.86f + 1.4f * (v - 0.9f);
+}
+static inline float chanceGateKnob(float frac) {
+	frac = clamp(frac, 0.05f, 1.f);
+	return frac <= 0.86f ? (frac - 0.05f) / 0.9f : 0.9f + (frac - 0.86f) / 1.4f;
+}
+// Shows the gate length as a share of the step, not the knob position.
+struct ChanceGateQuantity : ParamQuantity {
+	float getDisplayValue() override { return chanceGateFrac(getValue()) * 100.f; }
+	void setDisplayValue(float d) override { setValue(chanceGateKnob(d / 100.f)); }
+};
+
 // ─── Module ──────────────────────────────────────────────────────────────────
 struct Chance : Module {
 	enum ParamId {
@@ -182,6 +206,10 @@ struct Chance : Module {
 	// STYLE, which a Scala file has no opinion about.
 	sfs::BusScale scale;
 	float curGateFrac = 0.5f;
+	// A gate fired while the last one is still high goes low for this long first
+	// (only above the old 95% ceiling: below it the gates merge, as they always did).
+	float gapTimer = 0.f, pendGate = 0.f;
+	float lowFor = 1.f;   // how long the gate has been low, s
 
 	// per node-index (so the display aligns with the columns)
 	int  coreNote[NUM_NODES] = {};   // stable seeded skeleton
@@ -235,7 +263,8 @@ struct Chance : Module {
 		configParam(GRAVITY_PARAM, -1.f, 1.f, 0.f, "Gravity (down to up)");
 		configParam(DRIFT_PARAM, 0.f, 1.f, 0.3f, "Drift (move size)", "%", 0.f, 100.f);
 		configParam(BRANCH_PARAM, 0.f, 1.f, 0.25f, "Branch (chance of leaving the core melody)", "%", 0.f, 100.f);
-		configParam(GATE_PARAM, 0.f, 1.f, 0.5f, "Gate length", "%", 0.f, 100.f);
+		configParam<ChanceGateQuantity>(GATE_PARAM, 0.f, 1.f, 0.5f, "Gate length", "% of the step");
+		getParamQuantity(GATE_PARAM)->description = "At 100% the gate stays high until 1 ms before the next step";
 		configParam(RESTS_PARAM, 0.f, 1.f, 0.f, "Odd-note rests", "%", 0.f, 100.f);
 		configParam(EVEN_REST_PARAM, 0.f, 1.f, 0.f, "Even-note rests", "%", 0.f, 100.f);
 		configParam(OCTAVE_PARAM, 0.f, 1.f, 0.f, "Octave leaps", "%", 0.f, 100.f);
@@ -455,20 +484,46 @@ struct Chance : Module {
 		ratchetLeft = 0;
 		if (pathTie[curNodeIdx]) {
 			// tie: keep the gate high through the whole step, no retrigger (legato hold)
-			gateOpen = true; gateTimer = clockPeriod + std::max(0.001f, curGateFrac * clockPeriod);
+			openGate(clockPeriod + gateLen(clockPeriod), true);
 		} else if (!pathRest[curNodeIdx]) {
 			int rat = pathRatchet[curNodeIdx];
 			if (rat > 1) {
 				// Ratchet: rat evenly-spaced bursts across the step, each an independent gate
 				// (same pitch) — a rapid retrigger contained within this step's time.
 				ratchetSlot = clockPeriod / (float)rat;
-				ratchetGate = std::max(0.001f, curGateFrac * ratchetSlot);
-				gateOpen = true; gateTimer = ratchetGate;
+				ratchetGate = gateLen(ratchetSlot);
+				openGate(ratchetGate, false);
 				ratchetNext = ratchetSlot; ratchetLeft = rat - 1;
 			} else {
-				gateOpen = true; gateTimer = std::max(0.001f, curGateFrac * clockPeriod);
+				openGate(gateLen(clockPeriod), false);
 			}
 		}
+	}
+
+	// Gate length for a step (or ratchet slot) `per` seconds long. Up to a share of
+	// 95% (every knob position the old mapping could reach) this is the old formula
+	// exactly; above it the gate ends at least 1 ms before the next step.
+	float gateLen(float per) const {
+		float g = curGateFrac * per;
+		if (curGateFrac > 0.95f) g = std::min(g, per - sfs::GATE_GAP_SEC);
+		return std::max(0.001f, g);
+	}
+	// Open the gate for `len` seconds from now. Above a 95% share, a new note arriving
+	// while the last gate is still high (a faster clock, or the note after a tie) takes
+	// the gate low for 1 ms first so it is heard as a new note; the gate after the gap
+	// is that much shorter, so it still ends where it would have (1 ms before the next
+	// step) and the step after it does not need a gap too. A note arriving less than
+	// 1 ms after the last gate fell (a clock speeding up) waits out the rest of the
+	// 1 ms the same way. A tie never does this. (sfs::GatePulse does the same.)
+	void openGate(float len, bool tie) {
+		if (gapTimer > 0.f) { pendGate = std::max(pendGate, len - gapTimer); return; }
+		if (!tie && curGateFrac > 0.95f && (gateOpen || lowFor < sfs::GATE_GAP_SEC)) {
+			gapTimer = gateOpen ? sfs::GATE_GAP_SEC : sfs::GATE_GAP_SEC - lowFor;
+			gateOpen = false;
+			pendGate = std::max(0.001f, len - gapTimer);
+			return;
+		}
+		gateOpen = true; gateTimer = len;
 	}
 
 	void onClock() {
@@ -501,7 +556,7 @@ struct Chance : Module {
 		int rootKnob = (int)std::round(params[ROOT_PARAM].getValue());
 		int rootCv = inputs[ROOT_CV_INPUT].isConnected() ? (int)std::round(sfs::rootCvSemis(inputs[ROOT_CV_INPUT].getVoltage(), rootCvMode)) : 0;
 		curRoot = ((rootKnob + rootCv) % 12 + 12) % 12;
-		curGateFrac = rescale(clamp(params[GATE_PARAM].getValue(), 0.f, 1.f), 0.f, 1.f, 0.05f, 0.95f);
+		curGateFrac = chanceGateFrac(params[GATE_PARAM].getValue());
 
 		// A step's gate was toggled on-screen — recompute now so it takes effect immediately
 		// rather than at the next cycle. Every decision is seeded, so this is deterministic:
@@ -522,7 +577,7 @@ struct Chance : Module {
 		    || resetTrigIn.process(inputs[RESET_INPUT].getVoltage())) {
 			curStep = 0; started = false; nodeClocksRemaining = 1;
 			playPat = firstActivePattern(); curRepeat = 1;
-			ratchetLeft = 0; gateOpen = false;
+			ratchetLeft = 0; gateOpen = false; gapTimer = 0.f;
 		}
 
 		// External clock only — Chance advances a step per rising edge of CLOCK.
@@ -540,11 +595,16 @@ struct Chance : Module {
 
 		if (clk) onClock();
 		if (gateOpen) { gateTimer -= dt; if (gateTimer <= 0.f) gateOpen = false; }
+		else if (gapTimer > 0.f) {
+			gapTimer -= dt;
+			if (gapTimer <= 0.f) { gapTimer = 0.f; gateOpen = true; gateTimer = pendGate; }
+		}
+		lowFor = (gateOpen || gapTimer > 0.f) ? 0.f : lowFor + dt;
 		// Ratchet: retrigger the same note at each sub-slot until the burst is spent.
 		if (ratchetLeft > 0) {
 			ratchetNext -= dt;
 			if (ratchetNext <= 0.f) {
-				gateOpen = true; gateTimer = ratchetGate;
+				openGate(ratchetGate, false);
 				ratchetNext += ratchetSlot; ratchetLeft--;
 			}
 		}

@@ -25,7 +25,12 @@ struct MeterX : Module {
 		LIGHTS_LEN
 	};
 
-	dsp::PulseGenerator ppqnPulse, barPulse[8];
+	dsp::PulseGenerator ppqnPulse;
+	// The bar outputs can be gates as long as their step. GatePulse goes low for
+	// 1 ms before a gate fired while the last is still high, so a 100% gate
+	// still gives each bar its own rising edge.
+	sfs::GatePulse barPulse[8];
+	float sinceBar[8] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f, 1.f};   // seconds since each fired
 	float flash[10] = {};          // LED flash: [0]=ppqn, [1]=run(unused), [2..9]=bars
 	float barPos = 0.f;            // continuous bars-since-reset (drives the cycle pies)
 	int pulseWidthIdx = 0;         // encoder-safe pulse width (index into sfs::PULSE_WIDTHS)
@@ -65,10 +70,17 @@ struct MeterX : Module {
 		static const int NB[8] = {1, 2, 4, 8, 16, 32, 64, 128};
 		for (int k = 0; k < 8; k++) {
 			if (msg.bar[k]) {
-				barPulse[k].trigger(sfs::pulseWidthSec(pulseWidthIdx, msg.barSec * NB[k]));
+				float per = msg.barSec * NB[k];
+				// A second bar flag within 1 ms is the same downbeat (a reset and
+				// the downbeat it owes), so it lengthens the pulse rather than
+				// opening a gap in it.
+				if (sinceBar[k] < sfs::GATE_GAP_SEC) barPulse[k].trigger(sfs::pulseWidthSec(pulseWidthIdx, per));
+				else sfs::firePulse(barPulse[k], pulseWidthIdx, per);
+				sinceBar[k] = 0.f;
 				flash[2 + k] = 1.f;
 			}
 			outputs[BAR_OUTPUT + k].setVoltage(barPulse[k].process(dt) ? 10.f : 0.f);
+			sinceBar[k] += dt;
 			flash[2 + k] = std::max(0.f, flash[2 + k] - decay);
 			lights[BAR_LIGHT + k].setBrightness(flash[2 + k]);
 		}

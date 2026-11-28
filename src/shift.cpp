@@ -1,5 +1,6 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 
 
@@ -93,6 +94,15 @@ struct Shift : Module {
 	// gateOpen[i] is armed on the lane's firing (divided) clock and closes when
 	// that input clock pulse falls, so the gate width == the input clock width.
 	bool  gateOpen[NUM_OUTS] = {false, false, false, false};
+	// Gate length (menu, saved as "gateLen"): GATE_AS_CLOCK (the default) passes the
+	// input clock's own pulse through as above; 0..sfs::NUM_PULSE_WIDTHS-1 is the shared
+	// list, a share of the step sized against the measured input clock interval x the
+	// lane's division.
+	enum { GATE_AS_CLOCK = -1 };
+	int   gateLen = GATE_AS_CLOCK;
+	sfs::GatePulse gatePulse[NUM_OUTS];
+	int   sinceClock = -1;                       // samples since the last clock (-1 = none yet)
+	float clockPer = 0.f;                        // measured input clock interval, s
 	float jumbleHeld = 0.f;
 	float jumbleLedFlash = 0.f;
 
@@ -233,6 +243,15 @@ struct Shift : Module {
 		// --- Clock processing ---
 		bool clockRose = clockTrigger.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
 		bool clockHigh = clockTrigger.isHigh();   // for clock-shape passthrough
+		{
+			// interval between clock edges; the first edge measures nothing, a gap over 20 s is ignored
+			const int maxGap = (int)(args.sampleRate * 20.f);
+			if (sinceClock >= 0 && sinceClock < maxGap) sinceClock++;
+			if (clockRose) {
+				if (sinceClock > 0 && sinceClock < maxGap) clockPer = sinceClock * args.sampleTime;
+				sinceClock = 0;
+			}
+		}
 		bool tickFired[NUM_OUTS] = {false, false, false, false};
 		bool cvConnected = inputs[CV_INPUT].isConnected();
 		float inCV = inputs[CV_INPUT].getVoltage();
@@ -335,7 +354,13 @@ struct Shift : Module {
 			if (!clockHigh) gateOpen[i] = false;   // close with the input clock pulse
 			lights[LIGHT_A + i].setBrightness(ledFlash[i]);
 			outputs[OUT_A + i].setVoltage(held[i]);
-			outputs[GATE_A + i].setVoltage((gateOpen[i] && clockHigh) ? 10.f : 0.f);
+			bool g;
+			if (gateLen == GATE_AS_CLOCK) { g = gateOpen[i] && clockHigh; gatePulse[i].reset(); }
+			else {
+				if (laneTick[i]) sfs::firePulse(gatePulse[i], gateLen, clockPer * (float)laneDiv[i]);
+				g = gatePulse[i].process(args.sampleTime);
+			}
+			outputs[GATE_A + i].setVoltage(g ? 10.f : 0.f);
 		}
 
 		// --- Jumble: re-roll on each input clock pulse, picking a random
@@ -398,10 +423,13 @@ struct Shift : Module {
 		json_object_set_new(root, "historyWriteIdx", histWJ);
 		json_object_set_new(root, "historyReadIdx",  histRJ);
 		json_object_set_new(root, "jumble", json_real(jumbleHeld));
+		json_object_set_new(root, "gateLen", json_integer(gateLen));
 		return root;
 	}
 
 	void dataFromJson(json_t* root) override {
+		if (json_t* j = json_object_get(root, "gateLen"))
+			gateLen = clamp((int)json_integer_value(j), (int)GATE_AS_CLOCK, sfs::NUM_PULSE_WIDTHS - 1);
 		if (json_t* j = json_object_get(root, "held")) {
 			for (int i = 0; i < NUM_OUTS && i < (int)json_array_size(j); i++) {
 				held[i] = (float)json_number_value(json_array_get(j, i));
@@ -569,6 +597,26 @@ struct ShiftWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Clear all", "",
 			[m]() { m->clearAll(); }));
+		menu->addChild(new MenuSeparator);
+		// The shared list, with the input clock's own pulse (the original behaviour) first.
+		int* idx = &m->gateLen;
+		menu->addChild(createSubmenuItem("Gate A-D length",
+			*idx == Shift::GATE_AS_CLOCK ? "Input clock's pulse" : *idx == 0 ? "1 ms" : sfs::PULSE_WIDTH_LABELS[clamp(*idx, 0, sfs::NUM_PULSE_WIDTHS - 1)],
+			[idx](Menu* sub) {
+				sub->addChild(createCheckMenuItem("As long as the input clock's pulse (default)", "",
+					[idx]() { return *idx == Shift::GATE_AS_CLOCK; },
+					[idx]() { *idx = Shift::GATE_AS_CLOCK; }));
+				sub->addChild(new MenuSeparator);
+				for (int k = 0; k < sfs::NUM_PULSE_WIDTHS; k++) {
+					int i = sfs::PULSE_MENU_ORDER[k];
+					if (k == sfs::NUM_FIXED_WIDTHS)
+						sub->addChild(createMenuLabel("Gate, as a share of the lane's step"));
+					// index 0 is not the default here, so drop the list's own "(default)"
+					sub->addChild(createCheckMenuItem(i == 0 ? "1 ms" : sfs::PULSE_WIDTH_LABELS[i], "",
+						[idx, i]() { return *idx == i; },
+						[idx, i]() { *idx = i; }));
+				}
+			}));
 	}
 };
 

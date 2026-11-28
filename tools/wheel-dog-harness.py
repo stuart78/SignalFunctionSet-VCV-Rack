@@ -95,7 +95,7 @@ struct Rig {
   int coups=4, coupSlot=0; unsigned char coupMask=0xFF;
   bool coupIn=false; float dogK=0.35f;
   int fires=0; int fireSlot[64]; int nfire=0;
-  struct { void trigger(float){} } coupPulse;
+  void fireCoup(){}   // the COUP output pulse; the harness counts strokes, not volts
 
 %(ripple)s
 

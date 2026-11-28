@@ -14,6 +14,7 @@
 #include "fastmath.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
+#include "pulse-width.hpp"
 #include "dr_wav.h"
 #include <osdialog.h>
 #include <algorithm>
@@ -468,7 +469,13 @@ struct Strata : Module {
 	float gp[3] = {0.f, 0.f, 0.f};                // where the glide is
 	float gv[3] = {0.f, 0.f, 0.f};                // time mode: per-axis velocity
 	dsp::SchmittTrigger clockTrig, resetTrig;
-	dsp::PulseGenerator stepPulse;
+	// STEP out. sfs::GatePulse fires a trigger exactly as dsp::PulseGenerator does, so
+	// the default (stepLen 0 = 1 ms) is unchanged. stepLen is the menu's choice, saved as
+	// "stepLen"; a share of the step is sized against the measured CLOCK interval.
+	sfs::GatePulse stepPulse;
+	int stepLen = 0;
+	int sinceClock = -1;                       // samples since the last CLOCK (-1 = none yet)
+	float clockPer = 0.f;                      // measured CLOCK interval, s
 
 	struct Voice {
 		double phase = 0.0;
@@ -879,10 +886,20 @@ struct Strata : Module {
 			gp[0] = steps[0].x; gp[1] = steps[0].y; gp[2] = steps[0].z;
 			stepPulse.trigger(1e-3f);
 		}
-		if (clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f) && nSteps > 0) {
+		bool clkEdge = clockTrig.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
+		{
+			// interval between CLOCK edges; the first edge measures nothing, a gap over 20 s is ignored
+			const int maxGap = (int)(args.sampleRate * 20.f);
+			if (sinceClock >= 0 && sinceClock < maxGap) sinceClock++;
+			if (clkEdge) {
+				if (sinceClock > 0 && sinceClock < maxGap) clockPer = sinceClock * args.sampleTime;
+				sinceClock = 0;
+			}
+		}
+		if (clkEdge && nSteps > 0) {
 			cur = (cur + 1) % nSteps;
 			aimGlide(spc);
-			stepPulse.trigger(1e-3f);
+			sfs::firePulse(stepPulse, stepLen, clockPer);
 		}
 		if (seqOn) stepGlide(args.sampleTime, spc);
 		float sx = seqOn ? gp[0] : 0.f, sy = seqOn ? gp[1] : 0.f, sz = seqOn ? gp[2] : 0.f;
@@ -1286,12 +1303,14 @@ struct Strata : Module {
 		}
 		json_object_set_new(r, "listeners", li);
 		json_object_set_new(r, "shuffleSeed", json_integer((json_int_t)shufSeed));
+		json_object_set_new(r, "stepLen", json_integer(stepLen));
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
 		auto i = [&](const char* k, int& v, int lo, int hi) { if (json_t* j = json_object_get(r, k)) v = clamp((int)json_integer_value(j), lo, hi); };
 		auto b = [&](const char* k, bool& v) { if (json_t* j = json_object_get(r, k)) v = json_boolean_value(j); };
 		i("glideMode", glideMode, 0, 1); i("pathMode", pathMode, 0, 1);
+		i("stepLen", stepLen, 0, sfs::NUM_PULSE_WIDTHS - 1);
 		i("wrapX", wrap[0], 0, 1); i("wrapY", wrap[1], 0, 1); i("wrapZ", wrap[2], 0, 1);
 		b("normalize", conform.normalize); b("removeDC", conform.removeDC); b("align", conform.align); b("squareUp", squareUp);
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_real_value(j);
@@ -2014,6 +2033,7 @@ struct StrataWidget : ModuleWidget {
 		menu->addChild(createMenuItem("Clear the waypoints", "", [=]() { m->nSteps = 0; m->cur = 0; }, m->nSteps == 0));
 		menu->addChild(createIndexPtrSubmenuItem("Glide", {"Rate (a long move takes longer)", "Time (every move the same)"}, &m->glideMode));
 		menu->addChild(createIndexPtrSubmenuItem("Path", {"Straight through the volume", "Along the grid"}, &m->pathMode));
+		sfs::addPulseWidthMenu(menu, &m->stepLen, "STEP out length", true);
 		menu->addChild(createMenuLabel("Edges"));
 		menu->addChild(createIndexPtrSubmenuItem("X", {"Clamp", "Wrap"}, &m->wrap[0]));
 		menu->addChild(createIndexPtrSubmenuItem("Y", {"Clamp", "Wrap"}, &m->wrap[1]));

@@ -1,6 +1,7 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
 #include "fastmath.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 #include <vector>
 #include <deque>
@@ -257,8 +258,11 @@ struct Gravity : Module {
 	float  gpPrevPhi[MAX_BALLS]   = {};
 	int    gpLastBucket[MAX_BALLS] = {};
 	bool   gpInit[MAX_BALLS] = {};
-	float gateTimer[NUM_SECTORS] = {};
-	float anyTimer = 0.f, oddTimer = 0.f, evenTimer = 0.f, newTimer = 0.f;
+	// Gates: one per ray, then ANY / ODD / EVEN / NEW. A crossing while a
+	// gate is still high takes it low for 1 ms and starts it again (a 1 ms
+	// trigger only extends), so two crossings stay two notes.
+	sfs::GatePulse gatePulse[NUM_SECTORS];
+	sfs::GatePulse anyPulse, oddPulse, evenPulse, newPulse;
 	int   lastRayFired = -1;      // for NEW: the previous crossing, whenever it was
 	float sectorOut[NUM_SECTORS] = {};
 	// 0 = morph: a sector speaks only while the point is inside its wedge.
@@ -273,7 +277,17 @@ struct Gravity : Module {
 	float dispGateFlash[NUM_SECTORS] = {};
 
 	// --- Options (context menu, persisted) ---
-	float gateHoldSec = 0.06f;       // retriggerable gate hold time
+	float gateHoldSec = 0.06f;       // gate length per crossing
+	// Held high until the next crossing on that output, then low for 1 ms
+	// before the new gate. A separate key, so an older patch, which has no
+	// such key, keeps the length in gateHoldSec.
+	bool gateUntilNext = false;
+	// How long a gate is high, and whether a crossing during it restarts it.
+	float gateLenSec() const { return gateUntilNext ? 1e9f : gateHoldSec; }
+	// Only "until the next crossing" restarts with a 1 ms low. A timed hold is
+	// extended by a crossing that arrives while it is high, as it always was, so
+	// a patch saved before the option is unchanged.
+	bool gateRestarts() const { return gateUntilNext; }
 	int trailLength = 90;            // trail ring-buffer length (frames); 0 = off
 
 	Gravity() {
@@ -555,6 +569,11 @@ struct Gravity : Module {
 
 		// Ray-cross gates: every gate point fires the ray it crosses. Each point
 		// keeps its own continuous-angle tracker so crossings never alias.
+		// Which gates fired this sample: several crossings in one sample are one
+		// event per output, or the second would read as a retrigger and take the
+		// gate low for 1 ms at once.
+		bool rayFired[NUM_SECTORS] = {};
+		bool anyF = false, oddF = false, evenF = false, newF = false;
 		for (int p = 0; p < gatePtCount && p < MAX_BALLS; p++) {
 			float pphi = std::atan2(gatePtX[p], gatePtY[p]);
 			if (!gpInit[p]) {
@@ -571,33 +590,42 @@ struct Gravity : Module {
 				for (int b = gpLastBucket[p]; b != bucket; b += dir) {
 					int boundary = (dir > 0) ? (b + 1) : b;
 					int ray = ((boundary % NUM_SECTORS) + NUM_SECTORS) % NUM_SECTORS;
-					gateTimer[ray] = gateHoldSec;
+					rayFired[ray] = true;
 					dispGateFlash[ray] = 1.f;
-					anyTimer = gateHoldSec;
+					anyF = true;
 					// ray index 0 is ray "1" at 0 degrees, so index parity is flipped
-					((ray % 2 == 0) ? oddTimer : evenTimer) = gateHoldSec;
-					if (ray != lastRayFired) newTimer = gateHoldSec;
+					((ray % 2 == 0) ? oddF : evenF) = true;
+					if (ray != lastRayFired) newF = true;
 					lastRayFired = ray;
 				}
 				gpLastBucket[p] = bucket;
 			}
 		}
 
+		// One sample short, because the old timers were counted down in the
+		// sample that set them: a timed gate is high for exactly as many samples
+		// as it was before the GatePulse.
+		const float glen = gateUntilNext ? gateLenSec() : gateHoldSec - args.sampleTime;
+		const bool grst = gateRestarts();
+		for (int i = 0; i < NUM_SECTORS; i++)
+			if (rayFired[i]) gatePulse[i].trigger(glen, grst);
+		if (anyF) anyPulse.trigger(glen, grst);
+		if (oddF) oddPulse.trigger(glen, grst);
+		if (evenF) evenPulse.trigger(glen, grst);
+		if (newF) newPulse.trigger(glen, grst);
+
 		for (int i = 0; i < NUM_SECTORS; i++) {
-			if (gateTimer[i] > 0.f) gateTimer[i] -= args.sampleTime;
-			bool gateHigh = gateTimer[i] > 0.f;
+			bool gateHigh = gatePulse[i].process(args.sampleTime);
 			outputs[GATE_OUTPUT + i].setVoltage(gateHigh ? 10.f : 0.f);
 			// Gate LED: simply on while the gate is high.
 			lights[GATE_LIGHT + i].setBrightness(gateHigh ? 1.f : 0.f);
 			if (dispGateFlash[i] > 0.f) dispGateFlash[i] -= args.sampleTime * 6.f;
 		}
 		{
-			float* t[4] = {&anyTimer, &oddTimer, &evenTimer, &newTimer};
+			sfs::GatePulse* t[4] = {&anyPulse, &oddPulse, &evenPulse, &newPulse};
 			const int o[4] = {ANY_GATE_OUTPUT, ODD_GATE_OUTPUT, EVEN_GATE_OUTPUT, NEW_GATE_OUTPUT};
-			for (int i = 0; i < 4; i++) {
-				if (*t[i] > 0.f) *t[i] -= args.sampleTime;
-				outputs[o[i]].setVoltage(*t[i] > 0.f ? 10.f : 0.f);
-			}
+			for (int i = 0; i < 4; i++)
+				outputs[o[i]].setVoltage(t[i]->process(args.sampleTime) ? 10.f : 0.f);
 		}
 	}
 
@@ -1252,6 +1280,7 @@ struct Gravity : Module {
 		json_object_set_new(root, "w1", json_real(w1));
 		json_object_set_new(root, "w2", json_real(w2));
 		json_object_set_new(root, "gateHoldSec", json_real(gateHoldSec));
+		json_object_set_new(root, "gateUntilNext", json_boolean(gateUntilNext));
 		json_object_set_new(root, "sectorMode", json_integer(sectorMode));
 		json_object_set_new(root, "trailLength", json_integer(trailLength));
 		json_object_set_new(root, "mode", json_integer(mode));
@@ -1266,6 +1295,7 @@ struct Gravity : Module {
 		if (json_t* j = json_object_get(root, "w1")) w1 = json_number_value(j);
 		if (json_t* j = json_object_get(root, "w2")) w2 = json_number_value(j);
 		if (json_t* j = json_object_get(root, "gateHoldSec")) gateHoldSec = json_number_value(j);
+		if (json_t* j = json_object_get(root, "gateUntilNext")) gateUntilNext = json_boolean_value(j);
 		if (json_t* j = json_object_get(root, "sectorMode")) sectorMode = clamp((int) json_integer_value(j), 0, 1);
 		if (json_t* j = json_object_get(root, "trailLength")) trailLength = (int) json_integer_value(j);
 		if (json_t* j = json_object_get(root, "mode")) {
@@ -2111,15 +2141,19 @@ struct GravityWidget : ModuleWidget {
 			[=](int i) { module->sectorMode = clamp(i, 0, 1); }));
 
 		menu->addChild(new MenuSeparator);
-		menu->addChild(createMenuLabel("Gate hold"));
+		menu->addChild(createMenuLabel("Gate length"));
 		struct HoldOpt { const char* name; float sec; };
-		static const HoldOpt holds[3] = {{"Tight (30ms)", 0.03f}, {"Medium (60ms)", 0.06f}, {"Gluey (120ms)", 0.12f}};
-		for (int i = 0; i < 3; i++) {
+		static const HoldOpt holds[6] = {{"1 ms trigger", 0.001f}, {"30 ms", 0.03f},
+			{"60 ms (default)", 0.06f}, {"120 ms", 0.12f}, {"250 ms", 0.25f}, {"500 ms", 0.5f}};
+		for (int i = 0; i < 6; i++) {
 			float sec = holds[i].sec;
 			menu->addChild(createCheckMenuItem(holds[i].name, "",
-				[=]() { return std::abs(module->gateHoldSec - sec) < 1e-4f; },
-				[=]() { module->gateHoldSec = sec; }));
+				[=]() { return !module->gateUntilNext && std::abs(module->gateHoldSec - sec) < 1e-4f; },
+				[=]() { module->gateHoldSec = sec; module->gateUntilNext = false; }));
 		}
+		menu->addChild(createCheckMenuItem("Until the next crossing (low for 1 ms before it)", "",
+			[=]() { return module->gateUntilNext; },
+			[=]() { module->gateUntilNext = true; }));
 
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Trail length"));

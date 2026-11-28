@@ -272,7 +272,7 @@ int main() {
 		for (int i = 0; i < 4; i++) { r.tick(); got[i] = r.hits[0]; }
 		check(got[0] == 1 && got[1] == 3 && got[2] == 4 && got[3] == 1,
 		      string::f("ratchets 1 3 4 1 inside their steps: %d %d %d %d", got[0], got[1], got[2], got[3]));
-		r.m.gateMode = 0;
+		r.m.gateLen = 2;
 		for (int i = 0; i < 4; i++) { r.tick(); got[i] = r.hits[0]; }
 		check(got[1] == 3 && got[2] == 4, "and with 5 ms triggers");
 

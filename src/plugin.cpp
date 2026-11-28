@@ -68,6 +68,7 @@ void init(Plugin* p) {
 	p->addModel(modelGaramut);
 	p->addModel(modelBattery);
 	p->addModel(modelWake);
+	p->addModel(modelDiapason);
 
 	// Add modules here
 	// p->addModel(modelMyModule);

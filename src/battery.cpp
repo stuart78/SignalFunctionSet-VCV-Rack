@@ -29,6 +29,7 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -285,7 +286,11 @@ struct Battery : Module {
 	float barWait = 0.f;         // a BAR that came before its clock waits this long for it
 
 	// menu, saved
-	int gateMode = 1;            // 0: 5 ms trigger, 1: half the step
+	// Gate length, an index into sfs::PULSE_WIDTHS (src/pulse-width.hpp): a
+	// fixed width, or a share of the hit's own step (the lane's step divided
+	// by its ratchet count). Saved as "gateLen"; a patch from before it has
+	// "gateMode" (0 = 5 ms trigger, 1 = half the step), read as index 2 / PW_50.
+	int gateLen = sfs::PW_50;
 	bool resetOnRun = false;
 	bool switchNow = false;      // a new pattern takes over on the next step, lanes keep their positions
 
@@ -510,12 +515,14 @@ struct Battery : Module {
 		Run& r = run[l];
 		if (muted(l)) return;
 		int c = l + 8 * r.side;
-		float g = 0.005f;
-		if (gateMode == 1) {
+		float g;
+		if (sfs::pulseIsDuty(gateLen)) {
 			const BtLane& ln = pat[cur].lane[l];
 			float stepSec = periodValid ? (float)period / BT_RATE[clamp(ln.div, 0, BT_NDIV - 1)] : 0.02f;
-			g = std::max(0.002f, 0.5f * stepSec / r.ratch);
+			// (the 2 ms floor is what "half the step" always had)
+			g = std::max(0.002f, sfs::pulseWidthSec(gateLen, stepSec / r.ratch));
 		}
+		else g = sfs::pulseWidthSec(gateLen);
 		// a hit on a channel still high goes low for a millisecond first
 		if (gatePulse[c].remaining > 0.f) { gatePulse[c].reset(); gapT[c] = 0.001f; gapLen[c] = g; }
 		else gatePulse[c].trigger(g);
@@ -738,7 +745,7 @@ struct Battery : Module {
 		json_object_set_new(r, "locked", json_boolean(locked));
 		json_object_set_new(r, "cur", json_integer(cur));
 		json_object_set_new(r, "nextCount", json_integer(nextCount));
-		json_object_set_new(r, "gateMode", json_integer(gateMode));
+		json_object_set_new(r, "gateLen", json_integer(gateLen));
 		json_object_set_new(r, "resetOnRun", json_boolean(resetOnRun));
 		json_object_set_new(r, "switchNow", json_boolean(switchNow));
 		json_object_set_new(r, "editPattern", json_integer(editPattern));
@@ -797,7 +804,8 @@ struct Battery : Module {
 		if (json_t* j = json_object_get(r, "locked")) locked = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "cur")) cur = clamp((int)json_integer_value(j), 0, BT_P - 1);
 		if (json_t* j = json_object_get(r, "nextCount")) nextCount = (int)json_integer_value(j);
-		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "gateLen")) gateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
+		else if (json_t* j = json_object_get(r, "gateMode")) gateLen = json_integer_value(j) == 0 ? 2 : sfs::PW_50;
 		if (json_t* j = json_object_get(r, "resetOnRun")) resetOnRun = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "switchNow")) switchNow = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "editPattern")) editPattern = clamp((int)json_integer_value(j), 0, BT_P - 1);
@@ -1438,7 +1446,7 @@ struct BatteryWidget : ModuleWidget {
 				}
 			}
 		}));
-		menu->addChild(createIndexPtrSubmenuItem("Gate length", {"Trigger (5 ms)", "Half a step"}, &m->gateMode));
+		sfs::addPulseWidthMenu(menu, &m->gateLen, "Gate length", true);
 		menu->addChild(createIndexSubmenuItem("When a new pattern starts",
 			{"At the next BAR (or the end of the longest lane), every lane from step 1",
 			 "On the next step, every lane keeping its position"},

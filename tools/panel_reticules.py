@@ -504,6 +504,8 @@ PLATES = {
     # EOC and the output grid
     "battery": [(104.14, 82.55, 63.5, 44.45)],
     "wake": [(93.98, 73.66, 41.91, 50.8)],
+    # the two outputs at the foot
+    "diapason": [(171.45, 110.49, 26.67, 16.51)],
     "canon": [],
     "brigade": [(41.0, 100.33, 39.0, 16.17)],
     # only the MIX pair. The per-tape outs are interleaved with their inputs so
@@ -561,6 +563,7 @@ MODULES = {
     "garamut": ("Garamut", "src/garamut.cpp", "res/garamut.svg", {}),
     "battery": ("Battery", "src/battery.cpp", "res/battery.svg", {}),
     "wake": ("Wake", "src/wake.cpp", "res/wake.svg", {}),
+    "diapason": ("Diapason", "src/diapason.cpp", "res/diapason.svg", {}),
     "drift":   ("Drift",   "src/quadlfo.cpp", "res/drift.svg",   {}),
     # the legacy panels, redrawn in code for dark panels (2026-11)
     "gsx": ("Gsx", "src/gsx.cpp", "res/gsx.svg", {}),
@@ -590,7 +593,7 @@ MODULES = {
 }
 
 # Panels drawn on the faceplate, with no screen, so the tool does not fill a slab.
-NO_SCREEN_SLAB = {"wheel", "flock", "carillon", "canopy", "garamut"}
+NO_SCREEN_SLAB = {"wheel", "flock", "carillon", "canopy", "garamut", "diapason"}
 
 # Panels whose ART is now the specification: the designer has drawn them, their
 # screens and plates are flattened into the export, and regenerating over one

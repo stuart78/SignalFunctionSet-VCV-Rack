@@ -530,10 +530,16 @@ struct Fill : Module {
 	float clkMeasure = 0.f, clkInterval = 0.f;      // samples since last CLOCK / between CLOCKs
 	float swDelay[FILL_NCH] = {};                   // countdown to a delayed (swung) hit; 0 = none
 	float pendVel[FILL_NCH] = {}; bool pendAcc[FILL_NCH] = {}; int pendRat[FILL_NCH] = {};
+	float pendPer[FILL_NCH] = {};                   // a delayed hit's time to the next grid step, in samples
 	int   ratLeft[FILL_NCH] = {}; float ratPeriod[FILL_NCH] = {}, ratTimer[FILL_NCH] = {};
 
 	dsp::SchmittTrigger clockTrig, barTrig, resetTrig, reseedTrig;
-	dsp::PulseGenerator gatePulse[FILL_NCH], accPulse[FILL_NCH];
+	// GatePulse: a gate fired while the last is still high goes low for 1 ms
+	// first, so 100% gates on consecutive steps stay separate hits. With a
+	// fixed width it behaves exactly as dsp::PulseGenerator.
+	sfs::GatePulse gatePulse[FILL_NCH], accPulse[FILL_NCH];
+	float sinceGate[FILL_NCH], sinceAcc[FILL_NCH];   // seconds since each last fired
+	float sampleTimeC = 1.f / 48000.f;               // for turning step samples into seconds
 	float velHold[FILL_NCH] = {};
 	int pulseWidthIdx = 0;
 	int screenTab = 0;                        // 0 = active pattern · 1..4 = Genre / Region / User / Favs browser
@@ -571,6 +577,7 @@ struct Fill : Module {
 
 	Fill() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+		for (int c = 0; c < FILL_NCH; c++) sinceGate[c] = sinceAcc[c] = 1.f;
 		configParam(ACCUM_PARAM, 0.f, 1.f, 0.2f, "Accumulate (pressure built per bar)", "%", 0.f, 100.f);
 		configParam(DISCHARGE_PARAM, 0.f, 1.f, 0.5f, "Discharge (pressure vented per fill)", "%", 0.f, 100.f);
 		configParam(TIER_PARAM, -2.f, 2.f, 0.f, "Tier offset (0 = follow pressure)");
@@ -956,20 +963,37 @@ struct Fill : Module {
 		return clkInterval * (float)clocksPerBar / std::max(1, curStepsPerBar);
 	}
 
+	// Fire one gate or accent for a step `periodSec` long (0 = not known, which
+	// falls a share-of-the-step setting back to 1 ms). A second fire within
+	// 1 ms of the last is the same hit arriving twice, so it lengthens the
+	// pulse rather than opening a gap in it.
+	void fireGate(sfs::GatePulse& g, float& since, float periodSec) {
+		if (since < sfs::GATE_GAP_SEC) g.trigger(sfs::pulseWidthSec(pulseWidthIdx, periodSec));
+		else sfs::firePulse(g, pulseWidthIdx, periodSec);
+		since = 0.f;
+	}
+
 	// Fire a hit now: gate + vel + accent, and arm the ratchet burst if the step asks.
-	void fireHit(int c, float v, bool acc, int rat) {
-		float pw = sfs::pulseWidthSec(pulseWidthIdx);
-		gatePulse[c].trigger(pw);
-		velHold[c] = v;
-		if (acc) accPulse[c].trigger(pw);
+	// `perSamples` is the time from this hit to the next step on the grid (see
+	// fireStep()); a gate set as a share of the step is a share of that, or of
+	// one ratchet's spacing when the step ratchets. The accent spans the step.
+	void fireHit(int c, float v, bool acc, int rat, float perSamples) {
 		float sd = stepDurSamples();
-		if (rat > 1 && sd > 8.f) { ratLeft[c] = rat - 1; ratPeriod[c] = sd / rat; ratTimer[c] = ratPeriod[c]; }
+		bool ratchet = rat > 1 && sd > 8.f;
+		float perSec = perSamples * sampleTimeC;
+		fireGate(gatePulse[c], sinceGate[c], ratchet ? sd / rat * sampleTimeC : perSec);
+		velHold[c] = v;
+		if (acc) fireGate(accPulse[c], sinceAcc[c], perSec);
+		if (ratchet) { ratLeft[c] = rat - 1; ratPeriod[c] = sd / rat; ratTimer[c] = ratPeriod[c]; }
 	}
 
 	void fireStep(int gstep) {
 		if (gstep < 0 || gstep >= curSteps) return;
 		int stepInBar = gstep % std::max(1, curStepsPerBar);
 		bool offbeat = (stepInBar % 2) == 1 && (curSpb % 3) != 0;   // triplet grids don't swing
+		// The step after this one is a swung off-beat (and lands late) when this
+		// is an on-beat that is not the last step of the bar.
+		bool nextOff = (stepInBar % 2) == 0 && (curSpb % 3) != 0 && stepInBar + 1 < curStepsPerBar;
 		float sd = stepDurSamples();
 		for (int c = 0; c < FILL_NCH; c++) {
 			float v = curVel[c][gstep];
@@ -979,9 +1003,18 @@ struct Fill : Module {
 			// feel) plus this channel's trimpot, as a fraction of the step PAIR. Off-beats
 			// fire late via the scheduler; on-beats always land on the grid.
 			float sw = clamp(curPatSwing / 6.f + params[SWING_PARAM + c].getValue(), 0.f, 0.5f);
-			float delay = (offbeat && sw > 0.005f && sd > 8.f) ? std::min(sw * 2.f * sd, sd * 0.95f) : 0.f;
-			if (delay < 1.f) fireHit(c, v, curAcc[c][gstep], curRat[c][gstep]);
-			else { swDelay[c] = delay; pendVel[c] = v; pendAcc[c] = curAcc[c][gstep]; pendRat[c] = curRat[c][gstep]; }
+			float swDel = (sw > 0.005f && sd > 8.f) ? std::min(sw * 2.f * sd, sd * 0.95f) : 0.f;
+			float delay = offbeat ? swDel : 0.f;
+			// A share of the step is a share of the time to the NEXT step on the
+			// grid: an off-beat that lands late has that much less of its step
+			// left, and the on-beat before a late off-beat has that much more.
+			// Measured with swing 0.25 at 50%, a late hit given the whole step
+			// ended on the sample the next on-beat fired and the two merged.
+			float per = sd;
+			if (delay >= 1.f) per = sd - delay;
+			else if (nextOff && swDel >= 1.f) per = sd + swDel;
+			if (delay < 1.f) fireHit(c, v, curAcc[c][gstep], curRat[c][gstep], per);
+			else { swDelay[c] = delay; pendVel[c] = v; pendAcc[c] = curAcc[c][gstep]; pendRat[c] = curRat[c][gstep]; pendPer[c] = per; }
 		}
 	}
 
@@ -989,6 +1022,7 @@ struct Fill : Module {
 		std::unique_lock<std::mutex> lk(libMutex, std::try_to_lock);
 		if (!lk.owns_lock()) return;         // library rebuild in flight (rare, user import)
 		float dt = args.sampleTime;
+		sampleTimeC = dt;
 		if (resetTrig.process(inputs[RESET_INPUT].getVoltage(), 0.1f, 1.f)) onReset();
 		if (resetBtnTrig.process(params[RESET_PARAM].getValue())) onReset();
 		// Button or jack, either fires it -- the panel puts them side by side and
@@ -1035,11 +1069,14 @@ struct Fill : Module {
 		for (int c = 0; c < FILL_NCH; c++) {
 			if (swDelay[c] > 0.f) {
 				swDelay[c] -= 1.f;
-				if (swDelay[c] <= 0.f) { swDelay[c] = 0.f; fireHit(c, pendVel[c], pendAcc[c], pendRat[c]); }
+				if (swDelay[c] <= 0.f) { swDelay[c] = 0.f; fireHit(c, pendVel[c], pendAcc[c], pendRat[c], pendPer[c]); }
 			}
 			if (ratLeft[c] > 0) {
 				ratTimer[c] -= 1.f;
-				if (ratTimer[c] <= 0.f) { gatePulse[c].trigger(sfs::pulseWidthSec(pulseWidthIdx)); ratTimer[c] += ratPeriod[c]; ratLeft[c]--; }
+				if (ratTimer[c] <= 0.f) {
+					fireGate(gatePulse[c], sinceGate[c], ratPeriod[c] * dt);
+					ratTimer[c] += ratPeriod[c]; ratLeft[c]--;
+				}
 			}
 		}
 
@@ -1047,6 +1084,8 @@ struct Fill : Module {
 			outputs[GATE_OUTPUT + c].setVoltage(gatePulse[c].process(dt) ? 10.f : 0.f);
 			outputs[VEL_OUTPUT + c].setVoltage(velHold[c] * 10.f);
 			outputs[ACC_OUTPUT + c].setVoltage(accPulse[c].process(dt) ? 10.f : 0.f);
+			sinceGate[c] += dt;
+			sinceAcc[c] += dt;
 		}
 		outputs[FILL_OUTPUT].setVoltage(fillActive ? 10.f : 0.f);
 		outputs[SET_OUTPUT].setVoltage(clamp((float)curSet, 0.f, 10.f));   // 1V per set
@@ -1793,7 +1832,9 @@ struct FillWidget : ModuleWidget {
 			{"Even thirds", "Main-heavy (stays basic longer)", "Slow build"}, &module->tierBalance));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Outputs"));
-		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx);
+		// true == offer gates as a share of the step: the step is measured from
+		// CLOCK (see stepDurSamples()).
+		sfs::addPulseWidthMenu(menu, &module->pulseWidthIdx, "Gate/trigger width", true);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuItem("Open user patterns folder", "", []() {
 			std::string dir = asset::user("SignalFunctionSet/patterns");

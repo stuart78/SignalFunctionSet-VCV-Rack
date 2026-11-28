@@ -1677,6 +1677,45 @@ int main(int argc, char** argv) {
 		r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 2); r.run(0.01f);
 		check(own, "Reuse: tongue 3 struck again goes back to channel 1");
 	}
+	printf("TRIG length\n");
+	{
+		// how many samples TRIG channel 0 stays high after GATE channel 3 strikes,
+		// and, struck again `againSec` later, how long it goes low before rising
+		auto measure = [](int len, float againSec, int& hi1, int& gap, int& hi2) {
+			Run r;
+			r.m->trigLen = len;
+			r.m->inputs[Canopy::GATE_INPUT].channels = 16; r.run(0.01f);
+			auto on = [&]() { return r.m->outputs[Canopy::TRIG_OUTPUT].getVoltage(0) > 5.f; };
+			auto strikeNow = [&]() {
+				r.m->inputs[Canopy::GATE_INPUT].setVoltage(10.f, 3); r.tick();
+				r.m->inputs[Canopy::GATE_INPUT].setVoltage(0.f, 3);
+			};
+			hi1 = gap = hi2 = 0;
+			strikeNow();
+			int againN = (int)(againSec * SR), i = 1;
+			bool wasOn = on(); if (wasOn) hi1++;
+			for (; i < againN; i++) { r.tick(); if (on()) hi1++; }
+			if (againN > 0) {
+				strikeNow();
+				int k = 0;
+				while (!on() && k < 10000) { gap++; r.tick(); k++; }
+				while (on() && k < 200000) { hi2++; r.tick(); k++; }
+			}
+		};
+		// (timed lengths within a sample: the countdown is in float)
+		int h1, g, h2;
+		measure(0, 0.5f, h1, g, h2);
+		check(h1 == 48 && g == 0 && h2 == 48, string::f("1 ms (default): high %d samples, again %d", h1, h2));
+		measure(1, 0.5f, h1, g, h2);
+		check(std::abs(h1 - 480) <= 1, string::f("10 ms: high %d samples", h1));
+		measure(3, 0.5f, h1, g, h2);
+		check(std::abs(h1 - 12000) <= 1, string::f("250 ms: high %d samples", h1));
+		measure(2, 0.02f, h1, g, h2);
+		// the 1 ms low is part of the new gate, so it is 50 ms from the strike to its end
+		check(g >= 47 && g <= 49 && std::abs(h2 - 2352) <= 1, string::f("50 ms struck again after 20 ms: low %d samples, then high %d", g, h2));
+		measure(4, 2.f, h1, g, h2);
+		check(h1 == (int)(2.f * SR) && g >= 47 && g <= 49, string::f("until the next note: high all %d samples, then low %d before the next", h1, g));
+	}
 	// rain on every instrument: every trigger is a note it can play, and fires with a hit
 	for (int inst = 0; inst <= 8; inst++) {
 		Run r(false);

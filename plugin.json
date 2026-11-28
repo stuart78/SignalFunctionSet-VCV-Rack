@@ -705,6 +705,16 @@
         "Random",
         "Visual"
       ]
+    },
+    {
+      "slug": "Diapason",
+      "name": "Diapason",
+      "description": "Pipe organ in three divisions, Great, Swell and Pedal, each with its own polyphonic input, stops and wind.",
+      "tags": [
+        "Synth voice",
+        "Polyphonic"
+      ],
+      "hidden": true
     }
   ]
 }

@@ -30,6 +30,7 @@
 #include "plugin.hpp"
 #include "root-cv.hpp"
 #include "fastmath.hpp"
+#include "pulse-width.hpp"
 #include "panel-style.hpp"
 #include "scales.hpp"
 #include "scale-bus.hpp"
@@ -306,7 +307,17 @@ struct Wheel : Module {
 	// made the pattern look like it was sliding round the circle. A slot lights
 	// when it buzzes, and only then.
 	float  slotFlash[WH_MAXCOUPS] = {};
-	dsp::PulseGenerator coupPulse;
+	sfs::GatePulse coupPulse;
+	// COUP length: an index into sfs::PULSE_WIDTHS (saved as "gateLen"; 0 = the
+	// 1 ms trigger it always was). The shares of the step are shares of one stroke
+	// slot of the turn; a stroke the dog or the pattern leaves out leaves a gap.
+	int gateLen = 0;
+	// The crank speed wanders, so a stroke can land just after a 100% gate fell;
+	// GatePulse still keeps the output low for the full 1 ms then.
+	void fireCoup() {
+		float slotSec = 1.f / std::max(1e-3f, (float)coups * speedBase);
+		sfs::firePulse(coupPulse, gateLen, slotSec);
+	}
 	dsp::SchmittTrigger coupTrig, clockTrig;
 
 	// external clock: one revolution per pulse
@@ -422,7 +433,7 @@ struct Wheel : Module {
 		configOutput(RIGHT_OUTPUT, "Right");
 		configOutput(POLY_OUTPUT,  "Voices (6ch poly, 6 = trompette)");
 		configOutput(WHEEL_OUTPUT, "Wheel ripple CV");
-		configOutput(COUP_OUTPUT,  "Coup trigger");
+		configOutput(COUP_OUTPUT,  "Coup trigger (length in the menu, 1 ms by default)");
 
 		// Fixed per-voice shapes: a position round the wheel and a detune
 		// direction. Not random per instance -- two Wheels set the same way
@@ -623,7 +634,7 @@ struct Wheel : Module {
 			// began with a soft edge instead of a strike. That is most of what
 			// made the timing feel unreliable rather than merely varied.
 			clickEnv = buzzEnv;
-			coupPulse.trigger(1e-3f);
+			fireCoup();
 			dogFlash = 1.f;
 			slotFlash[clamp(coupSlot, 0, WH_MAXCOUPS - 1)] = 1.f;
 		}
@@ -812,7 +823,10 @@ struct Wheel : Module {
 		for (int v = 0; v < WH_V; v++)
 			outputs[POLY_OUTPUT].setVoltage(sfs::softClip(polyV[v]), v);
 		outputs[WHEEL_OUTPUT].setVoltage(clamp(rippleAt(wheelPhase) * 5.f, -10.f, 10.f));
-		outputs[COUP_OUTPUT].setVoltage(coupPulse.process(dt) ? 10.f : 0.f);
+		{
+			bool coupHigh = coupPulse.process(dt);
+			outputs[COUP_OUTPUT].setVoltage(coupHigh ? 10.f : 0.f);
+		}
 		lights[COUP_LIGHT].setBrightnessSmooth(dogFlash, args.sampleTime);
 	}
 
@@ -823,12 +837,14 @@ struct Wheel : Module {
 		sfs::rootCvToJson(root, rootCvMode);
 		json_object_set_new(root, "coupMask", json_integer(coupMask));
 		json_object_set_new(root, "envToPress", json_boolean(envToPress));
+		json_object_set_new(root, "gateLen", json_integer(gateLen));
 		return root;
 	}
 	void dataFromJson(json_t* root) override {
 		sfs::rootCvFromJson(root, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(root, "coupMask")) coupMask = (uint8_t)json_integer_value(j);
 		if (json_t* j = json_object_get(root, "envToPress")) envToPress = json_boolean_value(j);
+		if (json_t* j = json_object_get(root, "gateLen")) gateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
 	}
 };
 
@@ -1450,6 +1466,8 @@ struct WheelWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createBoolPtrMenuItem("Gate presses the string", "", &m->envToPress));
 		menu->addChild(createMenuLabel("  (off: the gate is a plain VCA)"));
+		menu->addChild(new MenuSeparator);
+		sfs::addPulseWidthMenu(menu, &m->gateLen, "COUP length (a step is one stroke slot of the turn)", true);
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Gate press time"));
 		struct Sl : ui::Slider { Sl(Quantity* q) { quantity = q; box.size.x = 200.f; } };

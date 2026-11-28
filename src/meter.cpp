@@ -125,7 +125,13 @@ struct Meter : Module {
 	bool hasPendingChange = false;
 
 	// --- Pulse generators ---
-	dsp::PulseGenerator pulses[NUM_OUTPUTS];
+	// GatePulse rather than dsp::PulseGenerator so a 100% gate fired while the
+	// last one is still high goes low for 1 ms first: consecutive steps stay
+	// separate notes. With a fixed width it behaves exactly as PulseGenerator.
+	sfs::GatePulse pulses[NUM_OUTPUTS];
+	// Seconds since each output last fired (swung set, then grid set).
+	float sinceFire[NUM_OUTPUTS] = {1.f, 1.f, 1.f, 1.f, 1.f, 1.f};
+	float sinceFireGrid[5] = {1.f, 1.f, 1.f, 1.f, 1.f};
 
 	// --- Triggers ---
 	dsp::PulseGenerator resetOutPulse;
@@ -254,7 +260,17 @@ struct Meter : Module {
 	// 5 entries for the swingable subdivisions: Q, E, S, QT, ET (no BAR
 	// straight — BAR has no swing, so BAR_OUTPUT is already on the grid).
 	float samplesSinceGrid[5] = { 0.f, 0.f, 0.f, 0.f, 0.f };
-	dsp::PulseGenerator pulses_grid[5];
+	sfs::GatePulse pulses_grid[5];
+
+	// Fire one subdivision output for a step `periodSec` long. A second fire
+	// within 1 ms of the last is the same beat arriving twice (the bar wrap
+	// fires the grid set on the sample the grid accumulator has usually just
+	// fired it), so it lengthens the pulse instead of opening a gap in it.
+	void fireGate(sfs::GatePulse& g, float& since, float periodSec) {
+		if (since < sfs::GATE_GAP_SEC) g.trigger(sfs::pulseWidthSec(pulseWidthIdx, periodSec));
+		else sfs::firePulse(g, pulseWidthIdx, periodSec);
+		since = 0.f;
+	}
 
 	// Cached samplesPerQuarter from previous process call. When BPM changes,
 	// every accumulator gets scaled by (new / old) so the *phase fraction*
@@ -443,8 +459,11 @@ struct Meter : Module {
 		sixteenthCount = 0;
 		for (int i = 0; i < 5; i++) samplesSinceGrid[i] = 0.f;
 		for (int i = 0; i < NUM_OUTPUTS; i++) {
-			pulses[i].trigger(sfs::pulseWidthSec(pulseWidthIdx,
-			                                     basePeriods[i] * sampleTime));
+			// The step after a downbeat is pulse 1, an off-beat, so under swing
+			// it is longer or shorter than the base period; a share of the step
+			// has to be a share of that one (BAR has no swing).
+			fireGate(pulses[i], sinceFire[i],
+			         swingAdjustedPeriod(0, basePeriods[i], activeSwing[i]) * sampleTime);
 			pulseFlashIdx[i] = 0;
 			pulseInBar[i] = 1;
 			pulseFlash[i] = 1.f;
@@ -455,8 +474,7 @@ struct Meter : Module {
 			basePeriods[SUB_ETRIP]
 		};
 		for (int i = 0; i < 5; i++) {
-			pulses_grid[i].trigger(sfs::pulseWidthSec(pulseWidthIdx,
-			                                          gridBase[i] * sampleTime));
+			fireGate(pulses_grid[i], sinceFireGrid[i], gridBase[i] * sampleTime);
 		}
 		displayedSixteenth = 0;
 		msgBar = true;
@@ -927,8 +945,7 @@ struct Meter : Module {
 		for (int i = 0; i < 5; i++) {
 			if (samplesSinceGrid[i] >= gridBase[i]) {
 				samplesSinceGrid[i] -= gridBase[i];
-				pulses_grid[i].trigger(sfs::pulseWidthSec(pulseWidthIdx,
-					gridBase[i] * args.sampleTime));
+				fireGate(pulses_grid[i], sinceFireGrid[i], gridBase[i] * args.sampleTime);
 			}
 		}
 
@@ -951,8 +968,7 @@ struct Meter : Module {
 		// gate scaled from the long interval would still be high when the short
 		// one ended.
 		auto firePulse = [&](int outIdx, float nextPeriod) {
-			pulses[outIdx].trigger(sfs::pulseWidthSec(pulseWidthIdx,
-			                                          nextPeriod * args.sampleTime));
+			fireGate(pulses[outIdx], sinceFire[outIdx], nextPeriod * args.sampleTime);
 			if (outIdx == SUB_BAR) msgBar = true;   // notify the expander
 			pulseFlashIdx[outIdx] = pulseInBar[outIdx];
 			pulseInBar[outIdx]++;
@@ -1033,8 +1049,7 @@ struct Meter : Module {
 				// the downbeat straight pulses, mirroring the swung set).
 				for (int i = 0; i < 5; i++) {
 					samplesSinceGrid[i] = 0.f;
-					pulses_grid[i].trigger(sfs::pulseWidthSec(pulseWidthIdx,
-						gridBase[i] * args.sampleTime));
+					fireGate(pulses_grid[i], sinceFireGrid[i], gridBase[i] * args.sampleTime);
 				}
 				// Commit pending swing → active for the new bar. Doing it
 				// only on bar boundaries prevents mid-period accumulator
@@ -1049,6 +1064,7 @@ struct Meter : Module {
 		// --- Emit swung gate outputs ---
 		for (int i = 0; i < NUM_OUTPUTS; i++) {
 			bool pulseHigh = pulses[i].process(args.sampleTime);
+			sinceFire[i] += args.sampleTime;
 			outputs[BAR_OUTPUT + i].setVoltage(pulseHigh ? 10.f : 0.f);
 		}
 
@@ -1062,6 +1078,7 @@ struct Meter : Module {
 		};
 		for (int i = 0; i < 5; i++) {
 			bool hi = pulses_grid[i].process(args.sampleTime);
+			sinceFireGrid[i] += args.sampleTime;
 			outputs[gridOutIds[i]].setVoltage(hi ? 10.f : 0.f);
 		}
 

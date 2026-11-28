@@ -24,6 +24,7 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
+#include "pulse-width.hpp"
 #include "root-cv.hpp"
 #include "scale-bus.hpp"
 #include <atomic>
@@ -141,6 +142,7 @@ struct WkGate {
 		if (high > 0 || gap > 0) { gap = gapLen; pend = len; high = 0; }
 		else high = len;
 	}
+	void release() { high = gap = pend = 0; }
 	float out() {
 		if (gap > 0) { if (--gap == 0) high = pend; return 0.f; }
 		if (high > 0) { high--; return 10.f; }
@@ -214,12 +216,19 @@ struct Wake : Module {
 	// settings (menu)
 	bool wrapEdges = false;
 	int respawnDelay = 2;              // steps
-	int gateMode = 1;                  // 0 trigger, 1 half a step
+	// Gate length, an index into sfs::PULSE_WIDTHS (src/pulse-width.hpp): a
+	// fixed width or a share of the cycle's step. holdNote instead holds GATE
+	// until the next note. Saved as "gateLen" and "holdNote"; a patch from
+	// before them has "gateMode" (0 = 5 ms trigger, 1 = half a step, 2 = a
+	// whole step, 3 = until the next note), read as 2 / PW_50 / PW_100 / holdNote.
+	int gateLen = sfs::PW_50;
+	bool holdNote = false;
 	int ivIdx = 0;
 	int view = 1;                      // the screen: 0 flat, 1 3D
 	float camYaw = 0.f, camElev = WK_ELEV0;   // the 3D camera, dragged on the screen
 	int rootCvMode = sfs::ROOT_CV_VOCT;
 	bool scoreWrap = true;
+	bool scoreLife = true;             // SCORE counts one life and goes to 0 at a crash (off in a patch from before)
 
 	// timing
 	double tSec = 0.0;
@@ -681,10 +690,16 @@ struct Wake : Module {
 	}
 
 	// ---------------------------------------------------------------- a life
+	// A whole step ends 1 ms before the next one, so a gate on every step still
+	// goes low between them. Until the next note holds GATE until it fires
+	// again (or the cycle crashes or is switched off); CRASH lasts a whole step.
 	void fire(WkGate& g, int c) {
 		float stepSec = period * cyc[c].div;
-		float len = gateMode == 0 ? 0.005f : std::max(0.001f, 0.5f * stepSec);
-		g.fire(std::max(1, (int)(len * sr)), std::max(1, (int)(0.001f * sr)));
+		int gapN = std::max(1, (int)(0.001f * sr));
+		bool isGate = &g == &cyc[c].gate;
+		if (holdNote && isGate) { g.fire(1 << 30, gapN); return; }
+		float len = sfs::pulseWidthSec(holdNote ? sfs::PW_100 : gateLen, stepSec);
+		g.fire(std::max(1, (int)(std::max(0.001f, len) * sr)), gapN);
 	}
 	// Puts cycle c at (x, y) heading d, as a new life. Used by spawn() and the harness.
 	void place(int c, int x, int y, int d) {
@@ -826,6 +841,8 @@ struct Wake : Module {
 		k.alive = false;
 		k.wait = respawnDelay;
 		k.crashes++;
+		if (scoreLife) k.score = 0;
+		if (holdNote) k.gate.release();
 		fire(k.crashGate, c);
 		if (k.killer >= 0 && k.killer != c) { cyc[k.killer].score += WK_KILL; cyc[k.killer].kills++; }
 	}
@@ -921,7 +938,7 @@ struct Wake : Module {
 			curStyle[c] = clamp((int)std::round(params[STYLE_PARAM + c].getValue()
 			                    + inputs[STYLE_INPUT + c].getVoltage()), 0, WK_NSTYLE - 1);
 			bool on = params[ON_PARAM + c].getValue() > 0.5f;
-			if (!on && k.on) { dropTrail(c, true); k.alive = false; }
+			if (!on && k.on) { dropTrail(c, true); k.alive = false; if (holdNote) k.gate.release(); }
 			if (on && !k.on) k.wait = 0;
 			k.on = on;
 			if (k.turnTrig.process(inputs[TURN_INPUT + c].getVoltage(), 0.1f, 1.f)) k.forceTurn = true;
@@ -960,7 +977,7 @@ struct Wake : Module {
 
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
-		wrapEdges = false; respawnDelay = 2; gateMode = 1; ivIdx = 0; scoreWrap = true; view = 1;
+		wrapEdges = false; respawnDelay = 2; gateLen = sfs::PW_50; holdNote = false; ivIdx = 0; scoreWrap = true; scoreLife = true; view = 1;
 		camYaw = 0.f; camElev = WK_ELEV0;
 		for (int c = 0; c < WK_N; c++) cyc[c].div = 1;
 		shapeReq = WK_SQUARE;
@@ -974,13 +991,15 @@ struct Wake : Module {
 		json_object_set_new(r, "shape", json_integer(shape));
 		json_object_set_new(r, "wrap", json_boolean(wrapEdges));
 		json_object_set_new(r, "respawn", json_integer(respawnDelay));
-		json_object_set_new(r, "gateMode", json_integer(gateMode));
+		json_object_set_new(r, "gateLen", json_integer(gateLen));
+		json_object_set_new(r, "holdNote", json_boolean(holdNote));
 		json_object_set_new(r, "view", json_integer(view));
 		json_object_set_new(r, "camYaw", json_real(camYaw));
 		json_object_set_new(r, "camElev", json_real(camElev));
 		sfs::rootCvToJson(r, rootCvMode);
 		json_object_set_new(r, "intervals", json_integer(ivIdx));
 		json_object_set_new(r, "scoreWrap", json_boolean(scoreWrap));
+		json_object_set_new(r, "scoreLife", json_boolean(scoreLife));
 		json_t* dv = json_array();
 		json_t* sc = json_array();
 		for (int c = 0; c < WK_N; c++) {
@@ -996,13 +1015,26 @@ struct Wake : Module {
 		if (json_t* j = json_object_get(r, "shape")) shapeReq = clamp((int)json_integer_value(j), 0, WK_NSHAPE - 1);
 		if (json_t* j = json_object_get(r, "wrap")) wrapEdges = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "respawn")) respawnDelay = clamp((int)json_integer_value(j), 0, 16);
-		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "gateLen")) {
+			gateLen = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
+			json_t* h = json_object_get(r, "holdNote");
+			holdNote = h && json_boolean_value(h);
+		}
+		else if (json_t* j = json_object_get(r, "gateMode")) {
+			static const int MAP[4] = {2, sfs::PW_50, sfs::PW_100, sfs::PW_50};
+			int g = clamp((int)json_integer_value(j), 0, 3);
+			gateLen = MAP[g];
+			holdNote = g == 3;
+		}
 		if (json_t* j = json_object_get(r, "view")) view = clamp((int)json_integer_value(j), 0, 1);
 		if (json_t* j = json_object_get(r, "camYaw")) camYaw = (float)json_number_value(j);
 		if (json_t* j = json_object_get(r, "camElev")) camElev = clamp((float)json_number_value(j), WK_ELEV_MIN, WK_ELEV_MAX);
 		sfs::rootCvFromJson(r, this, ROOT_INPUT, rootCvMode);
 		if (json_t* j = json_object_get(r, "intervals")) ivIdx = clamp((int)json_integer_value(j), 0, WK_NIV - 1);
 		if (json_t* j = json_object_get(r, "scoreWrap")) scoreWrap = json_boolean_value(j);
+		// a patch from before the option kept its score across crashes
+		json_t* sl = json_object_get(r, "scoreLife");
+		scoreLife = sl ? json_boolean_value(sl) : false;
 		if (json_t* a = json_object_get(r, "div"))
 			for (int c = 0; c < WK_N && c < (int)json_array_size(a); c++)
 				cyc[c].div = clamp((int)json_integer_value(json_array_get(a, c)), 1, 4);
@@ -1882,7 +1914,12 @@ struct WakeWidget : ModuleWidget {
 			{"On the next step", "After 1 step", "After 2 steps", "After 4 steps", "After 8 steps"},
 			[=]() { int d = m->respawnDelay; return (size_t)(d <= 0 ? 0 : d == 1 ? 1 : d == 2 ? 2 : d <= 4 ? 3 : 4); },
 			[=](size_t i) { static const int D[5] = {0, 1, 2, 4, 8}; m->respawnDelay = D[i]; }));
-		menu->addChild(createIndexPtrSubmenuItem("Gate and crash length", {"Trigger (5 ms)", "Half a step"}, &m->gateMode));
+		sfs::addPulseWidthMenu(menu, &m->gateLen, "Gate and crash length", true);
+		menu->addChild(createBoolPtrMenuItem("GATE holds until the next note (CRASH lasts a whole step)", "", &m->holdNote));
+		menu->addChild(createIndexSubmenuItem("SCORE counts",
+			{"The current life (0 V after a crash)", "Every life since RESET"},
+			[=]() { return (size_t)(m->scoreLife ? 0 : 1); },
+			[=](size_t i) { m->scoreLife = i == 0; }));
 		menu->addChild(createIndexSubmenuItem("SCORE above 10 V",
 			{"Goes back to 0 V and counts up again", "Stays at 10 V"},
 			[=]() { return (size_t)(m->scoreWrap ? 0 : 1); },

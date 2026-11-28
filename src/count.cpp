@@ -16,6 +16,7 @@
 #include "plugin.hpp"
 #include "panel-style.hpp"
 #include "preview.hpp"
+#include "pulse-width.hpp"
 #include <cmath>
 #include <string>
 #include <vector>
@@ -108,10 +109,24 @@ struct CtMaskQ : ParamQuantity {
 	std::string getDisplayValueString() override { return CT_MASK_NAME[clamp((int)std::round(getValue()), 0, CT_NMASK - 1)]; }
 };
 
+// GATE: a share of the output's own pulse; at the bottom a trigger, at the top
+// the whole pulse less 1 ms
+static const float CT_GATE_TRIG = 0.02f, CT_GATE_FULL = 0.995f;
+struct CtGateQ : ParamQuantity {
+	std::string getDisplayValueString() override {
+		float v = getValue();
+		if (v <= CT_GATE_TRIG) return "Trigger (width in the menu)";
+		if (v >= CT_GATE_FULL) return "100% of the pulse (low for 1 ms before the next)";
+		return string::f("%.0f%% of the pulse", v * 100.f);
+	}
+};
+
 struct Count : Module {
 	enum ParamId { BPM_PARAM, STEPS_PARAM, ENUMS(DIV_PARAM, CT_N), ENUMS(MASK_PARAM, CT_N),
 	               // ── appended 2026-10; do not reorder ──
 	               RUN_PARAM, RESET_PARAM,
+	               // ── appended 2026-11; do not reorder ──
+	               ENUMS(GATE_PARAM, CT_N),
 	               PARAMS_LEN };
 	enum InputId { BPM_INPUT, STEPS_INPUT, CLOCK_INPUT, RESET_INPUT, INPUTS_LEN };
 	enum OutputId { ENUMS(GATE_OUTPUT, CT_N), OUTPUTS_LEN };
@@ -130,10 +145,15 @@ struct Count : Module {
 		dsp::PulseGenerator trig;
 	};
 	Out out[CT_N];
-	// 0 = 5 ms trigger, 1 = half the pulse period. Gates by default (2.22.1):
-	// a gate drives an envelope's sustain and still clocks anything edge-
-	// triggered. Saved patches keep the mode they were saved with.
-	int gateMode = 1;
+	// Gate length is a GATE trimpot per output (appended 2026-11): a share of
+	// that output's own pulse, read off its phase (high while the phase within
+	// its pulse is below the share), so it follows tempo and DIV exactly; fully
+	// right is the pulse less 1 ms. Fully left (CT_GATE_TRIG and below) is a
+	// trigger, whose width is the menu's `trigIdx` (an index into
+	// sfs::PULSE_WIDTHS, 5 ms by default). Half the pulse by default, as Count
+	// has sent since 2.22.1. A patch from before the trimpots has "gateMode"
+	// (0 = 5 ms trigger, 1 = half the pulse) and is set up to match.
+	int trigIdx = 2;
 	// external clock, one pulse per beat
 	dsp::SchmittTrigger clockTrig, resetTrig;
 	double extPeriod = 0.0;                  // seconds between the last two pulses
@@ -166,6 +186,8 @@ struct Count : Module {
 		configInput(RESET_INPUT, "Reset");
 		configSwitch(RUN_PARAM, 0.f, 1.f, 1.f, "Run", {"Stopped", "Running"});
 		configButton(RESET_PARAM, "Reset");
+		for (int i = 0; i < CT_N; i++)
+			configParam<CtGateQ>(GATE_PARAM + i, 0.f, 1.f, 0.5f, string::f("Output %d gate length", i + 1));
 	}
 
 	void reset() {
@@ -219,7 +241,10 @@ struct Count : Module {
 		}
 
 		// ── the outputs ──────────────────────────────────────────────────
+		float trigLen = sfs::pulseWidthSec(trigIdx);
 		for (int i = 0; i < CT_N; i++) {
+			float gv = params[GATE_PARAM + i].getValue();
+			bool trigMode = gv <= CT_GATE_TRIG;
 			Out& o = out[i];
 			int d = clamp((int)std::round(params[DIV_PARAM + i].getValue()), 0, CT_NDIV - 1);
 			int m = clamp((int)std::round(params[MASK_PARAM + i].getValue()), 0, CT_NMASK - 1);
@@ -233,18 +258,28 @@ struct Count : Module {
 				long cyc = (count >= 0) ? count / steps : 0;
 				o.rotNow = (int)(((o.rot + (long)o.rotStep * cyc) % steps + steps) % steps);
 				o.fired = ctPass(m, o.step - o.rotNow, steps);
-				if (o.fired) o.trig.trigger(0.005f);
+				if (o.fired && trigMode) o.trig.trigger(trigLen);
 			}
 			bool high;
-			if (gateMode == 0) high = o.trig.process(dt);
-			else { o.trig.process(dt); high = o.fired && (p - std::floor(p)) < 0.5; }
+			if (trigMode) high = o.trig.process(dt);
+			else {
+				o.trig.process(dt);
+				double share = gv;
+				if (gv >= CT_GATE_FULL) {
+					// low for 1 ms before the next pulse (never below half the pulse)
+					double perOut = 60.0 / ((double)bpmEff * (double)ctRate(d));
+					share = std::max(0.5, 1.0 - (double)sfs::GATE_GAP_SEC / perOut);
+				}
+				high = o.fired && (p - std::floor(p)) < share;
+			}
 			outputs[GATE_OUTPUT + i].setVoltage(high ? 10.f : 0.f);
 		}
 	}
 
 	json_t* dataToJson() override {
 		json_t* r = json_object();
-		json_object_set_new(r, "gateMode", json_integer(gateMode));
+		json_object_set_new(r, "trigWidth", json_integer(trigIdx));
+		json_object_set_new(r, "gateTrims", json_boolean(true));
 		json_object_set_new(r, "resetOnRun", json_boolean(resetOnRun));
 		json_t* rots = json_array();
 		for (int i = 0; i < CT_N; i++) json_array_append_new(rots, json_integer(out[i].rot));
@@ -255,7 +290,19 @@ struct Count : Module {
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
-		if (json_t* j = json_object_get(r, "gateMode")) gateMode = clamp((int)json_integer_value(j), 0, 1);
+		if (json_t* j = json_object_get(r, "trigWidth")) trigIdx = clamp((int)json_integer_value(j), 0, sfs::NUM_FIXED_WIDTHS - 1);
+		// a patch from before the GATE trimpots: set them to what its length was
+		if (!json_object_get(r, "gateTrims")) {
+			float v = 0.5f;
+			if (json_t* j = json_object_get(r, "gateLen")) {          // the menu's index, briefly (2026-11)
+				int idx = clamp((int)json_integer_value(j), 0, sfs::NUM_PULSE_WIDTHS - 1);
+				if (sfs::pulseIsDuty(idx)) v = sfs::PULSE_DUTIES[idx];
+				else { v = 0.f; trigIdx = idx; }
+			} else if (json_t* j = json_object_get(r, "gateMode")) {  // 0 = 5 ms trigger, 1 = half the pulse
+				if (json_integer_value(j) == 0) { v = 0.f; trigIdx = 2; }
+			}
+			for (int i = 0; i < CT_N; i++) params[GATE_PARAM + i].setValue(v);
+		}
 		if (json_t* j = json_object_get(r, "resetOnRun")) resetOnRun = json_boolean_value(j);
 		if (json_t* rots = json_object_get(r, "rot"))
 			for (int i = 0; i < CT_N && i < (int)json_array_size(rots); i++)
@@ -340,13 +387,22 @@ struct CountDisplay : OpaqueWidget {
 static const float CT_X_BTN = 5.12f, CT_X_IN = 13.93f, CT_X_BPM = 24.08f, CT_X_STEPS = 34.24f;
 static const float CT_Y_RUN = 34.24f, CT_Y_CLOCK = 34.33f, CT_Y_KNOB = 34.16f;   // the top row
 static const float CT_Y_RST = 48.21f, CT_Y_CV = 48.29f;                           // the second
-static const float CT_X_DIV = 11.47f, CT_X_MASK = 21.63f, CT_X_OUT = 32.97f;
+// the four columns of the top section (2026-11; DIV, MASK and OUT were 11.47, 21.63, 32.97)
+static const float CT_X_DIV = CT_X_BTN, CT_X_MASK = CT_X_BPM, CT_X_OUT = CT_X_STEPS;
+static const float CT_X_GATE = 0.5f * (CT_X_BTN + CT_X_BPM);   // halfway between DIV and MASK (2026-11)
+static const float CT_Y_HEAD = 58.17f;     // the baseline of the art's DIV / MASK / OUT
 static const float CT_Y_OUT[CT_N] = {63.5f, 75.0f, 86.4f, 97.8f, 109.2f, 120.7f};
 
 struct CountWidget : ModuleWidget {
 	CountWidget(Count* module) {
 		setModule(module);
 		setPanel(sfs::themedPanel("count"));
+		// the art outlines its own labels; GATE came after it, so it is drawn here,
+		// in the same face and size, on the baseline of DIV / MASK / OUT
+		sfs::PanelLabels* lbl = new sfs::PanelLabels();
+		lbl->box.size = box.size;
+		addChild(lbl);
+		lbl->add(CT_X_GATE, CT_Y_HEAD, "GATE");
 
 		CountDisplay* disp = new CountDisplay();
 		disp->module = module;
@@ -365,6 +421,7 @@ struct CountWidget : ModuleWidget {
 		addParam(createParamCentered<VCVButton>(mm2px(Vec(CT_X_BTN, CT_Y_RST)), module, Count::RESET_PARAM));
 
 		for (int i = 0; i < CT_N; i++) {
+			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_GATE, CT_Y_OUT[i])), module, Count::GATE_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_DIV, CT_Y_OUT[i])), module, Count::DIV_PARAM + i));
 			addParam(createParamCentered<Trimpot>(mm2px(Vec(CT_X_MASK, CT_Y_OUT[i])), module, Count::MASK_PARAM + i));
 			addOutput(createOutputCentered<sfs::Jack>(mm2px(Vec(CT_X_OUT, CT_Y_OUT[i])), module, Count::GATE_OUTPUT + i));
@@ -375,7 +432,7 @@ struct CountWidget : ModuleWidget {
 		Count* m = dynamic_cast<Count*>(module);
 		if (!m) return;
 		menu->addChild(new MenuSeparator);
-		menu->addChild(createIndexPtrSubmenuItem("Gate length", {"5 ms trigger", "Half the pulse"}, &m->gateMode));
+		sfs::addPulseWidthMenu(menu, &m->trigIdx, "Trigger width (a GATE trimpot fully left)", false);
 		menu->addChild(createBoolPtrMenuItem("Reset when RUN starts", "", &m->resetOnRun));
 		// ROTATION SHOWS ITS RESULT. A repeating mask rotated by its own
 		// period is unchanged -- Threes by 4, Odd by 2 -- and those are the

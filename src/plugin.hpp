@@ -70,3 +70,4 @@ extern Model* modelPole;
 extern Model* modelGaramut;
 extern Model* modelBattery;
 extern Model* modelWake;
+extern Model* modelDiapason;

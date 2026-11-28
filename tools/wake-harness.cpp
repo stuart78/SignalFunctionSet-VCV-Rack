@@ -266,8 +266,29 @@ int main() {
 		r.clear();
 		r.clock();
 		check(!r.m.cyc[0].alive && !r.m.cyc[1].alive && r.crashes[0] == 1 && r.crashes[1] == 1
-		      && r.m.cyc[0].score == a0 && r.m.cyc[1].score == b0,
-		      "two cycles into one cell both crash, and neither scores");
+		      && r.m.cyc[0].score == 0 && r.m.cyc[1].score == 0,
+		      "two cycles into one cell both crash, and both scores go to 0");
+	}
+	{
+		Rig r;
+		r.only({0, 1});
+		r.m.scoreLife = false;
+		r.style(0, WK_KEYS); r.style(1, WK_KEYS);
+		r.clock();
+		r.m.place(0, 10, 10, WK_DE);
+		r.m.place(1, 12, 10, WK_DW);
+		r.m.cyc[0].score = 100; r.m.cyc[1].score = 200;
+		long a0 = r.m.cyc[0].score, b0 = r.m.cyc[1].score;
+		r.clear();
+		r.clock();
+		check(r.crashes[0] == 1 && r.m.cyc[0].score == a0 && r.m.cyc[1].score == b0,
+		      "counting every life, a crash keeps the score, and a head-on scores neither");
+		json_t* j = r.m.dataToJson();
+		json_object_del(j, "scoreLife");
+		r.m.scoreLife = true;
+		r.m.dataFromJson(j);
+		json_decref(j);
+		check(!r.m.scoreLife, "a patch saved before the option keeps its score across crashes");
 	}
 
 	printf("== trail ==\n");
@@ -343,6 +364,7 @@ int main() {
 			r.only({0});
 			r.style(0, st);
 			r.m.respawnDelay = 0;
+			r.m.scoreLife = false;          // the total over every life, for the average below
 			r.clear();
 			for (int i = 0; i < 6000; i++) r.m.doTick();
 			long cr = r.m.cyc[0].crashes;
@@ -439,6 +461,7 @@ int main() {
 			q.only({0});
 			q.style(0, st);
 			q.m.respawnDelay = 0;
+			q.m.scoreLife = false;          // the total over every life, for the average below
 			for (int i = 0; i < 6000; i++) q.m.doTick();
 			long cr = q.m.cyc[0].crashes;
 			double life = cr ? (double)(q.m.cyc[0].score - q.m.cyc[0].life) / cr : 6000.0;
