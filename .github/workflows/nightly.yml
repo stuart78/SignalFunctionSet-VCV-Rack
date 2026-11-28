@@ -123,6 +123,17 @@ jobs:
           echo "--- nightly identity ---"
           jq '{slug, name, version}' plugin.json
 
+      - name: Point presets at the nightly plugin
+        # Rack refuses a preset whose "plugin" is not the plugin it is loaded
+        # from, so the presets must carry the nightly slug too (build.sh dev does
+        # the same for -dev).
+        run: |
+          if [ -d presets ]; then
+            find presets -name '*.vcvm' -exec sed -i.tmp 's/"plugin": *"SignalFunctionSet"/"plugin": "SignalFunctionSet-nightly"/' {} +
+            find presets -name '*.vcvm.tmp' -delete
+            grep -rh '"plugin"' presets | sort | uniq -c
+          fi
+
       - name: Build
         run: |
           make clean
@@ -179,6 +190,17 @@ jobs:
           ' --arg stamp "-nightly.${{ needs.stamp.outputs.date }}.${{ needs.stamp.outputs.sha }}" \
             plugin.json > plugin.json.tmp && mv plugin.json.tmp plugin.json
           jq '{slug, name, version}' plugin.json
+
+      - name: Point presets at the nightly plugin
+        # Rack refuses a preset whose "plugin" is not the plugin it is loaded
+        # from, so the presets must carry the nightly slug too (build.sh dev does
+        # the same for -dev).
+        run: |
+          if [ -d presets ]; then
+            find presets -name '*.vcvm' -exec sed -i.tmp 's/"plugin": *"SignalFunctionSet"/"plugin": "SignalFunctionSet-nightly"/' {} +
+            find presets -name '*.vcvm.tmp' -delete
+            grep -rh '"plugin"' presets | sort | uniq -c
+          fi
 
       - name: Build
         # Force libgcc + winpthread static so the .dll is self-contained (Rack on
